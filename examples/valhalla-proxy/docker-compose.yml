@@ -1,0 +1,40 @@
+services:
+  valhalla:
+    image: ghcr.io/gis-ops/docker-valhalla/valhalla:latest
+    restart: always
+    ports:
+      - "127.0.0.1:8002:8002"
+    volumes:
+      - valhalla-tiles:/custom_files
+    environment:
+      - tile_urls=https://download.geofabrik.de/europe/united-kingdom-latest.osm.pbf
+      - use_tiles_ignore_pbf=True
+      - build_elevation=False
+      - build_admins=False
+      - build_time_zones=False
+
+  phoenixd:
+    image: ghcr.io/acinq/phoenixd:latest
+    restart: always
+    ports:
+      - "127.0.0.1:9740:9740"
+    volumes:
+      - phoenixd-data:/root/.phoenix
+    command: ["--agree-to-terms-of-service", "--http-bind-ip", "0.0.0.0"]
+
+  routing-proxy:
+    build: .
+    restart: always
+    ports:
+      - "0.0.0.0:3000:3000"
+    env_file: .env
+    volumes:
+      - proxy-data:/data
+    depends_on:
+      - valhalla
+      - phoenixd
+
+volumes:
+  valhalla-tiles:
+  phoenixd-data:
+  proxy-data:

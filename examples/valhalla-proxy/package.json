@@ -1,0 +1,19 @@
+{
+  "name": "valhalla-proxy",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node --loader tsx server.ts",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "lightning-gate": "file:../../",
+    "@hono/node-server": "^1.13.0",
+    "hono": "^4.7.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}
