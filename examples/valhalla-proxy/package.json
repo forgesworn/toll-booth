@@ -8,7 +8,7 @@
     "build": "tsc"
   },
   "dependencies": {
-    "lightning-gate": "file:../../",
+    "toll-booth": "file:../../",
     "@hono/node-server": "^1.13.0",
     "hono": "^4.7.0"
   },

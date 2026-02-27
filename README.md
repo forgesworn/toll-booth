@@ -1,19 +1,19 @@
-# lightning-gate
+# toll-booth
 
 [![MIT licence](https://img.shields.io/badge/licence-MIT-blue.svg)](./package.json)
 
-Generic L402 middleware for gating any HTTP API behind Lightning Network payments. Drop it into a Hono app and your API becomes a paywall in minutes.
+Drop-in L402 middleware — your API becomes a toll booth in minutes.
 
 ## Quick start
 
 ```ts
 import { Hono } from 'hono'
-import { lightningGate } from 'lightning-gate'
-import { phoenixdBackend } from 'lightning-gate/backends/phoenixd'
+import { tollBooth } from 'toll-booth'
+import { phoenixdBackend } from 'toll-booth/backends/phoenixd'
 
 const app = new Hono()
 
-const gate = lightningGate({
+const booth = tollBooth({
   backend: phoenixdBackend({ url: 'http://localhost:9740', password: 'your-password' }),
   pricing: {
     '/route': 2,
@@ -24,7 +24,7 @@ const gate = lightningGate({
   upstream: 'http://localhost:8002',
 })
 
-app.use('/api/*', gate)
+app.use('/api/*', booth)
 ```
 
 ## Payment flow
@@ -50,8 +50,8 @@ Each IP address gets a configurable number of free requests per day — no signu
 
 ## Reference deployment
 
-See [`examples/valhalla-proxy/`](./examples/valhalla-proxy/) for a complete Docker Compose setup that gates a [Valhalla](https://github.com/valhalla/valhalla) routing engine behind lightning-gate.
+See [`examples/valhalla-proxy/`](./examples/valhalla-proxy/) for a complete Docker Compose setup that gates a [Valhalla](https://github.com/valhalla/valhalla) routing engine behind toll-booth.
 
 ## Protocol
 
-lightning-gate implements the [L402 protocol](https://docs.lightning.engineering/the-lightning-network/l402) — HTTP 402 Payment Required combined with the Lightning Network for machine-payable APIs.
+toll-booth implements the [L402 protocol](https://docs.lightning.engineering/the-lightning-network/l402) — HTTP 402 Payment Required combined with the Lightning Network for machine-payable APIs.

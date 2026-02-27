@@ -1,8 +1,8 @@
 {
-  "name": "lightning-gate",
+  "name": "toll-booth",
   "version": "0.1.0",
   "type": "module",
-  "description": "Generic L402 Lightning payment middleware for gating any HTTP API",
+  "description": "Drop-in L402 middleware — your API becomes a toll booth in minutes",
   "license": "MIT",
   "exports": {
     ".": {

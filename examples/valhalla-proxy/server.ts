@@ -1,12 +1,12 @@
 // examples/valhalla-proxy/server.ts
 import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
-import { lightningGate } from 'lightning-gate'
-import { phoenixdBackend } from 'lightning-gate/backends/phoenixd'
+import { tollBooth } from 'toll-booth'
+import { phoenixdBackend } from 'toll-booth/backends/phoenixd'
 
 const app = new Hono()
 
-const gate = lightningGate({
+const booth = tollBooth({
   backend: phoenixdBackend({
     url: process.env.PHOENIXD_URL ?? 'http://localhost:9740',
     password: process.env.PHOENIXD_PASSWORD ?? '',
@@ -31,7 +31,7 @@ const gate = lightningGate({
   },
 })
 
-app.use('/*', gate)
+app.use('/*', booth)
 
 const port = parseInt(process.env.PORT ?? '3000', 10)
 serve({ fetch: app.fetch, port }, () => {
