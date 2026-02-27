@@ -4,9 +4,9 @@ import type { GateConfig, PaymentEvent, RequestEvent } from './types.js'
 import { mintMacaroon, verifyMacaroon } from './macaroon.js'
 import { FreeTier } from './free-tier.js'
 import { CreditMeter } from './meter.js'
-import { randomBytes } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 
-type EventHandler = {
+export type EventHandler = {
   onPayment?: (event: PaymentEvent) => void
   onRequest?: (event: RequestEvent) => void
 }
@@ -31,8 +31,13 @@ export function lightningGate(config: GateConfig & EventHandler): MiddlewareHand
     // Check for L402 Authorisation header
     const authHeader = c.req.header('Authorization')
     if (authHeader?.startsWith('L402 ')) {
-      const result = handleL402Auth(authHeader, rootKey, meter, cost)
+      const result = handleL402Auth(authHeader, rootKey, meter, cost, defaultAmount)
       if (result.authorised) {
+        config.onPayment?.({
+          timestamp: new Date().toISOString(),
+          paymentHash: result.paymentHash!,
+          amountSats: cost,
+        })
         config.onRequest?.({
           timestamp: new Date().toISOString(),
           endpoint: path,
@@ -48,6 +53,8 @@ export function lightningGate(config: GateConfig & EventHandler): MiddlewareHand
 
     // Check free tier
     if (freeTier) {
+      // Note: X-Forwarded-For must be set by a trusted reverse proxy.
+      // Deploy behind nginx/Caddy that overwrites this header.
       const ip = c.req.header('X-Forwarded-For')?.split(',')[0]?.trim() ?? '127.0.0.1'
       const check = freeTier.check(ip)
       if (check.allowed) {
@@ -63,15 +70,13 @@ export function lightningGate(config: GateConfig & EventHandler): MiddlewareHand
       }
     }
 
-    // Issue L402 challenge
+    // Issue L402 challenge — credit is NOT stored yet.
+    // Credit is only granted when the client presents a valid preimage.
     const invoice = await config.backend.createInvoice(
       defaultAmount,
       `lightning-gate: ${defaultAmount} sats credit`,
     )
     const macaroon = mintMacaroon(rootKey, invoice.paymentHash, defaultAmount)
-
-    // Store pending credit (will be consumed when the client presents valid credentials)
-    meter.credit(invoice.paymentHash, defaultAmount)
 
     c.header('WWW-Authenticate', `L402 macaroon="${macaroon}", invoice="${invoice.bolt11}"`)
     c.header('X-Coverage', 'GB')
@@ -87,7 +92,8 @@ function handleL402Auth(
   rootKey: string,
   meter: CreditMeter,
   cost: number,
-): { authorised: boolean; remaining: number } {
+  defaultAmount: number,
+): { authorised: boolean; remaining: number; paymentHash?: string } {
   try {
     // Format: L402 <macaroon>:<preimage>
     const token = authHeader.slice(5) // Remove "L402 "
@@ -95,15 +101,27 @@ function handleL402Auth(
     if (colonIdx === -1) return { authorised: false, remaining: 0 }
 
     const macaroonBase64 = token.slice(0, colonIdx)
+    const preimage = token.slice(colonIdx + 1)
 
     const result = verifyMacaroon(rootKey, macaroonBase64)
     if (!result.valid || !result.paymentHash) return { authorised: false, remaining: 0 }
+
+    // Verify the preimage is proof of payment: sha256(preimage) must equal payment_hash
+    const computedHash = createHash('sha256')
+      .update(Buffer.from(preimage, 'hex'))
+      .digest('hex')
+    if (computedHash !== result.paymentHash) return { authorised: false, remaining: 0 }
+
+    // Credit on first valid presentation of preimage (idempotent via upsert)
+    if (meter.balance(result.paymentHash) === 0) {
+      meter.credit(result.paymentHash, result.creditBalance ?? defaultAmount)
+    }
 
     // Debit credit for this request
     const debit = meter.debit(result.paymentHash, cost)
     if (!debit.success) return { authorised: false, remaining: debit.remaining }
 
-    return { authorised: true, remaining: debit.remaining }
+    return { authorised: true, remaining: debit.remaining, paymentHash: result.paymentHash }
   } catch {
     return { authorised: false, remaining: 0 }
   }
@@ -124,6 +142,7 @@ async function proxyUpstream(c: Context, upstream: string): Promise<Response> {
       body: c.req.method !== 'GET' && c.req.method !== 'HEAD' ? c.req.raw.body : undefined,
       // @ts-expect-error duplex is required for streaming request body
       duplex: 'half',
+      signal: AbortSignal.timeout(30_000),
     })
 
     const responseHeaders = new Headers(res.headers)
