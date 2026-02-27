@@ -1,0 +1,61 @@
+import type { LightningBackend, Invoice, InvoiceStatus } from '../types.js'
+
+export interface PhoenixdConfig {
+  url: string
+  password: string
+}
+
+/**
+ * Lightning backend adapter for Phoenixd's HTTP API.
+ *
+ * Phoenixd uses HTTP Basic auth with an empty username — the Authorization
+ * header encodes `:password` (note the leading colon) in base64.
+ * The createinvoice endpoint expects an `application/x-www-form-urlencoded`
+ * POST body, not JSON.
+ *
+ * @see https://phoenix.acinq.co/server/api
+ */
+export function phoenixdBackend(config: PhoenixdConfig): LightningBackend {
+  const baseUrl = config.url.replace(/\/$/, '')
+  const authHeader = 'Basic ' + Buffer.from(`:${config.password}`).toString('base64')
+
+  return {
+    async createInvoice(amountSats: number, memo?: string): Promise<Invoice> {
+      const body = new URLSearchParams()
+      body.set('amountSat', String(amountSats))
+      if (memo) body.set('description', memo)
+      body.set('externalId', '')
+
+      const res = await fetch(`${baseUrl}/createinvoice`, {
+        method: 'POST',
+        headers: {
+          'Authorization': authHeader,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body,
+      })
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => '')
+        throw new Error(`Phoenixd createinvoice failed (${res.status}): ${text}`)
+      }
+
+      const data = await res.json() as { paymentHash: string; serialized: string }
+      return { bolt11: data.serialized, paymentHash: data.paymentHash }
+    },
+
+    async checkInvoice(paymentHash: string): Promise<InvoiceStatus> {
+      const res = await fetch(`${baseUrl}/payments/incoming/${paymentHash}`, {
+        headers: { 'Authorization': authHeader },
+      })
+
+      if (!res.ok) return { paid: false }
+
+      const data = await res.json() as { isPaid: boolean; preimage?: string }
+      return {
+        paid: data.isPaid,
+        preimage: data.isPaid ? data.preimage : undefined,
+      }
+    },
+  }
+}
