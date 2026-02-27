@@ -1,6 +1,6 @@
 // src/middleware.ts
 import type { Context, MiddlewareHandler } from 'hono'
-import type { GateConfig, PaymentEvent, RequestEvent } from './types.js'
+import type { BoothConfig, PaymentEvent, RequestEvent } from './types.js'
 import { mintMacaroon, verifyMacaroon } from './macaroon.js'
 import { FreeTier } from './free-tier.js'
 import { CreditMeter } from './meter.js'
@@ -11,7 +11,7 @@ export type EventHandler = {
   onRequest?: (event: RequestEvent) => void
 }
 
-export function lightningGate(config: GateConfig & EventHandler): MiddlewareHandler {
+export function tollBooth(config: BoothConfig & EventHandler): MiddlewareHandler {
   const rootKey = config.rootKey ?? randomBytes(32).toString('hex')
   const defaultAmount = config.defaultInvoiceAmount ?? 1000
   const meter = new CreditMeter(config.dbPath ?? ':memory:')
@@ -77,7 +77,7 @@ export function lightningGate(config: GateConfig & EventHandler): MiddlewareHand
     // Credit is only granted when the client presents a valid preimage.
     const invoice = await config.backend.createInvoice(
       defaultAmount,
-      `lightning-gate: ${defaultAmount} sats credit`,
+      `toll-booth: ${defaultAmount} sats credit`,
     )
     const macaroon = mintMacaroon(rootKey, invoice.paymentHash, defaultAmount)
 

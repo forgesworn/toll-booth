@@ -1,5 +1,5 @@
 // src/index.ts
-export { lightningGate } from './middleware.js'
+export { tollBooth } from './middleware.js'
 export type { EventHandler } from './middleware.js'
 export { mintMacaroon, verifyMacaroon, parseCaveats } from './macaroon.js'
 export { CreditMeter } from './meter.js'
@@ -10,7 +10,7 @@ export type {
   Invoice,
   InvoiceStatus,
   PricingTable,
-  GateConfig,
+  BoothConfig,
   PaymentEvent,
   RequestEvent,
 } from './types.js'

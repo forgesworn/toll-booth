@@ -1,6 +1,6 @@
 import { newMacaroon, importMacaroon } from 'macaroon'
 
-const LOCATION = 'lightning-gate'
+const LOCATION = 'toll-booth'
 
 /**
  * Mints a new macaroon encoding a payment hash and credit balance.

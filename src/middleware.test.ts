@@ -2,7 +2,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { createHash } from 'node:crypto'
 import { Hono } from 'hono'
-import { lightningGate } from './middleware.js'
+import { tollBooth } from './middleware.js'
 import { mintMacaroon } from './macaroon.js'
 import type { LightningBackend } from './types.js'
 
@@ -20,7 +20,7 @@ function mockBackend(): LightningBackend {
 
 function createApp(backend: LightningBackend, overrides?: Record<string, unknown>) {
   const app = new Hono()
-  const gate = lightningGate({
+  const booth = tollBooth({
     backend,
     pricing: { '/route': 2, '/isochrone': 5 },
     upstream: 'http://localhost:8002',
@@ -29,7 +29,7 @@ function createApp(backend: LightningBackend, overrides?: Record<string, unknown
     dbPath: ':memory:',
     ...overrides,
   })
-  app.use('/*', gate)
+  app.use('/*', booth)
   return app
 }
 
@@ -47,7 +47,7 @@ function makePreimageAndHash(): { preimage: string; paymentHash: string } {
   return { preimage, paymentHash }
 }
 
-describe('lightningGate middleware', () => {
+describe('tollBooth middleware', () => {
   describe('free tier', () => {
     it('serves requests within free tier limit', async () => {
       const app = createApp(mockBackend())

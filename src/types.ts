@@ -1,7 +1,7 @@
 /**
- * Core type definitions for lightning-gate.
+ * Core type definitions for toll-booth.
  *
- * lightning-gate is a generic L402 Lightning payment middleware for gating
+ * toll-booth is a generic L402 Lightning payment middleware for gating
  * any HTTP API behind a Lightning Network paywall.
  */
 
@@ -57,9 +57,9 @@ export interface LightningBackend {
 export type PricingTable = Record<string, number>
 
 /**
- * Configuration for a lightning-gate instance.
+ * Configuration for a toll-booth instance.
  */
-export interface GateConfig {
+export interface BoothConfig {
   /** The Lightning backend to use for invoice creation and status checks. */
   backend: LightningBackend
 
@@ -94,7 +94,7 @@ export interface GateConfig {
 
   /**
    * Path to the SQLite database file used for invoice persistence.
-   * Defaults to `lightning-gate.db` in the current working directory.
+   * Defaults to `toll-booth.db` in the current working directory.
    */
   dbPath?: string
 }
