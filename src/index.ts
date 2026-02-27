@@ -5,7 +5,6 @@ export type {
   LightningBackend,
   PricingTable,
   GateConfig,
-  FreeTierConfig,
   PaymentEvent,
   RequestEvent,
 } from './types.js'

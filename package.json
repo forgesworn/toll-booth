@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "type": "module",
   "description": "Generic L402 Lightning payment middleware for gating any HTTP API",
-  "licence": "MIT",
+  "license": "MIT",
   "exports": {
     ".": {
       "import": "./dist/index.js",
