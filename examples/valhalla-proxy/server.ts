@@ -14,7 +14,7 @@ const backend = phoenixdBackend({
 
 app.use('/*', cors({
   origin: '*',
-  exposeHeaders: ['WWW-Authenticate', 'X-Coverage', 'X-Credit-Balance'],
+  exposeHeaders: ['WWW-Authenticate', 'X-Coverage', 'X-Credit-Balance', 'X-Free-Remaining'],
 }))
 
 app.get('/invoice-status/:paymentHash', invoiceStatus(backend))

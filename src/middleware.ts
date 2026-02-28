@@ -69,7 +69,7 @@ export function tollBooth(config: BoothConfig & EventHandler): MiddlewareHandler
           latencyMs: Date.now() - start,
           authenticated: false,
         })
-        return proxyUpstream(c, upstream)
+        return proxyUpstream(c, upstream, undefined, check.remaining)
       }
     }
 
@@ -139,7 +139,7 @@ function handleL402Auth(
   }
 }
 
-async function proxyUpstream(c: Context, upstream: string, creditBalance?: number): Promise<Response> {
+async function proxyUpstream(c: Context, upstream: string, creditBalance?: number, freeRemaining?: number): Promise<Response> {
   const url = new URL(c.req.url)
   const targetUrl = `${upstream}${url.pathname}${url.search}`
 
@@ -161,6 +161,9 @@ async function proxyUpstream(c: Context, upstream: string, creditBalance?: numbe
     responseHeaders.set('X-Coverage', 'GB')
     if (creditBalance !== undefined) {
       responseHeaders.set('X-Credit-Balance', String(creditBalance))
+    }
+    if (freeRemaining !== undefined) {
+      responseHeaders.set('X-Free-Remaining', String(freeRemaining))
     }
 
     return new Response(res.body, {
