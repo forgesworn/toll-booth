@@ -10,7 +10,11 @@ import type { LightningBackend } from './types.js'
 export function invoiceStatus(backend: LightningBackend) {
   return async (c: Context) => {
     const hash = c.req.param('paymentHash')
-    const status = await backend.checkInvoice(hash)
-    return c.json(status)
+    try {
+      const status = await backend.checkInvoice(hash)
+      return c.json(status)
+    } catch {
+      return c.json({ error: 'Failed to check invoice status' }, 502)
+    }
   }
 }

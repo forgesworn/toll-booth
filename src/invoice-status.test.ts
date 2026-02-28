@@ -40,4 +40,15 @@ describe('invoiceStatus', () => {
     expect(await res.json()).toEqual({ paid: true, preimage: 'deadbeef' })
     expect(backend.checkInvoice).toHaveBeenCalledWith('def456')
   })
+
+  it('returns 502 when backend throws', async () => {
+    const backend = mockBackend()
+    vi.mocked(backend.checkInvoice).mockRejectedValue(new Error('connection refused'))
+
+    const app = createApp(backend)
+    const res = await app.request('/invoice-status/ghi789')
+
+    expect(res.status).toBe(502)
+    expect(await res.json()).toEqual({ error: 'Failed to check invoice status' })
+  })
 })
