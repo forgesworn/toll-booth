@@ -19,7 +19,7 @@ export interface PaymentPageErrorData {
 
 export async function renderPaymentPage(data: PaymentPageData): Promise<string> {
   const { invoice, paid, preimage, tiers, nwcEnabled, cashuEnabled } = data
-  const qrSvg = await QRCode.toString(invoice.bolt11.toUpperCase(), { type: 'svg', margin: 2 })
+  const qrSvg = await QRCode.toString(`lightning:${invoice.bolt11}`.toUpperCase(), { type: 'svg', margin: 2 })
 
   return `<!DOCTYPE html>
 <html lang="en">
