@@ -1,9 +1,11 @@
 // src/middleware.test.ts
 import { describe, it, expect, vi } from 'vitest'
 import { createHash } from 'node:crypto'
+import Database from 'better-sqlite3'
 import { Hono } from 'hono'
 import { tollBooth } from './middleware.js'
 import { mintMacaroon } from './macaroon.js'
+import { InvoiceStore } from './invoice-store.js'
 import type { LightningBackend } from './types.js'
 
 const ROOT_KEY = 'a'.repeat(64)
@@ -31,13 +33,6 @@ function createApp(backend: LightningBackend, overrides?: Record<string, unknown
   })
   app.use('/*', booth)
   return app
-}
-
-/** Generate a preimage whose SHA-256 equals the given hash. For tests only. */
-function preimageForHash(hash: string): string {
-  // We can't reverse SHA-256, so instead we create a known preimage first
-  // and derive the hash from it. Used in tests below.
-  return hash // placeholder — see makePreimageAndHash below
 }
 
 /** Create a matching preimage + paymentHash pair for test use. */
@@ -188,6 +183,46 @@ describe('tollBooth middleware', () => {
       const app = createApp(mockBackend())
       const res = await app.request('/route', { method: 'POST' })
       expect(res.headers.get('X-Coverage')).toBeTruthy()
+    })
+  })
+
+  describe('invoice storage', () => {
+    it('stores invoice details on 402 when InvoiceStore is provided', async () => {
+      const db = new Database(':memory:')
+      db.pragma('journal_mode = WAL')
+      const invoiceStore = new InvoiceStore(db)
+
+      const backend = mockBackend()
+      const app = new Hono()
+      const booth = tollBooth({
+        backend,
+        pricing: { '/route': 2 },
+        upstream: 'http://localhost:8002',
+        rootKey: ROOT_KEY,
+        dbPath: ':memory:',
+        _invoiceStore: invoiceStore,
+      })
+      app.use('/*', booth)
+
+      const res = await app.request('/route', { method: 'POST' })
+      expect(res.status).toBe(402)
+
+      const body = await res.json()
+      const stored = invoiceStore.get(body.payment_hash)
+      expect(stored).toBeDefined()
+      expect(stored!.bolt11).toBe('lnbc100n1mock...')
+      expect(stored!.amountSats).toBe(1000)
+    })
+
+    it('includes payment_url in 402 response body', async () => {
+      const backend = mockBackend()
+      const app = createApp(backend, { freeTier: undefined })
+
+      const res = await app.request('/route', { method: 'POST' })
+      expect(res.status).toBe(402)
+
+      const body = await res.json()
+      expect(body.payment_url).toBe(`/invoice-status/${'b'.repeat(64)}`)
     })
   })
 })

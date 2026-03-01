@@ -49,12 +49,27 @@ export interface LightningBackend {
 }
 
 /**
- * Pricing table mapping route patterns to amounts in millisatoshis.
+ * Pricing table mapping route patterns to amounts in satoshis.
  *
- * Keys are route patterns (e.g. `"GET /api/resource"`) and values are the
- * required payment amount in millisatoshis.
+ * Keys are route patterns (e.g. `"/route"`) and values are the
+ * required payment amount in satoshis.
  */
 export type PricingTable = Record<string, number>
+
+/**
+ * A credit tier offering volume discounts.
+ *
+ * The `amountSats` is what the user pays; `creditSats` is what they receive.
+ * When `creditSats > amountSats`, the difference is the volume discount.
+ */
+export interface CreditTier {
+  /** Amount the user pays in satoshis. */
+  amountSats: number
+  /** Credits received in satoshis (may exceed amountSats for volume discounts). */
+  creditSats: number
+  /** Human-readable label for this tier. */
+  label: string
+}
 
 /**
  * Configuration for a toll-booth instance.
@@ -64,7 +79,7 @@ export interface BoothConfig {
   backend: LightningBackend
 
   /**
-   * Pricing table mapping route patterns to amounts in millisatoshis.
+   * Pricing table mapping route patterns to amounts in satoshis.
    * Routes not listed here use `defaultInvoiceAmount` if set.
    */
   pricing: PricingTable
@@ -79,7 +94,7 @@ export interface BoothConfig {
   freeTier?: { requestsPerDay: number }
 
   /**
-   * Default invoice amount in millisatoshis, used when a route is not
+   * Default invoice amount in satoshis, used when a route is not
    * listed in the pricing table. Required if any routes are not priced.
    */
   defaultInvoiceAmount?: number
@@ -97,6 +112,26 @@ export interface BoothConfig {
    * Defaults to `toll-booth.db` in the current working directory.
    */
   dbPath?: string
+
+  /**
+   * Credit tiers with optional volume discounts.
+   * Used by the payment page tier selector and the `/create-invoice` endpoint.
+   */
+  creditTiers?: CreditTier[]
+
+  /**
+   * Pay a Lightning invoice via Nostr Wallet Connect.
+   * Accepts NWC URI + bolt11, returns the payment preimage.
+   * When provided, the payment page shows an NWC option.
+   */
+  nwcPayInvoice?: (nwcUri: string, bolt11: string) => Promise<string>
+
+  /**
+   * Redeem a Cashu token as payment.
+   * Returns the credited amount in satoshis.
+   * When provided, the payment page shows a Cashu option.
+   */
+  redeemCashu?: (token: string, paymentHash: string) => Promise<number>
 }
 
 /**

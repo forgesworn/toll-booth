@@ -1,12 +1,15 @@
 // src/meter.test.ts
 import { describe, it, expect, beforeEach } from 'vitest'
+import Database from 'better-sqlite3'
 import { CreditMeter } from './meter.js'
 
 describe('CreditMeter', () => {
   let meter: CreditMeter
 
   beforeEach(() => {
-    meter = new CreditMeter(':memory:')
+    const db = new Database(':memory:')
+    db.pragma('journal_mode = WAL')
+    meter = new CreditMeter(db)
   })
 
   describe('credit', () => {

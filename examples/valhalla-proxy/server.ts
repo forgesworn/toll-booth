@@ -2,7 +2,7 @@
 import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
-import { tollBooth, invoiceStatus } from 'toll-booth'
+import { Booth } from 'toll-booth'
 import { phoenixdBackend } from 'toll-booth/backends/phoenixd'
 
 const app = new Hono()
@@ -17,9 +17,7 @@ app.use('/*', cors({
   exposeHeaders: ['WWW-Authenticate', 'X-Coverage', 'X-Credit-Balance', 'X-Free-Remaining'],
 }))
 
-app.get('/invoice-status/:paymentHash', invoiceStatus(backend))
-
-const booth = tollBooth({
+const booth = new Booth({
   backend,
   pricing: {
     '/route': 2,
@@ -32,6 +30,11 @@ const booth = tollBooth({
   upstream: process.env.VALHALLA_URL ?? 'http://localhost:8002',
   defaultInvoiceAmount: parseInt(process.env.DEFAULT_INVOICE_SATS ?? '1000', 10),
   dbPath: process.env.DB_PATH ?? './credits.db',
+  creditTiers: [
+    { amountSats: 1_000,   creditSats: 1_000,   label: 'Starter' },
+    { amountSats: 10_000,  creditSats: 11_100,  label: 'Pro' },
+    { amountSats: 100_000, creditSats: 125_000, label: 'Business' },
+  ],
   onPayment: (event) => {
     console.log(`[payment] ${event.amountSats} sats | hash: ${event.paymentHash}`)
   },
@@ -41,7 +44,9 @@ const booth = tollBooth({
   },
 })
 
-app.use('/*', booth)
+app.get('/invoice-status/:paymentHash', booth.invoiceStatusHandler)
+app.post('/create-invoice', booth.createInvoiceHandler)
+app.use('/*', booth.middleware)
 
 const port = parseInt(process.env.PORT ?? '3000', 10)
 serve({ fetch: app.fetch, port }, () => {

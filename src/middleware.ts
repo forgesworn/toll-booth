@@ -4,17 +4,33 @@ import type { BoothConfig, PaymentEvent, RequestEvent } from './types.js'
 import { mintMacaroon, verifyMacaroon } from './macaroon.js'
 import { FreeTier } from './free-tier.js'
 import { CreditMeter } from './meter.js'
+import type { InvoiceStore } from './invoice-store.js'
 import { createHash, randomBytes } from 'node:crypto'
+import Database from 'better-sqlite3'
 
 export type EventHandler = {
   onPayment?: (event: PaymentEvent) => void
   onRequest?: (event: RequestEvent) => void
 }
 
-export function tollBooth(config: BoothConfig & EventHandler): MiddlewareHandler {
-  const rootKey = config.rootKey ?? randomBytes(32).toString('hex')
+export interface MiddlewareInternals {
+  _invoiceStore?: InvoiceStore
+  _meter?: CreditMeter
+  _rootKey?: string
+}
+
+export function tollBooth(config: BoothConfig & EventHandler & MiddlewareInternals): MiddlewareHandler {
+  const rootKey = config._rootKey ?? config.rootKey ?? randomBytes(32).toString('hex')
   const defaultAmount = config.defaultInvoiceAmount ?? 1000
-  const meter = new CreditMeter(config.dbPath ?? ':memory:')
+  let meter: CreditMeter
+  if (config._meter) {
+    meter = config._meter
+  } else {
+    const db = new Database(config.dbPath ?? ':memory:')
+    db.pragma('journal_mode = WAL')
+    meter = new CreditMeter(db)
+  }
+  const invoiceStore = config._invoiceStore
   const freeTier = config.freeTier ? new FreeTier(config.freeTier.requestsPerDay) : null
   const upstream = config.upstream.replace(/\/$/, '')
 
@@ -81,6 +97,9 @@ export function tollBooth(config: BoothConfig & EventHandler): MiddlewareHandler
     )
     const macaroon = mintMacaroon(rootKey, invoice.paymentHash, defaultAmount)
 
+    // Store invoice details for the payment page
+    invoiceStore?.store(invoice.paymentHash, invoice.bolt11, defaultAmount, macaroon)
+
     c.header('WWW-Authenticate', `L402 macaroon="${macaroon}", invoice="${invoice.bolt11}"`)
     c.header('X-Coverage', 'GB')
     return c.json(
@@ -89,6 +108,7 @@ export function tollBooth(config: BoothConfig & EventHandler): MiddlewareHandler
         invoice: invoice.bolt11,
         macaroon,
         payment_hash: invoice.paymentHash,
+        payment_url: `/invoice-status/${invoice.paymentHash}`,
         amount_sats: defaultAmount,
       },
       402,

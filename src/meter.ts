@@ -1,5 +1,5 @@
 // src/meter.ts
-import Database from 'better-sqlite3'
+import type Database from 'better-sqlite3'
 
 export interface DebitResult {
   success: boolean
@@ -12,9 +12,8 @@ export class CreditMeter {
   private readonly stmtDebit: Database.Statement
   private readonly stmtBalance: Database.Statement
 
-  constructor(dbPath: string) {
-    this.db = new Database(dbPath)
-    this.db.pragma('journal_mode = WAL')
+  constructor(db: Database.Database) {
+    this.db = db
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS credits (
         payment_hash TEXT PRIMARY KEY,
