@@ -5,3 +5,4 @@ dist/
 valhalla-tiles/
 .env
 .env.*
+.worktrees/
