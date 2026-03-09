@@ -1,6 +1,6 @@
 // src/booth.ts
 import type { Context } from 'hono'
-import type { BoothConfig } from './types.js'
+import type { BoothConfig, LightningBackend } from './types.js'
 import type { EventHandler } from './middleware.js'
 import { tollBooth } from './middleware.js'
 import { FreeTier } from './free-tier.js'
@@ -38,6 +38,7 @@ export class Booth {
   readonly stats: StatsCollector
 
   private readonly db: Database.Database
+  private readonly backend: LightningBackend
   private readonly meter: CreditMeter
   private readonly invoiceStore: InvoiceStore
   private readonly rootKey: string
@@ -58,6 +59,7 @@ export class Booth {
       )
     }
     this.rootKey = config.rootKey ?? randomBytes(32).toString('hex')
+    this.backend = config.backend
     this.db = new Database(config.dbPath ?? './toll-booth.db')
     this.db.pragma('journal_mode = WAL')
     this.meter = new CreditMeter(this.db)
@@ -248,17 +250,27 @@ export class Booth {
    */
   healthHandler = async (c: Context): Promise<Response> => {
     const dbOk = this.checkDatabase()
-    const status = dbOk ? 'healthy' : 'degraded'
-    const code = dbOk ? 200 : 503
+    const lnOk = await this.checkLightning()
+    const allOk = dbOk && lnOk
     return c.json({
-      status,
+      status: allOk ? 'healthy' : 'degraded',
       upSince: this.stats.snapshot().upSince,
       database: dbOk ? 'ok' : 'unreachable',
-    }, code)
+      lightning: lnOk ? 'ok' : 'unreachable',
+    }, allOk ? 200 : 503)
   }
 
   close(): void {
     this.db.close()
+  }
+
+  private async checkLightning(): Promise<boolean> {
+    try {
+      await this.backend.checkInvoice('0'.repeat(64))
+      return true
+    } catch {
+      return false
+    }
   }
 
   private checkDatabase(): boolean {

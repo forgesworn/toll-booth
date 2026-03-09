@@ -572,6 +572,33 @@ describe('Booth', () => {
       expect(body.database).toBe('unreachable')
     })
 
+    it('reports degraded when Lightning backend is unreachable', async () => {
+      const { app, booth, backend } = setup()
+      vi.mocked(backend.checkInvoice).mockRejectedValue(new Error('Connection refused'))
+
+      const res = await app.request('/health')
+      expect(res.status).toBe(503)
+      const body = await res.json()
+      expect(body.status).toBe('degraded')
+      expect(body.lightning).toBe('unreachable')
+      expect(body.database).toBe('ok')
+
+      booth.close()
+    })
+
+    it('reports healthy with lightning field when both services are ok', async () => {
+      const { app, booth, backend } = setup()
+      vi.mocked(backend.checkInvoice).mockResolvedValue({ paid: false })
+
+      const res = await app.request('/health')
+      expect(res.status).toBe(200)
+      const body = await res.json()
+      expect(body.lightning).toBe('ok')
+      expect(body.database).toBe('ok')
+
+      booth.close()
+    })
+
     it('requires no authentication', async () => {
       const { app, booth } = setup({ adminToken: 'secret-token' })
 
