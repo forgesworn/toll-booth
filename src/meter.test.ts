@@ -23,6 +23,20 @@ describe('CreditMeter', () => {
       meter.credit('abc123', 300)
       expect(meter.balance('abc123')).toBe(800)
     })
+
+    it('credits an invoice only once with creditOnce', () => {
+      expect(meter.creditOnce('hash1', 1000)).toBe(true)
+      expect(meter.creditOnce('hash1', 1000)).toBe(false)
+      expect(meter.balance('hash1')).toBe(1000)
+    })
+
+    it('does not re-credit after balance reaches zero', () => {
+      expect(meter.creditOnce('hash2', 5)).toBe(true)
+      expect(meter.debit('hash2', 5).success).toBe(true)
+      expect(meter.balance('hash2')).toBe(0)
+      expect(meter.creditOnce('hash2', 5)).toBe(false)
+      expect(meter.balance('hash2')).toBe(0)
+    })
   })
 
   describe('debit', () => {

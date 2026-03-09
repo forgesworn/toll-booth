@@ -41,14 +41,18 @@ export class Booth {
   private readonly invoiceStore: InvoiceStore
   private readonly rootKey: string
   private readonly freeTier: FreeTier | null
+  private readonly trustProxy: boolean
+  private readonly adminToken?: string
 
   constructor(config: BoothConfig & EventHandler) {
     this.rootKey = config.rootKey ?? randomBytes(32).toString('hex')
-    this.db = new Database(config.dbPath ?? ':memory:')
+    this.db = new Database(config.dbPath ?? './toll-booth.db')
     this.db.pragma('journal_mode = WAL')
     this.meter = new CreditMeter(this.db)
     this.invoiceStore = new InvoiceStore(this.db)
     this.stats = new StatsCollector()
+    this.trustProxy = config.trustProxy ?? false
+    this.adminToken = config.adminToken
 
     const defaultAmount = config.defaultInvoiceAmount ?? 1000
     this.freeTier = config.freeTier ? new FreeTier(config.freeTier.requestsPerDay) : null
@@ -78,6 +82,7 @@ export class Booth {
       _invoiceStore: this.invoiceStore,
       _rootKey: this.rootKey,
       _freeTier: this.freeTier,
+      trustProxy: this.trustProxy,
     })
 
     // Invoice status with content negotiation and HTML payment page
@@ -143,9 +148,8 @@ export class Booth {
    * Restricted to localhost — returns 403 for requests from other IPs.
    */
   statsHandler = async (c: Context): Promise<Response> => {
-    const forwarded = c.req.header('X-Forwarded-For')?.split(',')[0]?.trim()
-    if (forwarded && !isLoopback(forwarded)) {
-      return c.json({ error: 'Stats only available from localhost' }, 403)
+    if (!this.isAuthorisedAdmin(c)) {
+      return c.json({ error: this.adminErrorMessage() }, 403)
     }
     return c.json(this.stats.snapshot())
   }
@@ -160,9 +164,8 @@ export class Booth {
    * Restricted to localhost — returns 403 for requests from other IPs.
    */
   resetFreeTierHandler = async (c: Context): Promise<Response> => {
-    const forwarded = c.req.header('X-Forwarded-For')?.split(',')[0]?.trim()
-    if (forwarded && !isLoopback(forwarded)) {
-      return c.json({ error: 'Admin only available from localhost' }, 403)
+    if (!this.isAuthorisedAdmin(c)) {
+      return c.json({ error: this.adminErrorMessage() }, 403)
     }
     this.resetFreeTier()
     return c.json({ ok: true, message: 'Free-tier counters reset' })
@@ -171,8 +174,44 @@ export class Booth {
   close(): void {
     this.db.close()
   }
+
+  private isAuthorisedAdmin(c: Context): boolean {
+    if (this.adminToken) {
+      const auth = c.req.header('Authorization')
+      if (auth?.startsWith('Bearer ')) {
+        return auth.slice(7).trim() === this.adminToken
+      }
+      return c.req.header('X-Admin-Token') === this.adminToken
+    }
+
+    const ip = getTrustedClientIp(c, this.trustProxy)
+    return ip !== null && isLoopback(ip)
+  }
+
+  private adminErrorMessage(): string {
+    if (this.adminToken) {
+      return 'Invalid or missing admin token'
+    }
+    if (!this.trustProxy) {
+      return 'Admin endpoints require adminToken or trustProxy=true with a trusted reverse proxy'
+    }
+    return 'Admin only available from localhost'
+  }
 }
 
 function isLoopback(ip: string): boolean {
-  return ip === '127.0.0.1' || ip === '::1' || ip === 'localhost'
+  return ip === '127.0.0.1' || ip === '::1' || ip === 'localhost' || ip === '::ffff:127.0.0.1'
+}
+
+function getTrustedClientIp(c: Context, trustProxy: boolean): string | null {
+  if (!trustProxy) return null
+
+  const forwardedFor = c.req.header('X-Forwarded-For')
+  if (forwardedFor) {
+    const first = forwardedFor.split(',')[0]?.trim()
+    if (first) return first
+  }
+
+  const realIp = c.req.header('X-Real-IP')?.trim()
+  return realIp || null
 }

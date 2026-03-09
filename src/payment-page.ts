@@ -67,6 +67,7 @@ h1{font-size:1.4rem;text-align:center;margin-bottom:1.5rem;color:#fff}
 <body>
 <div class="card" id="card"
   data-payment-hash="${esc(invoice.paymentHash)}"
+  data-macaroon="${esc(invoice.macaroon)}"
   data-paid="${paid}"
   data-nwc="${nwcEnabled}"
   data-cashu="${cashuEnabled}"
@@ -242,6 +243,7 @@ function clientScript(): string {
       // Update payment hash for polling
       hash = d.payment_hash;
       card.dataset.paymentHash = d.payment_hash;
+      if (d.macaroon) card.dataset.macaroon = d.macaroon;
       // Update browser URL without reload
       if (d.payment_url) history.replaceState(null, '', d.payment_url);
       // Restart polling with new hash
@@ -338,10 +340,11 @@ function clientScript(): string {
     if (preimage) {
       var safePreimage = escHtml(preimage);
       successHtml += '<div><div class="token-label">Payment preimage</div><div class="token-box" id="preimage">' + safePreimage + '</div></div>';
-      var mac = card.querySelector('.token-box');
-      var macStr = mac ? escHtml(mac.textContent) : '';
-      successHtml += '<div><div class="token-label">L402 Token (macaroon:preimage)</div><div class="token-box" id="l402-token">' + macStr + ':' + safePreimage + '</div></div>';
-      successHtml += '<button class="btn btn-success" onclick="copyToken()">Copy L402 Token</button>';
+      var macStr = card.dataset.macaroon ? escHtml(card.dataset.macaroon) : '';
+      if (macStr) {
+        successHtml += '<div><div class="token-label">L402 Token (macaroon:preimage)</div><div class="token-box" id="l402-token">' + macStr + ':' + safePreimage + '</div></div>';
+        successHtml += '<button class="btn btn-success" onclick="copyToken()">Copy L402 Token</button>';
+      }
     }
     status.insertAdjacentHTML('afterend', successHtml);
   }

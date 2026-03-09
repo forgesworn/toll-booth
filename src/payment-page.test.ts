@@ -27,6 +27,7 @@ describe('renderPaymentPage', () => {
     expect(html).toContain('Copy Invoice')
     expect(html).toContain('Waiting for payment')
     expect(html).toContain('data-payment-hash="abc123def456"')
+    expect(html).toContain('data-macaroon="bWFjYXJvb24="')
   })
 
   it('renders paid state with preimage and L402 token', async () => {
@@ -154,6 +155,8 @@ describe('renderPaymentPage', () => {
     expect(html).not.toContain('window.location.href')
     // Should update the browser URL without reload
     expect(html).toContain('history.replaceState')
+    // Must update macaroon for the newly selected invoice
+    expect(html).toContain('card.dataset.macaroon = d.macaroon')
   })
 
   it('includes polling script when not paid', async () => {

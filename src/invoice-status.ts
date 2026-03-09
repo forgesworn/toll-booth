@@ -29,6 +29,9 @@ export function invoiceStatus(depsOrBackend: InvoiceStatusDeps | LightningBacken
 
   return async (c: Context) => {
     const hash = c.req.param('paymentHash')
+    if (!hash) {
+      return c.json({ error: 'Missing payment hash' }, 400)
+    }
     const acceptsHtml = c.req.header('Accept')?.includes('text/html')
 
     try {

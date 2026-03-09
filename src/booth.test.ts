@@ -19,7 +19,12 @@ const TIERS: CreditTier[] = [
   { amountSats: 10_000, creditSats: 11_100, label: 'Pro' },
 ]
 
-function setup(overrides?: Partial<{ nwcPayInvoice: any; redeemCashu: any }>) {
+function setup(overrides?: Partial<{
+  nwcPayInvoice: any
+  redeemCashu: any
+  trustProxy: boolean
+  adminToken: string
+}>) {
   const { preimage, paymentHash } = makePreimageAndHash()
 
   const backend: LightningBackend = {
@@ -217,10 +222,23 @@ describe('Booth', () => {
   })
 
   describe('statsHandler', () => {
-    it('returns stats from localhost (no X-Forwarded-For)', async () => {
+    it('rejects stats by default when admin auth is not configured', async () => {
       const { app, booth } = setup()
 
       const res = await app.request('/stats')
+      expect(res.status).toBe(403)
+      const body = await res.json()
+      expect(body.error).toContain('adminToken')
+
+      booth.close()
+    })
+
+    it('returns stats with a valid admin token', async () => {
+      const { app, booth } = setup({ adminToken: 'secret-token' })
+
+      const res = await app.request('/stats', {
+        headers: { 'Authorization': 'Bearer secret-token' },
+      })
       expect(res.status).toBe(200)
       const body = await res.json()
       expect(body.upSince).toBeTruthy()
@@ -229,8 +247,8 @@ describe('Booth', () => {
       booth.close()
     })
 
-    it('returns stats when X-Forwarded-For is loopback', async () => {
-      const { app, booth } = setup()
+    it('returns stats when X-Forwarded-For is loopback and trustProxy is enabled', async () => {
+      const { app, booth } = setup({ trustProxy: true })
 
       const res = await app.request('/stats', {
         headers: { 'X-Forwarded-For': '127.0.0.1' },
@@ -240,8 +258,8 @@ describe('Booth', () => {
       booth.close()
     })
 
-    it('rejects stats from non-local IP', async () => {
-      const { app, booth } = setup()
+    it('rejects stats from non-local IP when trustProxy is enabled', async () => {
+      const { app, booth } = setup({ trustProxy: true })
 
       const res = await app.request('/stats', {
         headers: { 'X-Forwarded-For': '203.0.113.50' },

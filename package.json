@@ -24,7 +24,7 @@
   },
   "dependencies": {
     "better-sqlite3": "^11.8.0",
-    "hono": "^4.7.0",
+    "hono": "^4.12.5",
     "macaroon": "^3.0.4",
     "qrcode": "^1.5.4"
   },

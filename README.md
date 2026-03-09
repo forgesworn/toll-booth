@@ -21,6 +21,10 @@ const booth = tollBooth({
   },
   freeTier: { requestsPerDay: 10 },
   upstream: 'http://localhost:8002',
+  rootKey: process.env.ROOT_KEY, // 32-byte hex key
+  dbPath: './toll-booth.db',
+  trustProxy: true, // only behind a trusted reverse proxy that sets client IP headers
+  adminToken: process.env.ADMIN_TOKEN, // protects /stats and /admin/reset-free-tier
 })
 
 app.use('/api/*', booth)
@@ -57,6 +61,15 @@ toll-booth exists for the cases where Aperture doesn't fit:
 ## Free tier
 
 Each IP address gets a configurable number of free requests per day — no signup required. Once the free allowance is consumed, the client must pay to continue.
+
+`X-Forwarded-For` is only used when `trustProxy: true`. Keep this disabled unless you run behind a trusted reverse proxy that overwrites client IP headers.
+
+## Production checklist
+
+- Set a persistent `rootKey` (32-byte hex), otherwise tokens are invalidated on restart.
+- Use a persistent `dbPath` (default: `./toll-booth.db`).
+- Upgrade/patch dependencies regularly (`npm audit`).
+- If you expose `/stats` or `/admin/reset-free-tier`, set `adminToken` (or use `trustProxy: true` with strict loopback-only proxy rules).
 
 ## Backends
 

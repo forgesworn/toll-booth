@@ -109,9 +109,21 @@ export interface BoothConfig {
 
   /**
    * Path to the SQLite database file used for invoice persistence.
-   * Defaults to `toll-booth.db` in the current working directory.
+   * Defaults to `./toll-booth.db` in the current working directory.
    */
   dbPath?: string
+
+  /**
+   * Trust reverse-proxy headers (`X-Forwarded-For` / `X-Real-IP`) for client IP.
+   * Keep disabled unless a trusted proxy overwrites these headers.
+   */
+  trustProxy?: boolean
+
+  /**
+   * Optional shared secret for `/stats` and `/admin/reset-free-tier`.
+   * When set, send `Authorization: Bearer <token>` or `X-Admin-Token`.
+   */
+  adminToken?: string
 
   /**
    * Credit tiers with optional volume discounts.

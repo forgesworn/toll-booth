@@ -9,6 +9,7 @@ export interface DebitResult {
 export class CreditMeter {
   private db: Database.Database
   private readonly stmtCredit: Database.Statement
+  private readonly stmtMarkSettled: Database.Statement
   private readonly stmtDebit: Database.Statement
   private readonly stmtBalance: Database.Statement
 
@@ -22,12 +23,22 @@ export class CreditMeter {
         updated_at TEXT NOT NULL DEFAULT (datetime('now'))
       )
     `)
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS settled_invoices (
+        payment_hash TEXT PRIMARY KEY,
+        settled_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )
+    `)
     this.stmtCredit = this.db.prepare(`
       INSERT INTO credits (payment_hash, balance)
       VALUES (?, ?)
       ON CONFLICT(payment_hash) DO UPDATE SET
         balance = balance + excluded.balance,
         updated_at = datetime('now')
+    `)
+    this.stmtMarkSettled = this.db.prepare(`
+      INSERT OR IGNORE INTO settled_invoices (payment_hash)
+      VALUES (?)
     `)
     this.stmtDebit = this.db.prepare(`
       UPDATE credits SET balance = balance - ?, updated_at = datetime('now')
@@ -40,6 +51,17 @@ export class CreditMeter {
 
   credit(paymentHash: string, amountSats: number): void {
     this.stmtCredit.run(paymentHash, amountSats)
+  }
+
+  /**
+   * Grants the initial invoice credit once per payment hash.
+   * Returns true only on the first successful settlement.
+   */
+  creditOnce(paymentHash: string, amountSats: number): boolean {
+    const marked = this.stmtMarkSettled.run(paymentHash)
+    if (marked.changes === 0) return false
+    this.stmtCredit.run(paymentHash, amountSats)
+    return true
   }
 
   debit(paymentHash: string, amountSats: number): DebitResult {

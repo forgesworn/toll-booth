@@ -68,6 +68,44 @@ describe('tollBooth middleware', () => {
       expect(res.status).toBe(402)
       expect(res.headers.get('WWW-Authenticate')).toMatch(/^L402 /)
     })
+
+    it('ignores spoofed X-Forwarded-For when trustProxy is disabled', async () => {
+      const app = createApp(mockBackend(), { freeTier: { requestsPerDay: 1 }, trustProxy: false })
+
+      const first = await app.request('/route', {
+        method: 'POST',
+        headers: { 'X-Forwarded-For': '198.51.100.1' },
+      })
+      expect(first.status).not.toBe(402)
+
+      const second = await app.request('/route', {
+        method: 'POST',
+        headers: { 'X-Forwarded-For': '203.0.113.99' },
+      })
+      expect(second.status).toBe(402)
+    })
+
+    it('uses forwarded client IP only when trustProxy is enabled', async () => {
+      const app = createApp(mockBackend(), { freeTier: { requestsPerDay: 1 }, trustProxy: true })
+
+      const a = await app.request('/route', {
+        method: 'POST',
+        headers: { 'X-Forwarded-For': '198.51.100.1' },
+      })
+      expect(a.status).not.toBe(402)
+
+      const b = await app.request('/route', {
+        method: 'POST',
+        headers: { 'X-Forwarded-For': '203.0.113.99' },
+      })
+      expect(b.status).not.toBe(402)
+
+      const c = await app.request('/route', {
+        method: 'POST',
+        headers: { 'X-Forwarded-For': '198.51.100.1' },
+      })
+      expect(c.status).toBe(402)
+    })
   })
 
   describe('L402 authentication', () => {
@@ -129,6 +167,42 @@ describe('tollBooth middleware', () => {
       })
       // Should proxy (502 because upstream is not running, but NOT 402)
       expect(res.status).not.toBe(402)
+    })
+
+    it('does not re-grant credits after they are fully spent', async () => {
+      const { preimage, paymentHash } = makePreimageAndHash()
+      const backend: LightningBackend = {
+        createInvoice: vi.fn().mockResolvedValue({
+          bolt11: 'lnbc100n1mock...',
+          paymentHash,
+        }),
+        checkInvoice: vi.fn().mockResolvedValue({ paid: true, preimage }),
+      }
+      const app = createApp(backend, {
+        freeTier: undefined,
+        defaultInvoiceAmount: 4,
+        pricing: { '/route': 2 },
+      })
+
+      const macaroon = mintMacaroon(ROOT_KEY, paymentHash, 4)
+      const authToken = `L402 ${macaroon}:${preimage}`
+
+      const first = await app.request('/route', {
+        method: 'POST',
+        headers: { 'Authorization': authToken },
+      })
+      const second = await app.request('/route', {
+        method: 'POST',
+        headers: { 'Authorization': authToken },
+      })
+      const third = await app.request('/route', {
+        method: 'POST',
+        headers: { 'Authorization': authToken },
+      })
+
+      expect(first.status).not.toBe(402)
+      expect(second.status).not.toBe(402)
+      expect(third.status).toBe(402)
     })
 
     it('rejects L402 token with wrong preimage', async () => {
@@ -223,6 +297,24 @@ describe('tollBooth middleware', () => {
 
       const body = await res.json()
       expect(body.payment_url).toBe(`/invoice-status/${'b'.repeat(64)}`)
+    })
+  })
+
+  describe('pricing lookup', () => {
+    it('matches configured pricing when middleware is mounted under a prefix', async () => {
+      const backend = mockBackend()
+      const app = new Hono()
+      const booth = tollBooth({
+        backend,
+        pricing: { '/route': 2 },
+        upstream: 'http://localhost:8002',
+        rootKey: ROOT_KEY,
+        freeTier: undefined,
+      })
+      app.use('/api/*', booth)
+
+      const res = await app.request('/api/route', { method: 'POST' })
+      expect(res.status).toBe(402)
     })
   })
 })

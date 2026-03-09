@@ -24,11 +24,12 @@ export interface MiddlewareInternals {
 export function tollBooth(config: BoothConfig & EventHandler & MiddlewareInternals): MiddlewareHandler {
   const rootKey = config._rootKey ?? config.rootKey ?? randomBytes(32).toString('hex')
   const defaultAmount = config.defaultInvoiceAmount ?? 1000
+  const trustProxy = config.trustProxy ?? false
   let meter: CreditMeter
   if (config._meter) {
     meter = config._meter
   } else {
-    const db = new Database(config.dbPath ?? ':memory:')
+    const db = new Database(config.dbPath ?? './toll-booth.db')
     db.pragma('journal_mode = WAL')
     meter = new CreditMeter(db)
   }
@@ -41,7 +42,7 @@ export function tollBooth(config: BoothConfig & EventHandler & MiddlewareInterna
   return async (c: Context, next) => {
     const start = Date.now()
     const path = new URL(c.req.url).pathname
-    const cost = config.pricing[path]
+    const cost = resolveCost(path, config.pricing)
 
     // If path has no pricing entry, proxy directly (health checks, etc.)
     if (cost === undefined) {
@@ -76,9 +77,7 @@ export function tollBooth(config: BoothConfig & EventHandler & MiddlewareInterna
 
     // Check free tier
     if (freeTier) {
-      // Note: X-Forwarded-For must be set by a trusted reverse proxy.
-      // Deploy behind nginx/Caddy that overwrites this header.
-      const ip = c.req.header('X-Forwarded-For')?.split(',')[0]?.trim() ?? '127.0.0.1'
+      const ip = getTrustedClientIp(c, trustProxy) ?? 'anonymous'
       const check = freeTier.check(ip)
       if (check.allowed) {
         config.onRequest?.({
@@ -151,11 +150,10 @@ function handleL402Auth(
       .digest('hex')
     if (computedHash !== result.paymentHash) return { authorised: false, remaining: 0 }
 
-    // Credit on first valid presentation of preimage
+    // Credit only once per settled invoice
     let creditedAmount: number | undefined
-    if (meter.balance(result.paymentHash) === 0) {
-      const amount = result.creditBalance ?? defaultAmount
-      meter.credit(result.paymentHash, amount)
+    const amount = result.creditBalance ?? defaultAmount
+    if (meter.creditOnce(result.paymentHash, amount)) {
       creditedAmount = amount
     }
 
@@ -204,4 +202,31 @@ async function proxyUpstream(c: Context, upstream: string, creditBalance?: numbe
     c.header('X-Coverage', 'GB')
     return c.json({ error: 'Upstream routing engine unavailable' }, 502)
   }
+}
+
+function resolveCost(path: string, pricing: Record<string, number>): number | undefined {
+  if (Object.hasOwn(pricing, path)) return pricing[path]
+
+  let bestMatch: { length: number; cost: number } | undefined
+  for (const [pricedPath, cost] of Object.entries(pricing)) {
+    if (!pricedPath.startsWith('/')) continue
+    if (!path.endsWith(pricedPath)) continue
+    if (!bestMatch || pricedPath.length > bestMatch.length) {
+      bestMatch = { length: pricedPath.length, cost }
+    }
+  }
+  return bestMatch?.cost
+}
+
+function getTrustedClientIp(c: Context, trustProxy: boolean): string | null {
+  if (!trustProxy) return null
+
+  const forwardedFor = c.req.header('X-Forwarded-For')
+  if (forwardedFor) {
+    const first = forwardedFor.split(',')[0]?.trim()
+    if (first) return first
+  }
+
+  const realIp = c.req.header('X-Real-IP')?.trim()
+  return realIp || null
 }
