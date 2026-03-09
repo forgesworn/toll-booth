@@ -45,6 +45,7 @@ export class Booth {
   private readonly freeTier: FreeTier | null
   private readonly trustProxy: boolean
   private readonly adminToken?: string
+  private readonly pendingRedemptions = new Set<string>()
 
   constructor(config: BoothConfig & EventHandler) {
     if (!config.rootKey) {
@@ -173,6 +174,7 @@ export class Booth {
       const redeem = config.redeemCashu
       const meter = this.meter
       const invoiceStore = this.invoiceStore
+      const pending = this.pendingRedemptions
       this.cashuRedeemHandler = async (c: Context) => {
         try {
           const { token, paymentHash } = await c.req.json<{ token: string; paymentHash: string }>()
@@ -187,47 +189,40 @@ export class Booth {
           if (!stored) {
             return c.json({ error: 'Unknown payment hash — no invoice found' }, 404)
           }
-          // Lock via creditOnce BEFORE consuming the token — prevents race
-          // where two concurrent requests both pass isSettled() then both call redeem()
           if (meter.isSettled(paymentHash)) {
             return c.json({ error: 'This payment hash has already been credited' }, 409)
           }
-          const wasFirstCredit = meter.creditOnce(paymentHash, stored.amountSats)
-          if (!wasFirstCredit) {
-            return c.json({ error: 'This payment hash has already been credited' }, 409)
+          // In-memory lock prevents concurrent redeems for the same hash.
+          // Unlike creditOnce, this does NOT make isSettled() return true,
+          // so the middleware won't grant access during in-flight redemption.
+          if (pending.has(paymentHash)) {
+            return c.json({ error: 'Redemption already in progress for this payment hash' }, 409)
           }
+          pending.add(paymentHash)
 
           let credited: number
           try {
             credited = await redeem(token, paymentHash)
           } catch (err) {
-            // Redemption failed — roll back the settlement lock so user can retry
-            meter.unsettle(paymentHash)
+            pending.delete(paymentHash)
             throw err // Re-throw to hit the outer catch block
           }
 
           // Validate adapter output before touching the ledger
           if (!Number.isInteger(credited) || credited < 1) {
-            meter.unsettle(paymentHash)
+            pending.delete(paymentHash)
             return c.json({
               error: `Cashu adapter returned invalid amount: ${credited}`,
             }, 502)
           }
 
-          // Reconcile if redeemed amount differs from the locked amount
-          try {
-            if (credited !== stored.amountSats) {
-              const diff = credited - stored.amountSats
-              if (diff > 0) {
-                meter.credit(paymentHash, diff)
-              } else if (diff < 0) {
-                meter.debit(paymentHash, -diff)
-              }
-            }
-          } catch (err) {
-            // Reconciliation failed — roll back to prevent stale credit state
-            meter.unsettle(paymentHash)
-            throw err
+          // Redemption succeeded — now atomically settle and credit
+          const wasFirstCredit = meter.creditOnce(paymentHash, credited)
+          pending.delete(paymentHash)
+          if (!wasFirstCredit) {
+            // Should not happen (we checked isSettled + held pending lock),
+            // but guard against it defensively
+            return c.json({ error: 'This payment hash has already been credited' }, 409)
           }
 
           stats.recordCashuRedemption(credited)

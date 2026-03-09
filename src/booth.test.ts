@@ -663,6 +663,85 @@ describe('Booth', () => {
       booth.close()
     })
 
+    it('does not grant L402 access during in-flight Cashu redemption', async () => {
+      // Simulate a slow redeem that resolves after we test L402 auth
+      let resolveRedeem!: (value: number) => void
+      const redeemCashu = vi.fn().mockImplementation(
+        () => new Promise<number>((resolve) => { resolveRedeem = resolve }),
+      )
+      const { app, booth, paymentHash } = setup({ redeemCashu })
+
+      // Store invoice
+      await app.request('/route', { method: 'POST' })
+
+      // Start cashu-redeem (will block on the slow redeem)
+      const redeemPromise = app.request('/cashu-redeem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: 'cashuA...', paymentHash }),
+      })
+
+      // While redeem is in-flight, try L402 auth with "settled" preimage
+      // Get the macaroon from the 402 response body
+      const challenge = await app.request('/route', { method: 'POST' })
+      const challengeBody = await challenge.json()
+      const authRes = await app.request('/route', {
+        method: 'POST',
+        headers: { 'Authorization': `L402 ${challengeBody.macaroon}:settled` },
+      })
+      // Must be 402 (not authorised) — isSettled() should be false during in-flight redeem
+      expect(authRes.status).toBe(402)
+
+      // Now let the redeem complete
+      resolveRedeem(1000)
+      const redeemRes = await redeemPromise
+      expect(redeemRes.status).toBe(200)
+
+      // After settlement, L402 with "settled" should now work
+      const authRes2 = await app.request('/route', {
+        method: 'POST',
+        headers: { 'Authorization': `L402 ${challengeBody.macaroon}:settled` },
+      })
+      expect(authRes2.status).not.toBe(402)
+
+      booth.close()
+    })
+
+    it('rejects concurrent redemptions for the same payment hash', async () => {
+      let resolveFirst!: (value: number) => void
+      const redeemCashu = vi.fn().mockImplementation(
+        () => new Promise<number>((resolve) => { resolveFirst = resolve }),
+      )
+      const { app, booth, paymentHash } = setup({ redeemCashu })
+
+      // Store invoice
+      await app.request('/route', { method: 'POST' })
+
+      // Start first redeem (blocks)
+      const first = app.request('/cashu-redeem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: 'cashuA...', paymentHash }),
+      })
+
+      // Second redeem while first is in-flight
+      const second = await app.request('/cashu-redeem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: 'cashuB...', paymentHash }),
+      })
+      expect(second.status).toBe(409)
+      const body = await second.json()
+      expect(body.error).toContain('in progress')
+
+      // Let first complete
+      resolveFirst(1000)
+      const firstRes = await first
+      expect(firstRes.status).toBe(200)
+
+      booth.close()
+    })
+
     it('does not expose /cashu-redeem when adapter not provided', async () => {
       const { booth } = setup()
       expect(booth.cashuRedeemHandler).toBeUndefined()

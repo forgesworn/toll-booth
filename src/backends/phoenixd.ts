@@ -49,7 +49,14 @@ export function phoenixdBackend(config: PhoenixdConfig): LightningBackend {
         headers: { 'Authorization': authHeader },
       })
 
-      if (!res.ok) return { paid: false }
+      // 404 = invoice not found (normal for unknown hashes)
+      if (res.status === 404) return { paid: false }
+
+      // Auth failures and server errors must propagate so health checks detect them
+      if (!res.ok) {
+        const text = await res.text().catch(() => '')
+        throw new Error(`Phoenixd checkInvoice failed (${res.status}): ${text}`)
+      }
 
       const data = await res.json() as { isPaid: boolean; preimage?: string }
       return {

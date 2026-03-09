@@ -82,5 +82,25 @@ describe('phoenixdBackend', () => {
       const status = await backend.checkInvoice('abc123')
       expect(status.paid).toBe(false)
     })
+
+    it('throws on 401 (auth failure)', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        text: async () => 'Unauthorized',
+      })
+
+      await expect(backend.checkInvoice('abc123')).rejects.toThrow(/401/)
+    })
+
+    it('throws on 500 (server error)', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        text: async () => 'Internal error',
+      })
+
+      await expect(backend.checkInvoice('abc123')).rejects.toThrow(/500/)
+    })
   })
 })
