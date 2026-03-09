@@ -9,8 +9,9 @@ import { createInvoiceHandler } from './create-invoice.js'
 import { CreditMeter } from './meter.js'
 import { InvoiceStore } from './invoice-store.js'
 import { StatsCollector } from './stats.js'
-import { randomBytes } from 'node:crypto'
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
 import Database from 'better-sqlite3'
+import { getTrustedClientIp } from './client-ip.js'
 
 /**
  * Encapsulates the middleware, invoice-status handler, create-invoice handler,
@@ -50,6 +51,10 @@ export class Booth {
         '[toll-booth] WARNING: No rootKey provided — using a random key. ' +
         'All macaroons will be invalidated on restart. ' +
         'Set rootKey to a persistent 32-byte hex string in production.',
+      )
+    } else if (!/^[0-9a-f]{64}$/i.test(config.rootKey)) {
+      throw new Error(
+        `rootKey must be exactly 64 hex characters (32 bytes), got ${config.rootKey.length} characters`,
       )
     }
     this.rootKey = config.rootKey ?? randomBytes(32).toString('hex')
@@ -114,15 +119,47 @@ export class Booth {
     // NWC proxy endpoint (only if adapter provided)
     if (config.nwcPayInvoice) {
       const nwcPay = config.nwcPayInvoice
+      const meter = this.meter
+      const invoiceStore = this.invoiceStore
       this.nwcPayHandler = async (c: Context) => {
         try {
-          const { nwcUri, bolt11 } = await c.req.json<{ nwcUri: string; bolt11: string }>()
-          if (!nwcUri || !bolt11) {
-            return c.json({ error: 'nwcUri and bolt11 are required' }, 400)
+          const body = await c.req.json<{
+            nwcUri: string; bolt11: string; paymentHash: string
+          }>()
+          const { nwcUri, bolt11, paymentHash } = body
+          if (!nwcUri || !bolt11 || !paymentHash) {
+            return c.json({ error: 'nwcUri, bolt11, and paymentHash are required' }, 400)
+          }
+          if (!/^[0-9a-f]{64}$/i.test(paymentHash)) {
+            return c.json({ error: 'Invalid paymentHash — expected 64 hex characters' }, 400)
+          }
+          // Look up the server-issued invoice to get the authoritative credit amount
+          const stored = invoiceStore.get(paymentHash)
+          if (!stored) {
+            return c.json({ error: 'Unknown payment hash — no invoice found' }, 404)
+          }
+          if (meter.isSettled(paymentHash)) {
+            return c.json({ error: 'This payment hash has already been credited' }, 409)
+          }
+          if (bolt11 !== stored.bolt11) {
+            return c.json({ error: 'bolt11 does not match the stored invoice' }, 400)
           }
           const preimage = await nwcPay(nwcUri, bolt11)
-          stats.recordNwcPayment(defaultAmount)
-          return c.json({ preimage })
+          // Verify preimage matches the paymentHash
+          const computedHash = createHash('sha256')
+            .update(Buffer.from(preimage, 'hex'))
+            .digest('hex')
+          if (computedHash !== paymentHash) {
+            return c.json({ error: 'Preimage does not match payment hash' }, 400)
+          }
+          // Credit the server-determined amount, not a client-supplied value
+          const wasFirstCredit = meter.creditOnce(paymentHash, stored.amountSats)
+          if (!wasFirstCredit) {
+            // Race: another request credited between isSettled() and here
+            return c.json({ error: 'This payment hash has already been credited' }, 409)
+          }
+          stats.recordNwcPayment(stored.amountSats)
+          return c.json({ preimage, credited: stored.amountSats })
         } catch (err) {
           return c.json({ error: err instanceof Error ? err.message : 'NWC payment failed' }, 500)
         }
@@ -133,14 +170,33 @@ export class Booth {
     if (config.redeemCashu) {
       const redeem = config.redeemCashu
       const meter = this.meter
+      const invoiceStore = this.invoiceStore
       this.cashuRedeemHandler = async (c: Context) => {
         try {
           const { token, paymentHash } = await c.req.json<{ token: string; paymentHash: string }>()
           if (!token || !paymentHash) {
             return c.json({ error: 'token and paymentHash are required' }, 400)
           }
+          if (!/^[0-9a-f]{64}$/i.test(paymentHash)) {
+            return c.json({ error: 'Invalid paymentHash — expected 64 hex characters' }, 400)
+          }
+          // Verify the paymentHash corresponds to a server-issued invoice
+          const stored = invoiceStore.get(paymentHash)
+          if (!stored) {
+            return c.json({ error: 'Unknown payment hash — no invoice found' }, 404)
+          }
+          // Check idempotency before consuming the Cashu token
+          if (meter.isSettled(paymentHash)) {
+            return c.json({ error: 'This payment hash has already been credited' }, 409)
+          }
           const credited = await redeem(token, paymentHash)
-          meter.credit(paymentHash, credited)
+          const wasFirstCredit = meter.creditOnce(paymentHash, credited)
+          if (!wasFirstCredit) {
+            // Race: another request credited between isSettled() and here.
+            // Token was already consumed by redeem() — return 409 so the client
+            // knows credit was not granted (the token value is lost in this edge case).
+            return c.json({ error: 'This payment hash has already been credited' }, 409)
+          }
           stats.recordCashuRedemption(credited)
           return c.json({ credited })
         } catch (err) {
@@ -200,7 +256,7 @@ export class Booth {
 
   private checkDatabase(): boolean {
     try {
-      this.db.pragma('integrity_check')
+      this.db.prepare('SELECT 1').get()
       return true
     } catch {
       return false
@@ -211,9 +267,9 @@ export class Booth {
     if (this.adminToken) {
       const auth = c.req.header('Authorization')
       if (auth?.startsWith('Bearer ')) {
-        return auth.slice(7).trim() === this.adminToken
+        return safeEqual(auth.slice(7).trim(), this.adminToken)
       }
-      return c.req.header('X-Admin-Token') === this.adminToken
+      return safeEqual(c.req.header('X-Admin-Token') ?? '', this.adminToken)
     }
 
     const ip = getTrustedClientIp(c, this.trustProxy)
@@ -235,15 +291,8 @@ function isLoopback(ip: string): boolean {
   return ip === '127.0.0.1' || ip === '::1' || ip === 'localhost' || ip === '::ffff:127.0.0.1'
 }
 
-function getTrustedClientIp(c: Context, trustProxy: boolean): string | null {
-  if (!trustProxy) return null
-
-  const forwardedFor = c.req.header('X-Forwarded-For')
-  if (forwardedFor) {
-    const first = forwardedFor.split(',')[0]?.trim()
-    if (first) return first
-  }
-
-  const realIp = c.req.header('X-Real-IP')?.trim()
-  return realIp || null
+function safeEqual(a: string, b: string): boolean {
+  const hashA = createHash('sha256').update(a).digest()
+  const hashB = createHash('sha256').update(b).digest()
+  return timingSafeEqual(hashA, hashB)
 }

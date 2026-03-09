@@ -1,6 +1,6 @@
 // src/index.ts
 export { tollBooth } from './middleware.js'
-export type { EventHandler } from './middleware.js'
+export type { EventHandler, TollBoothMiddleware } from './middleware.js'
 export { invoiceStatus } from './invoice-status.js'
 export { createInvoiceHandler } from './create-invoice.js'
 export { Booth } from './booth.js'

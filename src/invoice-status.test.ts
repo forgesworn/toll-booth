@@ -5,6 +5,12 @@ import { invoiceStatus } from './invoice-status.js'
 import { InvoiceStore } from './invoice-store.js'
 import type { LightningBackend } from './types.js'
 
+/** Valid 64-char hex payment hashes for test use. */
+const HASH_A = 'a'.repeat(64)
+const HASH_B = 'b'.repeat(64)
+const HASH_C = 'c'.repeat(64)
+const HASH_UNKNOWN = 'd'.repeat(64)
+
 function mockBackend(): LightningBackend {
   return {
     createInvoice: vi.fn(),
@@ -39,11 +45,11 @@ describe('invoiceStatus', () => {
       vi.mocked(backend.checkInvoice).mockResolvedValue({ paid: false })
 
       const app = createApp(backend)
-      const res = await app.request('/invoice-status/abc123')
+      const res = await app.request(`/invoice-status/${HASH_A}`)
 
       expect(res.status).toBe(200)
       expect(await res.json()).toEqual({ paid: false })
-      expect(backend.checkInvoice).toHaveBeenCalledWith('abc123')
+      expect(backend.checkInvoice).toHaveBeenCalledWith(HASH_A)
     })
 
     it('returns { paid: true, preimage } for a settled invoice', async () => {
@@ -51,11 +57,11 @@ describe('invoiceStatus', () => {
       vi.mocked(backend.checkInvoice).mockResolvedValue({ paid: true, preimage: 'deadbeef' })
 
       const app = createApp(backend)
-      const res = await app.request('/invoice-status/def456')
+      const res = await app.request(`/invoice-status/${HASH_B}`)
 
       expect(res.status).toBe(200)
       expect(await res.json()).toEqual({ paid: true, preimage: 'deadbeef' })
-      expect(backend.checkInvoice).toHaveBeenCalledWith('def456')
+      expect(backend.checkInvoice).toHaveBeenCalledWith(HASH_B)
     })
 
     it('returns 502 when backend throws', async () => {
@@ -63,10 +69,19 @@ describe('invoiceStatus', () => {
       vi.mocked(backend.checkInvoice).mockRejectedValue(new Error('connection refused'))
 
       const app = createApp(backend)
-      const res = await app.request('/invoice-status/ghi789')
+      const res = await app.request(`/invoice-status/${HASH_C}`)
 
       expect(res.status).toBe(502)
       expect(await res.json()).toEqual({ error: 'Failed to check invoice status' })
+    })
+
+    it('rejects invalid payment hash', async () => {
+      const backend = mockBackend()
+      const app = createApp(backend)
+      const res = await app.request('/invoice-status/not-valid')
+
+      expect(res.status).toBe(400)
+      expect(await res.json()).toEqual({ error: 'Invalid payment hash — expected 64 hex characters' })
     })
   })
 
@@ -75,13 +90,13 @@ describe('invoiceStatus', () => {
       const db = new Database(':memory:')
       db.pragma('journal_mode = WAL')
       const store = new InvoiceStore(db)
-      store.store('abc123', 'lnbc1000n1...', 1000, 'mac_base64')
+      store.store(HASH_A, 'lnbc1000n1...', 1000, 'mac_base64')
 
       const backend = mockBackend()
       vi.mocked(backend.checkInvoice).mockResolvedValue({ paid: false })
 
       const app = createAppWithStore(backend, store)
-      const res = await app.request('/invoice-status/abc123', {
+      const res = await app.request(`/invoice-status/${HASH_A}`, {
         headers: { 'Accept': 'text/html,application/xhtml+xml' },
       })
 
@@ -96,13 +111,13 @@ describe('invoiceStatus', () => {
       const db = new Database(':memory:')
       db.pragma('journal_mode = WAL')
       const store = new InvoiceStore(db)
-      store.store('abc123', 'lnbc1000n1...', 1000, 'mac_base64')
+      store.store(HASH_A, 'lnbc1000n1...', 1000, 'mac_base64')
 
       const backend = mockBackend()
       vi.mocked(backend.checkInvoice).mockResolvedValue({ paid: true, preimage: 'deadbeef' })
 
       const app = createAppWithStore(backend, store)
-      const res = await app.request('/invoice-status/abc123', {
+      const res = await app.request(`/invoice-status/${HASH_A}`, {
         headers: { 'Accept': 'text/html' },
       })
 
@@ -119,7 +134,7 @@ describe('invoiceStatus', () => {
 
       const backend = mockBackend()
       const app = createAppWithStore(backend, store)
-      const res = await app.request('/invoice-status/unknown', {
+      const res = await app.request(`/invoice-status/${HASH_UNKNOWN}`, {
         headers: { 'Accept': 'text/html' },
       })
 
@@ -132,13 +147,13 @@ describe('invoiceStatus', () => {
       const db = new Database(':memory:')
       db.pragma('journal_mode = WAL')
       const store = new InvoiceStore(db)
-      store.store('abc123', 'lnbc1000n1...', 1000, 'mac_base64')
+      store.store(HASH_A, 'lnbc1000n1...', 1000, 'mac_base64')
 
       const backend = mockBackend()
       vi.mocked(backend.checkInvoice).mockRejectedValue(new Error('fail'))
 
       const app = createAppWithStore(backend, store)
-      const res = await app.request('/invoice-status/abc123', {
+      const res = await app.request(`/invoice-status/${HASH_A}`, {
         headers: { 'Accept': 'text/html' },
       })
 
@@ -152,7 +167,7 @@ describe('invoiceStatus', () => {
       vi.mocked(backend.checkInvoice).mockResolvedValue({ paid: false })
 
       const app = createApp(backend)
-      const res = await app.request('/invoice-status/abc123', {
+      const res = await app.request(`/invoice-status/${HASH_A}`, {
         headers: { 'Accept': 'text/html' },
       })
 

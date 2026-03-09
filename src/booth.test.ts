@@ -58,6 +58,47 @@ function setup(overrides?: Partial<{
 }
 
 describe('Booth', () => {
+  describe('rootKey validation', () => {
+    it('rejects a short rootKey', () => {
+      expect(() => new Booth({
+        backend: { createInvoice: vi.fn(), checkInvoice: vi.fn() },
+        pricing: {},
+        upstream: 'http://localhost',
+        rootKey: 'abc',
+        dbPath: ':memory:',
+      })).toThrow(/64 hex characters/)
+    })
+
+    it('accepts a valid 64-char hex rootKey', () => {
+      const booth = new Booth({
+        backend: { createInvoice: vi.fn(), checkInvoice: vi.fn() },
+        pricing: {},
+        upstream: 'http://localhost',
+        rootKey: 'a'.repeat(64),
+        dbPath: ':memory:',
+      })
+      booth.close()
+    })
+  })
+
+  describe('paymentHash validation', () => {
+    it('rejects non-hex payment hash', async () => {
+      const { app, booth } = setup()
+      const res = await app.request('/invoice-status/not-a-valid-hash')
+      expect(res.status).toBe(400)
+      const body = await res.json()
+      expect(body.error).toContain('64 hex')
+      booth.close()
+    })
+
+    it('rejects a short payment hash', async () => {
+      const { app, booth } = setup()
+      const res = await app.request('/invoice-status/abc123')
+      expect(res.status).toBe(400)
+      booth.close()
+    })
+  })
+
   it('issues 402 with payment_url and stores invoice', async () => {
     const { app, booth, paymentHash } = setup()
 
@@ -141,20 +182,107 @@ describe('Booth', () => {
   })
 
   describe('NWC adapter', () => {
-    it('proxies NWC payment when adapter provided', async () => {
-      const nwcPayInvoice = vi.fn().mockResolvedValue('preimage_hex')
+    it('pays via NWC and credits the server-determined amount', async () => {
+      const { preimage, paymentHash } = makePreimageAndHash()
+      const nwcPayInvoice = vi.fn().mockResolvedValue(preimage)
+      const { app, booth } = setup({ nwcPayInvoice })
+
+      // First trigger a 402 to store the invoice (amount = defaultInvoiceAmount = 1000)
+      await app.request('/route', { method: 'POST' })
+
+      const res = await app.request('/nwc-pay', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nwcUri: 'nostr+walletconnect://...', bolt11: 'lnbc1000n1test...',
+          paymentHash,
+        }),
+      })
+
+      expect(res.status).toBe(200)
+      const body = await res.json()
+      expect(body.preimage).toBe(preimage)
+      // Credits the amount from the stored invoice (defaultInvoiceAmount), not client-supplied
+      expect(body.credited).toBe(1000)
+      expect(nwcPayInvoice).toHaveBeenCalledWith('nostr+walletconnect://...', 'lnbc1000n1test...')
+
+      booth.close()
+    })
+
+    it('rejects NWC payment for unknown payment hash', async () => {
+      const nwcPayInvoice = vi.fn()
       const { app, booth } = setup({ nwcPayInvoice })
 
       const res = await app.request('/nwc-pay', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nwcUri: 'nostr+walletconnect://...', bolt11: 'lnbc...' }),
+        body: JSON.stringify({
+          nwcUri: 'nostr+walletconnect://...', bolt11: 'lnbc...',
+          paymentHash: 'e'.repeat(64),
+        }),
       })
 
-      expect(res.status).toBe(200)
+      expect(res.status).toBe(404)
+      expect(nwcPayInvoice).not.toHaveBeenCalled()
+
+      booth.close()
+    })
+
+    it('rejects replay of same payment hash', async () => {
+      const { preimage, paymentHash } = makePreimageAndHash()
+      const nwcPayInvoice = vi.fn().mockResolvedValue(preimage)
+      const { app, booth } = setup({ nwcPayInvoice })
+
+      // Store invoice
+      await app.request('/route', { method: 'POST' })
+
+      // First payment succeeds
+      await app.request('/nwc-pay', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nwcUri: 'nostr+walletconnect://...', bolt11: 'lnbc1000n1test...',
+          paymentHash,
+        }),
+      })
+
+      // Second with same hash is rejected before calling NWC
+      nwcPayInvoice.mockClear()
+      const res2 = await app.request('/nwc-pay', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nwcUri: 'nostr+walletconnect://...', bolt11: 'lnbc1000n1test...',
+          paymentHash,
+        }),
+      })
+
+      expect(res2.status).toBe(409)
+      expect(nwcPayInvoice).not.toHaveBeenCalled()
+
+      booth.close()
+    })
+
+    it('rejects NWC payment when preimage does not match hash', async () => {
+      const { paymentHash } = makePreimageAndHash()
+      const nwcPayInvoice = vi.fn().mockResolvedValue('aa'.repeat(32)) // wrong preimage
+      const { app, booth } = setup({ nwcPayInvoice })
+
+      // Store invoice
+      await app.request('/route', { method: 'POST' })
+
+      const res = await app.request('/nwc-pay', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nwcUri: 'nostr+walletconnect://...', bolt11: 'lnbc1000n1test...',
+          paymentHash,
+        }),
+      })
+
+      expect(res.status).toBe(400)
       const body = await res.json()
-      expect(body.preimage).toBe('preimage_hex')
-      expect(nwcPayInvoice).toHaveBeenCalledWith('nostr+walletconnect://...', 'lnbc...')
+      expect(body.error).toContain('Preimage does not match')
 
       booth.close()
     })
@@ -174,6 +302,50 @@ describe('Booth', () => {
       booth.close()
     })
 
+    it('returns 400 for invalid paymentHash', async () => {
+      const nwcPayInvoice = vi.fn()
+      const { app, booth } = setup({ nwcPayInvoice })
+
+      const res = await app.request('/nwc-pay', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nwcUri: 'nostr+walletconnect://...', bolt11: 'lnbc...',
+          paymentHash: 'bad',
+        }),
+      })
+
+      expect(res.status).toBe(400)
+      expect(nwcPayInvoice).not.toHaveBeenCalled()
+
+      booth.close()
+    })
+
+    it('rejects NWC payment when bolt11 does not match stored invoice', async () => {
+      const { paymentHash } = makePreimageAndHash()
+      const nwcPayInvoice = vi.fn()
+      const { app, booth } = setup({ nwcPayInvoice })
+
+      // Store invoice (bolt11 = 'lnbc1000n1test...')
+      await app.request('/route', { method: 'POST' })
+
+      const res = await app.request('/nwc-pay', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nwcUri: 'nostr+walletconnect://...', bolt11: 'lnbc_attacker_invoice...',
+          paymentHash,
+        }),
+      })
+
+      expect(res.status).toBe(400)
+      const body = await res.json()
+      expect(body.error).toContain('bolt11 does not match')
+      expect(nwcPayInvoice).not.toHaveBeenCalled()
+
+      booth.close()
+    })
+
     it('does not expose /nwc-pay when adapter not provided', async () => {
       const { booth } = setup()
       expect(booth.nwcPayHandler).toBeUndefined()
@@ -184,18 +356,79 @@ describe('Booth', () => {
   describe('Cashu adapter', () => {
     it('redeems Cashu token and credits meter', async () => {
       const redeemCashu = vi.fn().mockResolvedValue(500)
-      const { app, booth } = setup({ redeemCashu })
+      const { app, booth, paymentHash } = setup({ redeemCashu })
+
+      // Trigger a 402 to store the invoice for this paymentHash
+      await app.request('/route', { method: 'POST' })
 
       const res = await app.request('/cashu-redeem', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: 'cashuA...', paymentHash: 'hash123' }),
+        body: JSON.stringify({ token: 'cashuA...', paymentHash }),
       })
 
       expect(res.status).toBe(200)
       const body = await res.json()
       expect(body.credited).toBe(500)
-      expect(redeemCashu).toHaveBeenCalledWith('cashuA...', 'hash123')
+      expect(redeemCashu).toHaveBeenCalledWith('cashuA...', paymentHash)
+
+      booth.close()
+    })
+
+    it('rejects replay of same payment hash', async () => {
+      const redeemCashu = vi.fn().mockResolvedValue(500)
+      const { app, booth, paymentHash } = setup({ redeemCashu })
+
+      // Store invoice
+      await app.request('/route', { method: 'POST' })
+
+      // First redeem succeeds
+      const res1 = await app.request('/cashu-redeem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: 'cashuA...', paymentHash }),
+      })
+      expect(res1.status).toBe(200)
+
+      // Second redeem with same hash is rejected
+      const res2 = await app.request('/cashu-redeem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: 'cashuA...', paymentHash }),
+      })
+      expect(res2.status).toBe(409)
+      const body = await res2.json()
+      expect(body.error).toContain('already been credited')
+
+      booth.close()
+    })
+
+    it('rejects unknown payment hash', async () => {
+      const redeemCashu = vi.fn()
+      const { app, booth } = setup({ redeemCashu })
+
+      const res = await app.request('/cashu-redeem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: 'cashuA...', paymentHash: 'e'.repeat(64) }),
+      })
+      expect(res.status).toBe(404)
+      expect(redeemCashu).not.toHaveBeenCalled()
+
+      booth.close()
+    })
+
+    it('rejects invalid paymentHash format', async () => {
+      const redeemCashu = vi.fn().mockResolvedValue(500)
+      const { app, booth } = setup({ redeemCashu })
+
+      const res = await app.request('/cashu-redeem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: 'cashuA...', paymentHash: 'not-valid' }),
+      })
+      expect(res.status).toBe(400)
+      expect(redeemCashu).not.toHaveBeenCalled()
 
       booth.close()
     })

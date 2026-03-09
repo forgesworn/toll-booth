@@ -62,8 +62,10 @@ examples/
 | `VALHALLA_URL` | — | Upstream API to proxy |
 | `FREE_TIER_REQUESTS` | 1000 | Daily free requests per IP |
 | `DEFAULT_INVOICE_SATS` | 1000 | Default invoice amount |
-| `DB_PATH` | ./credits.db | SQLite database path |
-| `ROOT_KEY` | auto-generated | Macaroon signing key (hex, 32 bytes) |
+| `DB_PATH` | ./toll-booth.db | SQLite database path |
+| `ROOT_KEY` | — | Macaroon signing key (hex, 64 chars / 32 bytes). **Required for production.** |
+| `ADMIN_TOKEN` | — | Bearer token for `/stats` and `/admin/*` endpoints |
+| `TRUST_PROXY` | false | Trust `X-Forwarded-For` / `X-Real-IP` headers |
 | `PORT` | 3000 | HTTP listen port |
 
 ## Conventions

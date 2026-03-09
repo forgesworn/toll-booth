@@ -45,15 +45,18 @@ function makePreimageAndHash(): { preimage: string; paymentHash: string } {
 describe('tollBooth middleware', () => {
   describe('free tier', () => {
     it('serves requests within free tier limit', async () => {
-      const app = createApp(mockBackend())
-      const res = await app.request('/route', { method: 'POST' })
+      const app = createApp(mockBackend(), { trustProxy: true })
+      const res = await app.request('/route', {
+        method: 'POST',
+        headers: { 'X-Forwarded-For': '1.2.3.4' },
+      })
       // The upstream is not reachable in tests, but the middleware should attempt to proxy.
       // We confirm it did not return 402.
       expect(res.status).not.toBe(402)
     })
 
     it('returns 402 when free tier is exhausted', async () => {
-      const app = createApp(mockBackend())
+      const app = createApp(mockBackend(), { trustProxy: true })
       // Exhaust free tier
       for (let i = 0; i < 3; i++) {
         await app.request('/route', {
@@ -69,20 +72,15 @@ describe('tollBooth middleware', () => {
       expect(res.headers.get('WWW-Authenticate')).toMatch(/^L402 /)
     })
 
-    it('ignores spoofed X-Forwarded-For when trustProxy is disabled', async () => {
-      const app = createApp(mockBackend(), { freeTier: { requestsPerDay: 1 }, trustProxy: false })
+    it('skips free tier when trustProxy is disabled (no identifiable client)', async () => {
+      const app = createApp(mockBackend(), { freeTier: { requestsPerDay: 10 }, trustProxy: false })
 
-      const first = await app.request('/route', {
+      // Without trustProxy, client IP is unidentifiable — free tier is skipped
+      const res = await app.request('/route', {
         method: 'POST',
         headers: { 'X-Forwarded-For': '198.51.100.1' },
       })
-      expect(first.status).not.toBe(402)
-
-      const second = await app.request('/route', {
-        method: 'POST',
-        headers: { 'X-Forwarded-For': '203.0.113.99' },
-      })
-      expect(second.status).toBe(402)
+      expect(res.status).toBe(402)
     })
 
     it('uses forwarded client IP only when trustProxy is enabled', async () => {
@@ -252,11 +250,17 @@ describe('tollBooth middleware', () => {
     })
   })
 
-  describe('coverage header', () => {
-    it('includes X-Coverage header on all responses', async () => {
+  describe('response headers', () => {
+    it('includes configured responseHeaders on all responses', async () => {
+      const app = createApp(mockBackend(), { responseHeaders: { 'X-Coverage': 'GB' } })
+      const res = await app.request('/route', { method: 'POST' })
+      expect(res.headers.get('X-Coverage')).toBe('GB')
+    })
+
+    it('omits extra headers when responseHeaders is not set', async () => {
       const app = createApp(mockBackend())
       const res = await app.request('/route', { method: 'POST' })
-      expect(res.headers.get('X-Coverage')).toBeTruthy()
+      expect(res.headers.get('X-Coverage')).toBeNull()
     })
   })
 

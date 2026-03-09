@@ -126,6 +126,12 @@ export interface BoothConfig {
   adminToken?: string
 
   /**
+   * Extra headers to include on every response (e.g. `{ 'X-Coverage': 'GB' }`).
+   * Replaces the previously hardcoded `X-Coverage: GB` header.
+   */
+  responseHeaders?: Record<string, string>
+
+  /**
    * Credit tiers with optional volume discounts.
    * Used by the payment page tier selector and the `/create-invoice` endpoint.
    */
@@ -144,6 +150,12 @@ export interface BoothConfig {
    * When provided, the payment page shows a Cashu option.
    */
   redeemCashu?: (token: string, paymentHash: string) => Promise<number>
+
+  /**
+   * Timeout in milliseconds for upstream proxy requests.
+   * Defaults to 30000 (30 seconds).
+   */
+  upstreamTimeout?: number
 }
 
 /**

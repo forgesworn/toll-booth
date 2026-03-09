@@ -7,6 +7,7 @@ import { CreditMeter } from './meter.js'
 import type { InvoiceStore } from './invoice-store.js'
 import { createHash, randomBytes } from 'node:crypto'
 import Database from 'better-sqlite3'
+import { getTrustedClientIp } from './client-ip.js'
 
 export type EventHandler = {
   onPayment?: (event: PaymentEvent) => void
@@ -21,32 +22,46 @@ export interface MiddlewareInternals {
   _freeTier?: FreeTier | null
 }
 
-export function tollBooth(config: BoothConfig & EventHandler & MiddlewareInternals): MiddlewareHandler {
-  const rootKey = config._rootKey ?? config.rootKey ?? randomBytes(32).toString('hex')
+export interface TollBoothMiddleware extends MiddlewareHandler {
+  /** Close the internal SQLite database (only needed when using tollBooth() standalone, not via Booth). */
+  close?: () => void
+}
+
+export function tollBooth(config: BoothConfig & EventHandler & MiddlewareInternals): TollBoothMiddleware {
+  const suppliedKey = config._rootKey ?? config.rootKey
+  if (suppliedKey && !/^[0-9a-f]{64}$/i.test(suppliedKey)) {
+    throw new Error(
+      `rootKey must be exactly 64 hex characters (32 bytes), got ${suppliedKey.length} characters`,
+    )
+  }
+  const rootKey = suppliedKey ?? randomBytes(32).toString('hex')
   const defaultAmount = config.defaultInvoiceAmount ?? 1000
   const trustProxy = config.trustProxy ?? false
   let meter: CreditMeter
+  let ownedDb: Database.Database | null = null
   if (config._meter) {
     meter = config._meter
   } else {
-    const db = new Database(config.dbPath ?? './toll-booth.db')
-    db.pragma('journal_mode = WAL')
-    meter = new CreditMeter(db)
+    ownedDb = new Database(config.dbPath ?? './toll-booth.db')
+    ownedDb.pragma('journal_mode = WAL')
+    meter = new CreditMeter(ownedDb)
   }
   const invoiceStore = config._invoiceStore
   const freeTier = config._freeTier !== undefined
     ? config._freeTier
     : (config.freeTier ? new FreeTier(config.freeTier.requestsPerDay) : null)
   const upstream = config.upstream.replace(/\/$/, '')
+  const extraHeaders = config.responseHeaders ?? {}
+  const upstreamTimeout = config.upstreamTimeout ?? 30_000
 
-  return async (c: Context, next) => {
+  const handler: TollBoothMiddleware = async (c: Context, next) => {
     const start = Date.now()
     const path = new URL(c.req.url).pathname
     const cost = resolveCost(path, config.pricing)
 
     // If path has no pricing entry, proxy directly (health checks, etc.)
     if (cost === undefined) {
-      return proxyUpstream(c, upstream)
+      return proxyUpstream(c, upstream, extraHeaders, upstreamTimeout)
     }
 
     // Check for L402 Authorisation header
@@ -70,26 +85,29 @@ export function tollBooth(config: BoothConfig & EventHandler & MiddlewareInterna
           latencyMs: Date.now() - start,
           authenticated: true,
         })
-        return proxyUpstream(c, upstream, result.remaining)
+        return proxyUpstream(c, upstream, extraHeaders, upstreamTimeout, result.remaining)
       }
       // Fall through to issue a new challenge if authorisation failed
     }
 
-    // Check free tier
+    // Check free tier (only when client IP is identifiable)
     if (freeTier) {
-      const ip = getTrustedClientIp(c, trustProxy) ?? 'anonymous'
-      const check = freeTier.check(ip)
-      if (check.allowed) {
-        config.onRequest?.({
-          timestamp: new Date().toISOString(),
-          endpoint: path,
-          satsDeducted: 0,
-          remainingBalance: 0,
-          latencyMs: Date.now() - start,
-          authenticated: false,
-        })
-        return proxyUpstream(c, upstream, undefined, check.remaining)
+      const ip = getTrustedClientIp(c, trustProxy)
+      if (ip) {
+        const check = freeTier.check(ip)
+        if (check.allowed) {
+          config.onRequest?.({
+            timestamp: new Date().toISOString(),
+            endpoint: path,
+            satsDeducted: 0,
+            remainingBalance: 0,
+            latencyMs: Date.now() - start,
+            authenticated: false,
+          })
+          return proxyUpstream(c, upstream, extraHeaders, upstreamTimeout, undefined, check.remaining)
+        }
       }
+      // No identifiable IP or free tier exhausted — require payment
     }
 
     // Issue L402 challenge — credit is NOT stored yet.
@@ -110,7 +128,9 @@ export function tollBooth(config: BoothConfig & EventHandler & MiddlewareInterna
     })
 
     c.header('WWW-Authenticate', `L402 macaroon="${macaroon}", invoice="${invoice.bolt11}"`)
-    c.header('X-Coverage', 'GB')
+    for (const [key, value] of Object.entries(extraHeaders)) {
+      c.header(key, value)
+    }
     return c.json(
       {
         error: 'Payment required',
@@ -123,6 +143,12 @@ export function tollBooth(config: BoothConfig & EventHandler & MiddlewareInterna
       402,
     )
   }
+
+  if (ownedDb) {
+    handler.close = () => ownedDb!.close()
+  }
+
+  return handler
 }
 
 function handleL402Auth(
@@ -167,7 +193,14 @@ function handleL402Auth(
   }
 }
 
-async function proxyUpstream(c: Context, upstream: string, creditBalance?: number, freeRemaining?: number): Promise<Response> {
+async function proxyUpstream(
+  c: Context,
+  upstream: string,
+  extraHeaders: Record<string, string>,
+  timeout: number,
+  creditBalance?: number,
+  freeRemaining?: number,
+): Promise<Response> {
   const url = new URL(c.req.url)
   const targetUrl = `${upstream}${url.pathname}${url.search}`
 
@@ -182,11 +215,13 @@ async function proxyUpstream(c: Context, upstream: string, creditBalance?: numbe
       body: c.req.method !== 'GET' && c.req.method !== 'HEAD' ? c.req.raw.body : undefined,
       // @ts-expect-error duplex is required for streaming request body
       duplex: 'half',
-      signal: AbortSignal.timeout(30_000),
+      signal: AbortSignal.timeout(timeout),
     })
 
     const responseHeaders = new Headers(res.headers)
-    responseHeaders.set('X-Coverage', 'GB')
+    for (const [key, value] of Object.entries(extraHeaders)) {
+      responseHeaders.set(key, value)
+    }
     if (creditBalance !== undefined) {
       responseHeaders.set('X-Credit-Balance', String(creditBalance))
     }
@@ -199,7 +234,9 @@ async function proxyUpstream(c: Context, upstream: string, creditBalance?: numbe
       headers: responseHeaders,
     })
   } catch {
-    c.header('X-Coverage', 'GB')
+    for (const [key, value] of Object.entries(extraHeaders)) {
+      c.header(key, value)
+    }
     return c.json({ error: 'Upstream routing engine unavailable' }, 502)
   }
 }
@@ -216,17 +253,4 @@ function resolveCost(path: string, pricing: Record<string, number>): number | un
     }
   }
   return bestMatch?.cost
-}
-
-function getTrustedClientIp(c: Context, trustProxy: boolean): string | null {
-  if (!trustProxy) return null
-
-  const forwardedFor = c.req.header('X-Forwarded-For')
-  if (forwardedFor) {
-    const first = forwardedFor.split(',')[0]?.trim()
-    if (first) return first
-  }
-
-  const realIp = c.req.header('X-Real-IP')?.trim()
-  return realIp || null
 }

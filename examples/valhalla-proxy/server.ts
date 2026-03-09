@@ -29,6 +29,7 @@ const booth = new Booth({
     requestsPerDay: parseInt(process.env.FREE_TIER_REQUESTS ?? '10', 10),
   },
   upstream: process.env.VALHALLA_URL ?? 'http://localhost:8002',
+  responseHeaders: { 'X-Coverage': 'GB' },
   defaultInvoiceAmount: parseInt(process.env.DEFAULT_INVOICE_SATS ?? '1000', 10),
   rootKey: process.env.ROOT_KEY,
   dbPath: process.env.DB_PATH ?? './credits.db',
@@ -56,6 +57,16 @@ app.post('/admin/reset-free-tier', booth.resetFreeTierHandler)
 app.use('/*', booth.middleware)
 
 const port = parseInt(process.env.PORT ?? '3000', 10)
-serve({ fetch: app.fetch, port }, () => {
+const server = serve({ fetch: app.fetch, port }, () => {
   console.log(`routing proxy listening on :${port}`)
 })
+
+function shutdown() {
+  console.log('shutting down…')
+  server.close()
+  booth.close()
+  process.exit(0)
+}
+
+process.on('SIGTERM', shutdown)
+process.on('SIGINT', shutdown)

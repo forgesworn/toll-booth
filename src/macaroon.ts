@@ -1,6 +1,7 @@
 import { newMacaroon, importMacaroon } from 'macaroon'
 
 const LOCATION = 'toll-booth'
+const KNOWN_CAVEATS = new Set(['payment_hash', 'credit_balance'])
 
 /**
  * Mints a new macaroon encoding a payment hash and credit balance.
@@ -46,14 +47,34 @@ export function verifyMacaroon(rootKey: string, macaroonBase64: string): VerifyR
   try {
     const keyBytes = hexToBytes(rootKey)
     const m = importMacaroon(base64ToUint8(macaroonBase64))
+
+    // Track caveat counts to reject duplicates (prevents attacker-appended overrides)
+    const seen = new Map<string, number>()
     m.verify(keyBytes, (condition: string) => {
-      if (condition.includes(' = ')) return null
-      return 'unknown caveat'
+      const eqIdx = condition.indexOf(' = ')
+      if (eqIdx === -1) return 'malformed caveat'
+      const key = condition.slice(0, eqIdx)
+      if (!KNOWN_CAVEATS.has(key)) return 'unknown caveat'
+      seen.set(key, (seen.get(key) ?? 0) + 1)
+      if (seen.get(key)! > 1) return 'duplicate caveat'
+      return null
     }, [])
+
+    // Use the immutable identifier as the authoritative payment hash —
+    // it is set at mint time and covered by the root signature.
+    const json = m.exportJSON() as Record<string, unknown>
+    const identifier = json.i as string
+
     const caveats = parseCaveats(macaroonBase64)
+
+    // Cross-check: the payment_hash caveat must match the identifier
+    if (caveats.payment_hash && caveats.payment_hash !== identifier) {
+      return { valid: false }
+    }
+
     return {
       valid: true,
-      paymentHash: caveats.payment_hash,
+      paymentHash: identifier,
       creditBalance: caveats.credit_balance !== undefined
         ? parseInt(caveats.credit_balance, 10)
         : undefined,
@@ -81,7 +102,12 @@ export function parseCaveats(macaroonBase64: string): Record<string, string> {
     const raw = new TextDecoder().decode(c.identifier)
     const eqIdx = raw.indexOf(' = ')
     if (eqIdx !== -1) {
-      result[raw.slice(0, eqIdx).trim()] = raw.slice(eqIdx + 3).trim()
+      const key = raw.slice(0, eqIdx).trim()
+      // First-occurrence-wins: server-set caveats come first in the chain,
+      // so any attacker-appended duplicates are ignored.
+      if (!Object.hasOwn(result, key)) {
+        result[key] = raw.slice(eqIdx + 3).trim()
+      }
     }
   }
   return result

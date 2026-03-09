@@ -278,7 +278,7 @@ function clientScript(): string {
     fetch('/nwc-pay', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({nwcUri: uri, bolt11: invoice})
+      body: JSON.stringify({nwcUri: uri, bolt11: invoice, paymentHash: hash})
     })
     .then(function(r){return r.json()})
     .then(function(d){

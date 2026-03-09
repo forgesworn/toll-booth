@@ -66,4 +66,43 @@ describe('CreditMeter', () => {
       expect(meter.balance('unknown')).toBe(0)
     })
   })
+
+  describe('isSettled', () => {
+    it('returns false for unknown payment hash', () => {
+      expect(meter.isSettled('unknown')).toBe(false)
+    })
+
+    it('returns true after creditOnce', () => {
+      meter.creditOnce('settled1', 100)
+      expect(meter.isSettled('settled1')).toBe(true)
+    })
+
+    it('returns false after credit (not creditOnce)', () => {
+      meter.credit('unsettled1', 100)
+      expect(meter.isSettled('unsettled1')).toBe(false)
+    })
+  })
+
+  describe('input validation', () => {
+    it('rejects negative credit amounts', () => {
+      expect(() => meter.credit('hash', -100)).toThrow(RangeError)
+    })
+
+    it('rejects zero credit amounts', () => {
+      expect(() => meter.credit('hash', 0)).toThrow(RangeError)
+    })
+
+    it('rejects fractional credit amounts', () => {
+      expect(() => meter.credit('hash', 1.5)).toThrow(RangeError)
+    })
+
+    it('rejects negative debit amounts', () => {
+      meter.credit('hash', 100)
+      expect(() => meter.debit('hash', -5)).toThrow(RangeError)
+    })
+
+    it('rejects negative creditOnce amounts', () => {
+      expect(() => meter.creditOnce('hash', -100)).toThrow(RangeError)
+    })
+  })
 })

@@ -29,8 +29,8 @@ export function invoiceStatus(depsOrBackend: InvoiceStatusDeps | LightningBacken
 
   return async (c: Context) => {
     const hash = c.req.param('paymentHash')
-    if (!hash) {
-      return c.json({ error: 'Missing payment hash' }, 400)
+    if (!hash || !/^[0-9a-f]{64}$/i.test(hash)) {
+      return c.json({ error: 'Invalid payment hash — expected 64 hex characters' }, 400)
     }
     const acceptsHtml = c.req.header('Accept')?.includes('text/html')
 

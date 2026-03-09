@@ -5,6 +5,9 @@ export interface FreeTierResult {
   remaining: number
 }
 
+/** Maximum number of distinct IPs tracked before new IPs are denied. */
+const MAX_TRACKED_IPS = 100_000
+
 export class FreeTier {
   private counters = new Map<string, { count: number; date: string }>()
   private currentDate = new Date().toISOString().slice(0, 10)
@@ -32,6 +35,10 @@ export class FreeTier {
     const entry = this.counters.get(ip)
 
     if (!entry || entry.date !== today) {
+      // Prevent unbounded memory growth from IP-spoofed requests
+      if (!entry && this.counters.size >= MAX_TRACKED_IPS) {
+        return { allowed: false, remaining: 0 }
+      }
       this.counters.set(ip, { count: 1, date: today })
       return { allowed: true, remaining: this.requestsPerDay - 1 }
     }

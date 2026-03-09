@@ -12,6 +12,8 @@ export class CreditMeter {
   private readonly stmtMarkSettled: Database.Statement
   private readonly stmtDebit: Database.Statement
   private readonly stmtBalance: Database.Statement
+  private readonly stmtIsSettled: Database.Statement
+  private readonly txCreditOnce!: (paymentHash: string, amountSats: number) => boolean
 
   constructor(db: Database.Database) {
     this.db = db
@@ -47,24 +49,40 @@ export class CreditMeter {
     this.stmtBalance = this.db.prepare(
       'SELECT balance FROM credits WHERE payment_hash = ?'
     )
+    this.stmtIsSettled = this.db.prepare(
+      'SELECT 1 FROM settled_invoices WHERE payment_hash = ?'
+    )
+    this.txCreditOnce = this.db.transaction((paymentHash: string, amountSats: number): boolean => {
+      const marked = this.stmtMarkSettled.run(paymentHash)
+      if (marked.changes === 0) return false
+      this.stmtCredit.run(paymentHash, amountSats)
+      return true
+    })
   }
 
   credit(paymentHash: string, amountSats: number): void {
+    if (!Number.isInteger(amountSats) || amountSats < 1) {
+      throw new RangeError(`amountSats must be a positive integer, got ${amountSats}`)
+    }
     this.stmtCredit.run(paymentHash, amountSats)
   }
 
   /**
    * Grants the initial invoice credit once per payment hash.
    * Returns true only on the first successful settlement.
+   * Atomic: marking settled and crediting happen in a single transaction.
    */
   creditOnce(paymentHash: string, amountSats: number): boolean {
-    const marked = this.stmtMarkSettled.run(paymentHash)
-    if (marked.changes === 0) return false
-    this.stmtCredit.run(paymentHash, amountSats)
-    return true
+    if (!Number.isInteger(amountSats) || amountSats < 1) {
+      throw new RangeError(`amountSats must be a positive integer, got ${amountSats}`)
+    }
+    return this.txCreditOnce(paymentHash, amountSats)
   }
 
   debit(paymentHash: string, amountSats: number): DebitResult {
+    if (!Number.isInteger(amountSats) || amountSats < 1) {
+      throw new RangeError(`amountSats must be a positive integer, got ${amountSats}`)
+    }
     const current = this.balance(paymentHash)
     if (current < amountSats) {
       return { success: false, remaining: current }
@@ -74,6 +92,11 @@ export class CreditMeter {
       return { success: false, remaining: this.balance(paymentHash) }
     }
     return { success: true, remaining: current - amountSats }
+  }
+
+  /** Check if a payment hash has already been settled (credited). */
+  isSettled(paymentHash: string): boolean {
+    return this.stmtIsSettled.get(paymentHash) !== undefined
   }
 
   balance(paymentHash: string): number {
