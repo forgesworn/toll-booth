@@ -448,6 +448,35 @@ describe('Booth', () => {
       booth.close()
     })
 
+    it('rolls back settlement when Cashu redemption fails', async () => {
+      const redeemCashu = vi.fn().mockRejectedValue(new Error('Mint unreachable'))
+      const { app, booth, paymentHash } = setup({ redeemCashu })
+
+      // Store invoice
+      await app.request('/route', { method: 'POST' })
+
+      const res = await app.request('/cashu-redeem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: 'cashuA...', paymentHash }),
+      })
+
+      expect(res.status).toBe(500)
+
+      // After rollback, a retry should be allowed (not stuck as "already credited")
+      redeemCashu.mockResolvedValue(500)
+      const res2 = await app.request('/cashu-redeem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: 'cashuRetry...', paymentHash }),
+      })
+
+      expect(res2.status).toBe(200)
+      expect((await res2.json()).credited).toBe(500)
+
+      booth.close()
+    })
+
     it('does not expose /cashu-redeem when adapter not provided', async () => {
       const { booth } = setup()
       expect(booth.cashuRedeemHandler).toBeUndefined()

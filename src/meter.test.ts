@@ -83,6 +83,29 @@ describe('CreditMeter', () => {
     })
   })
 
+  describe('unsettle', () => {
+    it('allows re-crediting after rollback', () => {
+      const hash = 'rollback1'
+      meter.creditOnce(hash, 100)
+      expect(meter.isSettled(hash)).toBe(true)
+      expect(meter.balance(hash)).toBe(100)
+
+      meter.unsettle(hash)
+      expect(meter.isSettled(hash)).toBe(false)
+      expect(meter.balance(hash)).toBe(0)
+
+      // Can credit again after rollback
+      expect(meter.creditOnce(hash, 200)).toBe(true)
+      expect(meter.balance(hash)).toBe(200)
+    })
+
+    it('is a no-op for unknown payment hash', () => {
+      // Should not throw
+      meter.unsettle('nonexistent')
+      expect(meter.isSettled('nonexistent')).toBe(false)
+    })
+  })
+
   describe('input validation', () => {
     it('rejects negative credit amounts', () => {
       expect(() => meter.credit('hash', -100)).toThrow(RangeError)

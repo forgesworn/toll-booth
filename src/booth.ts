@@ -185,18 +185,25 @@ export class Booth {
           if (!stored) {
             return c.json({ error: 'Unknown payment hash — no invoice found' }, 404)
           }
-          // Check idempotency before consuming the Cashu token
+          // Lock via creditOnce BEFORE consuming the token — prevents race
+          // where two concurrent requests both pass isSettled() then both call redeem()
           if (meter.isSettled(paymentHash)) {
             return c.json({ error: 'This payment hash has already been credited' }, 409)
           }
-          const credited = await redeem(token, paymentHash)
-          const wasFirstCredit = meter.creditOnce(paymentHash, credited)
+          const wasFirstCredit = meter.creditOnce(paymentHash, stored.amountSats)
           if (!wasFirstCredit) {
-            // Race: another request credited between isSettled() and here.
-            // Token was already consumed by redeem() — return 409 so the client
-            // knows credit was not granted (the token value is lost in this edge case).
             return c.json({ error: 'This payment hash has already been credited' }, 409)
           }
+
+          let credited: number
+          try {
+            credited = await redeem(token, paymentHash)
+          } catch (err) {
+            // Redemption failed — roll back the settlement lock so user can retry
+            meter.unsettle(paymentHash)
+            throw err // Re-throw to hit the outer catch block
+          }
+
           stats.recordCashuRedemption(credited)
           return c.json({ credited })
         } catch (err) {
