@@ -136,7 +136,7 @@ describe('CreditMeter', () => {
   })
 
   describe('cleanupDrained', () => {
-    it('removes zero-balance credits and their settlement records', () => {
+    it('removes zero-balance credits but preserves settlement tombstones', () => {
       const db = new Database(':memory:')
       db.pragma('journal_mode = WAL')
       const meter = new CreditMeter(db)
@@ -148,7 +148,10 @@ describe('CreditMeter', () => {
       const removed = meter.cleanupDrained()
       expect(removed).toBe(1)
       expect(meter.balance(hash)).toBe(0)
-      expect(meter.isSettled(hash)).toBe(false)
+      // Tombstone must survive — prevents replay of spent L402 tokens
+      expect(meter.isSettled(hash)).toBe(true)
+      // Replayed creditOnce must still be rejected
+      expect(meter.creditOnce(hash, 10)).toBe(false)
     })
 
     it('keeps credits with remaining balance', () => {
@@ -163,6 +166,24 @@ describe('CreditMeter', () => {
       const removed = meter.cleanupDrained()
       expect(removed).toBe(0)
       expect(meter.balance(hash)).toBe(5)
+    })
+
+    it('prevents replay attack: spent token cannot re-credit after cleanup', () => {
+      const db = new Database(':memory:')
+      db.pragma('journal_mode = WAL')
+      const meter = new CreditMeter(db)
+
+      const hash = 'e'.repeat(64)
+      // Simulate full lifecycle: credit, spend, cleanup
+      meter.creditOnce(hash, 100)
+      meter.debit(hash, 100)
+      expect(meter.balance(hash)).toBe(0)
+
+      meter.cleanupDrained()
+
+      // Attacker replays the same macaroon+preimage — creditOnce must reject
+      expect(meter.creditOnce(hash, 100)).toBe(false)
+      expect(meter.balance(hash)).toBe(0)
     })
   })
 

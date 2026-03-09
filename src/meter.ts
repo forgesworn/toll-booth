@@ -215,20 +215,12 @@ export class CreditMeter {
    * Returns the number of rows deleted.
    */
   cleanupDrained(): number {
-    const hashes = this.db.prepare(
-      'SELECT payment_hash FROM credits WHERE balance = 0'
-    ).all() as { payment_hash: string }[]
-    if (hashes.length === 0) return 0
-
-    const tx = this.db.transaction(() => {
-      this.db.prepare('DELETE FROM credits WHERE balance = 0').run()
-      const del = this.db.prepare('DELETE FROM settled_invoices WHERE payment_hash = ?')
-      for (const { payment_hash } of hashes) {
-        del.run(payment_hash)
-      }
-    })
-    tx()
-    return hashes.length
+    // Only remove the zero-balance credits row. The settled_invoices
+    // tombstone MUST be preserved — it prevents replay attacks where
+    // a spent L402 token (valid macaroon + preimage) is resubmitted
+    // to re-credit via creditOnce().
+    const result = this.db.prepare('DELETE FROM credits WHERE balance = 0').run()
+    return result.changes
   }
 
   close(): void {
