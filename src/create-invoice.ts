@@ -26,6 +26,10 @@ export function createInvoiceHandler(deps: CreateInvoiceDeps) {
       const body = await c.req.json<{ amountSats?: number }>()
       const requestedAmount = body.amountSats ?? deps.defaultAmount
 
+      if (!Number.isInteger(requestedAmount) || requestedAmount < 1) {
+        return c.json({ error: 'amountSats must be a positive integer' }, 400)
+      }
+
       // Find matching tier or validate amount
       let creditSats = requestedAmount
       if (deps.tiers.length > 0) {

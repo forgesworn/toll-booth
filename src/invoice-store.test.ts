@@ -36,6 +36,33 @@ describe('InvoiceStore', () => {
     expect(inv!.macaroon).toBe('mac1')
   })
 
+  it('removes invoices older than the specified age', () => {
+    const db = new Database(':memory:')
+    db.pragma('journal_mode = WAL')
+    const store = new InvoiceStore(db)
+
+    store.store('a'.repeat(64), 'lnbc...', 1000, 'mac...')
+
+    // Manually backdate the invoice
+    db.prepare("UPDATE invoices SET created_at = datetime('now', '-2 hours')").run()
+
+    const removed = store.cleanup(3600) // 1 hour
+    expect(removed).toBe(1)
+    expect(store.get('a'.repeat(64))).toBeUndefined()
+  })
+
+  it('keeps invoices newer than the specified age', () => {
+    const db = new Database(':memory:')
+    db.pragma('journal_mode = WAL')
+    const store = new InvoiceStore(db)
+
+    store.store('a'.repeat(64), 'lnbc...', 1000, 'mac...')
+
+    const removed = store.cleanup(3600)
+    expect(removed).toBe(0)
+    expect(store.get('a'.repeat(64))).toBeDefined()
+  })
+
   it('shares the same database with CreditMeter', () => {
     // Verify both tables can coexist on the same DB
     const db = new Database(':memory:')

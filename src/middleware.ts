@@ -233,9 +233,12 @@ async function proxyUpstream(
       status: res.status,
       headers: responseHeaders,
     })
-  } catch {
+  } catch (err) {
     for (const [key, value] of Object.entries(extraHeaders)) {
       c.header(key, value)
+    }
+    if (err instanceof Error && err.name === 'TimeoutError') {
+      return c.json({ error: 'Upstream request timed out' }, 504)
     }
     return c.json({ error: 'Upstream routing engine unavailable' }, 502)
   }

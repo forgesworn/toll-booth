@@ -13,6 +13,8 @@ export class CreditMeter {
   private readonly stmtDebit: Database.Statement
   private readonly stmtBalance: Database.Statement
   private readonly stmtIsSettled: Database.Statement
+  private readonly stmtDeleteSettled: Database.Statement
+  private readonly stmtDeleteCredits: Database.Statement
   private readonly txCreditOnce!: (paymentHash: string, amountSats: number) => boolean
 
   constructor(db: Database.Database) {
@@ -51,6 +53,12 @@ export class CreditMeter {
     )
     this.stmtIsSettled = this.db.prepare(
       'SELECT 1 FROM settled_invoices WHERE payment_hash = ?'
+    )
+    this.stmtDeleteSettled = this.db.prepare(
+      'DELETE FROM settled_invoices WHERE payment_hash = ?'
+    )
+    this.stmtDeleteCredits = this.db.prepare(
+      'DELETE FROM credits WHERE payment_hash = ?'
     )
     this.txCreditOnce = this.db.transaction((paymentHash: string, amountSats: number): boolean => {
       const marked = this.stmtMarkSettled.run(paymentHash)
@@ -102,6 +110,38 @@ export class CreditMeter {
   balance(paymentHash: string): number {
     const row = this.stmtBalance.get(paymentHash) as { balance: number } | undefined
     return row?.balance ?? 0
+  }
+
+  /**
+   * Remove a settlement record and its credits, allowing creditOnce to succeed again.
+   * Used to roll back when a post-lock operation (e.g. Cashu redemption) fails.
+   */
+  unsettle(paymentHash: string): void {
+    this.db.transaction(() => {
+      this.stmtDeleteSettled.run(paymentHash)
+      this.stmtDeleteCredits.run(paymentHash)
+    })()
+  }
+
+  /**
+   * Remove credits with zero balance and their corresponding settlement records.
+   * Returns the number of rows deleted.
+   */
+  cleanupDrained(): number {
+    const hashes = this.db.prepare(
+      'SELECT payment_hash FROM credits WHERE balance = 0'
+    ).all() as { payment_hash: string }[]
+    if (hashes.length === 0) return 0
+
+    const tx = this.db.transaction(() => {
+      this.db.prepare('DELETE FROM credits WHERE balance = 0').run()
+      const del = this.db.prepare('DELETE FROM settled_invoices WHERE payment_hash = ?')
+      for (const { payment_hash } of hashes) {
+        del.run(payment_hash)
+      }
+    })
+    tx()
+    return hashes.length
   }
 
   close(): void {

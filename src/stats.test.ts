@@ -183,6 +183,26 @@ describe('StatsCollector', () => {
     })
   })
 
+  describe('endpoint cap', () => {
+    it('caps endpoint entries to prevent unbounded growth', () => {
+      const stats = new StatsCollector()
+      for (let i = 0; i < 1001; i++) {
+        stats.recordRequest({
+          timestamp: new Date().toISOString(),
+          endpoint: `/route/${i}`,
+          satsDeducted: 1,
+          remainingBalance: 99,
+          latencyMs: 10,
+          authenticated: true,
+        })
+      }
+      const snap = stats.snapshot()
+      expect(Object.keys(snap.endpoints).length).toBeLessThanOrEqual(1000)
+      // Total request count should still be accurate
+      expect(snap.requests.total).toBe(1001)
+    })
+  })
+
   describe('mixed usage', () => {
     it('tracks a realistic session correctly', () => {
       // 3 free requests

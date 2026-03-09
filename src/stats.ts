@@ -1,6 +1,9 @@
 // src/stats.ts
 import type { PaymentEvent, RequestEvent, ChallengeEvent } from './types.js'
 
+/** Maximum number of distinct endpoint paths tracked in stats. */
+const MAX_TRACKED_ENDPOINTS = 1000
+
 /**
  * Aggregate statistics snapshot from a toll-booth instance.
  *
@@ -69,10 +72,13 @@ export class StatsCollector {
       this.requests.freeTier++
     }
 
-    const ep = this.endpoints.get(event.endpoint) ?? { requests: 0, satsConsumed: 0 }
-    ep.requests++
-    ep.satsConsumed += event.satsDeducted
-    this.endpoints.set(event.endpoint, ep)
+    const existing = this.endpoints.get(event.endpoint)
+    if (existing) {
+      existing.requests++
+      existing.satsConsumed += event.satsDeducted
+    } else if (this.endpoints.size < MAX_TRACKED_ENDPOINTS) {
+      this.endpoints.set(event.endpoint, { requests: 1, satsConsumed: event.satsDeducted })
+    }
 
     this.revenue.totalConsumed += event.satsDeducted
   }

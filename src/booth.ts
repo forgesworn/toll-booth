@@ -1,6 +1,6 @@
 // src/booth.ts
 import type { Context } from 'hono'
-import type { BoothConfig } from './types.js'
+import type { BoothConfig, LightningBackend } from './types.js'
 import type { EventHandler } from './middleware.js'
 import { tollBooth } from './middleware.js'
 import { FreeTier } from './free-tier.js'
@@ -38,6 +38,7 @@ export class Booth {
   readonly stats: StatsCollector
 
   private readonly db: Database.Database
+  private readonly backend: LightningBackend
   private readonly meter: CreditMeter
   private readonly invoiceStore: InvoiceStore
   private readonly rootKey: string
@@ -58,6 +59,7 @@ export class Booth {
       )
     }
     this.rootKey = config.rootKey ?? randomBytes(32).toString('hex')
+    this.backend = config.backend
     this.db = new Database(config.dbPath ?? './toll-booth.db')
     this.db.pragma('journal_mode = WAL')
     this.meter = new CreditMeter(this.db)
@@ -185,18 +187,25 @@ export class Booth {
           if (!stored) {
             return c.json({ error: 'Unknown payment hash — no invoice found' }, 404)
           }
-          // Check idempotency before consuming the Cashu token
+          // Lock via creditOnce BEFORE consuming the token — prevents race
+          // where two concurrent requests both pass isSettled() then both call redeem()
           if (meter.isSettled(paymentHash)) {
             return c.json({ error: 'This payment hash has already been credited' }, 409)
           }
-          const credited = await redeem(token, paymentHash)
-          const wasFirstCredit = meter.creditOnce(paymentHash, credited)
+          const wasFirstCredit = meter.creditOnce(paymentHash, stored.amountSats)
           if (!wasFirstCredit) {
-            // Race: another request credited between isSettled() and here.
-            // Token was already consumed by redeem() — return 409 so the client
-            // knows credit was not granted (the token value is lost in this edge case).
             return c.json({ error: 'This payment hash has already been credited' }, 409)
           }
+
+          let credited: number
+          try {
+            credited = await redeem(token, paymentHash)
+          } catch (err) {
+            // Redemption failed — roll back the settlement lock so user can retry
+            meter.unsettle(paymentHash)
+            throw err // Re-throw to hit the outer catch block
+          }
+
           stats.recordCashuRedemption(credited)
           return c.json({ credited })
         } catch (err) {
@@ -241,17 +250,38 @@ export class Booth {
    */
   healthHandler = async (c: Context): Promise<Response> => {
     const dbOk = this.checkDatabase()
-    const status = dbOk ? 'healthy' : 'degraded'
-    const code = dbOk ? 200 : 503
+    const lnOk = await this.checkLightning()
+    const allOk = dbOk && lnOk
     return c.json({
-      status,
+      status: allOk ? 'healthy' : 'degraded',
       upSince: this.stats.snapshot().upSince,
       database: dbOk ? 'ok' : 'unreachable',
-    }, code)
+      lightning: lnOk ? 'ok' : 'unreachable',
+    }, allOk ? 200 : 503)
+  }
+
+  /**
+   * Remove expired invoices and drained credits.
+   * Call periodically (e.g. daily) to prevent unbounded database growth.
+   * @param invoiceMaxAgeSecs - Max age for invoices (default: 86400 = 24 hours)
+   */
+  cleanup(invoiceMaxAgeSecs = 86_400): { invoicesRemoved: number; creditsRemoved: number } {
+    const invoicesRemoved = this.invoiceStore.cleanup(invoiceMaxAgeSecs)
+    const creditsRemoved = this.meter.cleanupDrained()
+    return { invoicesRemoved, creditsRemoved }
   }
 
   close(): void {
     this.db.close()
+  }
+
+  private async checkLightning(): Promise<boolean> {
+    try {
+      await this.backend.checkInvoice('0'.repeat(64))
+      return true
+    } catch {
+      return false
+    }
   }
 
   private checkDatabase(): boolean {

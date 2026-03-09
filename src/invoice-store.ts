@@ -10,10 +10,12 @@ export interface StoredInvoice {
 }
 
 export class InvoiceStore {
+  private readonly db: Database.Database
   private readonly stmtStore: Database.Statement
   private readonly stmtGet: Database.Statement
 
   constructor(db: Database.Database) {
+    this.db = db
     db.exec(`
       CREATE TABLE IF NOT EXISTS invoices (
         payment_hash TEXT PRIMARY KEY,
@@ -34,6 +36,17 @@ export class InvoiceStore {
 
   store(paymentHash: string, bolt11: string, amountSats: number, macaroon: string): void {
     this.stmtStore.run(paymentHash, bolt11, amountSats, macaroon)
+  }
+
+  /**
+   * Remove invoices older than `maxAgeSecs` seconds.
+   * Returns the number of rows deleted.
+   */
+  cleanup(maxAgeSecs: number): number {
+    const result = this.db.prepare(
+      "DELETE FROM invoices WHERE created_at < datetime('now', '-' || ? || ' seconds')"
+    ).run(maxAgeSecs)
+    return result.changes
   }
 
   get(paymentHash: string): StoredInvoice | undefined {

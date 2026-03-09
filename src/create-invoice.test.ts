@@ -112,6 +112,37 @@ describe('createInvoiceHandler', () => {
     expect(body.credit_sats).toBe(7777)
   })
 
+  it('rejects zero amount when no tiers configured', async () => {
+    const { app } = setup([])
+    const res = await app.request('/create-invoice', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amountSats: 0 }),
+    })
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toContain('positive integer')
+  })
+
+  it('rejects negative amount when no tiers configured', async () => {
+    const { app } = setup([])
+    const res = await app.request('/create-invoice', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amountSats: -100 }),
+    })
+    expect(res.status).toBe(400)
+  })
+
+  it('rejects non-integer amount when no tiers configured', async () => {
+    const { app } = setup([])
+    const res = await app.request('/create-invoice', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amountSats: 10.5 }),
+    })
+    expect(res.status).toBe(400)
+  })
+
   it('returns 500 on backend failure', async () => {
     const db = new Database(':memory:')
     db.pragma('journal_mode = WAL')
