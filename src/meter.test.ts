@@ -83,6 +83,35 @@ describe('CreditMeter', () => {
     })
   })
 
+  describe('claim', () => {
+    it('returns true on first claim', () => {
+      expect(meter.claim('claim1')).toBe(true)
+    })
+
+    it('returns false on duplicate claim', () => {
+      meter.claim('claim2')
+      expect(meter.claim('claim2')).toBe(false)
+    })
+
+    it('marks as settled without crediting', () => {
+      meter.claim('claim3')
+      expect(meter.isSettled('claim3')).toBe(true)
+      expect(meter.balance('claim3')).toBe(0)
+    })
+
+    it('allows credit after claim', () => {
+      meter.claim('claim4')
+      meter.credit('claim4', 500)
+      expect(meter.balance('claim4')).toBe(500)
+    })
+
+    it('allows retry after unsettle', () => {
+      meter.claim('claim5')
+      meter.unsettle('claim5')
+      expect(meter.claim('claim5')).toBe(true)
+    })
+  })
+
   describe('unsettle', () => {
     it('allows re-crediting after rollback', () => {
       const hash = 'rollback1'

@@ -189,14 +189,15 @@ export class Booth {
           if (!stored) {
             return c.json({ error: 'Unknown payment hash — no invoice found' }, 404)
           }
-          if (meter.isSettled(paymentHash)) {
-            return c.json({ error: 'This payment hash has already been credited' }, 409)
-          }
-          // In-memory lock prevents concurrent redeems for the same hash.
-          // Unlike creditOnce, this does NOT make isSettled() return true,
-          // so the middleware won't grant access during in-flight redemption.
+          // In-memory fast path — prevents duplicate work within one process
           if (pending.has(paymentHash)) {
             return c.json({ error: 'Redemption already in progress for this payment hash' }, 409)
+          }
+          // DB-level claim — cross-instance distributed lock via settled_invoices.
+          // This MUST happen BEFORE redeem() so only one instance calls the
+          // irreversible Cashu mint. isSettled() is now implied by claim().
+          if (!meter.claim(paymentHash)) {
+            return c.json({ error: 'This payment hash has already been credited' }, 409)
           }
           pending.add(paymentHash)
 
@@ -205,25 +206,22 @@ export class Booth {
             credited = await redeem(token, paymentHash)
           } catch (err) {
             pending.delete(paymentHash)
+            meter.unsettle(paymentHash)
             throw err // Re-throw to hit the outer catch block
           }
 
           // Validate adapter output before touching the ledger
           if (!Number.isInteger(credited) || credited < 1) {
             pending.delete(paymentHash)
+            meter.unsettle(paymentHash)
             return c.json({
               error: `Cashu adapter returned invalid amount: ${credited}`,
             }, 502)
           }
 
-          // Redemption succeeded — now atomically settle and credit
-          const wasFirstCredit = meter.creditOnce(paymentHash, credited)
+          // Claim already held — just credit the balance
+          meter.credit(paymentHash, credited)
           pending.delete(paymentHash)
-          if (!wasFirstCredit) {
-            // Should not happen (we checked isSettled + held pending lock),
-            // but guard against it defensively
-            return c.json({ error: 'This payment hash has already been credited' }, 409)
-          }
 
           stats.recordCashuRedemption(credited)
           return c.json({ credited, macaroon: stored.macaroon })

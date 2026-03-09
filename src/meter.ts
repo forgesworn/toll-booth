@@ -76,6 +76,18 @@ export class CreditMeter {
   }
 
   /**
+   * Claims a payment hash for redemption without crediting.
+   * Returns true only on the first successful claim — acts as a
+   * cross-instance distributed lock via the `settled_invoices` table.
+   * Call `credit()` after the external operation succeeds, or
+   * `unsettle()` to release the claim on failure.
+   */
+  claim(paymentHash: string): boolean {
+    const result = this.stmtMarkSettled.run(paymentHash)
+    return result.changes > 0
+  }
+
+  /**
    * Grants the initial invoice credit once per payment hash.
    * Returns true only on the first successful settlement.
    * Atomic: marking settled and crediting happen in a single transaction.

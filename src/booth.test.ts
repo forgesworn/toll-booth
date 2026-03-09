@@ -747,6 +747,74 @@ describe('Booth', () => {
       expect(booth.cashuRedeemHandler).toBeUndefined()
       booth.close()
     })
+
+    it('cross-instance: only one instance calls redeem() for the same hash', async () => {
+      const { preimage, paymentHash } = makePreimageAndHash()
+      const tmpDb = `/tmp/toll-booth-race-${Date.now()}.db`
+
+      // Two independent Booth instances sharing the same SQLite DB
+      const redeemA = vi.fn().mockImplementation(
+        () => new Promise<number>((resolve) => setTimeout(() => resolve(500), 50)),
+      )
+      const redeemB = vi.fn().mockImplementation(
+        () => new Promise<number>((resolve) => setTimeout(() => resolve(500), 50)),
+      )
+
+      const backend: LightningBackend = {
+        createInvoice: vi.fn().mockResolvedValue({ bolt11: 'lnbc1000n1test...', paymentHash }),
+        checkInvoice: vi.fn().mockResolvedValue({ paid: false }),
+      }
+
+      const boothA = new Booth({
+        backend, pricing: { '/route': 2 }, upstream: 'http://localhost:8002',
+        rootKey: ROOT_KEY, dbPath: tmpDb, redeemCashu: redeemA,
+      })
+      const boothB = new Booth({
+        backend, pricing: { '/route': 2 }, upstream: 'http://localhost:8002',
+        rootKey: ROOT_KEY, dbPath: tmpDb, redeemCashu: redeemB,
+      })
+
+      const appA = new Hono()
+      appA.post('/cashu-redeem', boothA.cashuRedeemHandler!)
+      appA.use('/*', boothA.middleware)
+
+      const appB = new Hono()
+      appB.post('/cashu-redeem', boothB.cashuRedeemHandler!)
+      appB.use('/*', boothB.middleware)
+
+      // Store invoice via instance A (both share the same DB)
+      await appA.request('/route', { method: 'POST' })
+
+      // Race: both instances attempt redeem concurrently
+      const [resA, resB] = await Promise.all([
+        appA.request('/cashu-redeem', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: 'cashuA...', paymentHash }),
+        }),
+        appB.request('/cashu-redeem', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: 'cashuB...', paymentHash }),
+        }),
+      ])
+
+      const statuses = [resA.status, resB.status].sort()
+      expect(statuses).toEqual([200, 409])
+
+      // Critical: only ONE instance should have called its redeem adapter
+      const totalRedeemCalls = redeemA.mock.calls.length + redeemB.mock.calls.length
+      expect(totalRedeemCalls).toBe(1)
+
+      boothA.close()
+      boothB.close()
+
+      // Clean up temp DB
+      const { unlinkSync } = await import('node:fs')
+      try { unlinkSync(tmpDb) } catch {}
+      try { unlinkSync(`${tmpDb}-wal`) } catch {}
+      try { unlinkSync(`${tmpDb}-shm`) } catch {}
+    })
   })
 
   describe('statsHandler', () => {
