@@ -298,7 +298,7 @@ function clientScript(): string {
     })
     .then(function(r){return r.json()})
     .then(function(d){
-      if (d.credited) showPaid(null, d.credited);
+      if (d.credited) showPaid(null, d.credited, d.macaroon);
       else if (d.error) alert(d.error);
     })
     .catch(function(e){ alert('Cashu redemption failed: ' + e.message) });
@@ -307,7 +307,7 @@ function clientScript(): string {
   function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
   function fmtSats(n){return Number(n).toLocaleString('en-GB')}
 
-  function showPaid(preimage, creditedAmount){
+  function showPaid(preimage, creditedAmount, cashuMacaroon){
     clearInterval(pollInterval);
     var status = document.getElementById('status');
     status.className = 'status status-paid';
@@ -337,14 +337,21 @@ function clientScript(): string {
     if (creditedAmount) {
       successHtml += '<div class="credit-bal">' + fmtSats(creditedAmount) + ' sats credited</div>';
     }
+
+    // Determine the macaroon and auth token format
+    var macStr = cashuMacaroon ? escHtml(cashuMacaroon) : (card.dataset.macaroon ? escHtml(card.dataset.macaroon) : '');
+
     if (preimage) {
       var safePreimage = escHtml(preimage);
       successHtml += '<div><div class="token-label">Payment preimage</div><div class="token-box" id="preimage">' + safePreimage + '</div></div>';
-      var macStr = card.dataset.macaroon ? escHtml(card.dataset.macaroon) : '';
       if (macStr) {
         successHtml += '<div><div class="token-label">L402 Token (macaroon:preimage)</div><div class="token-box" id="l402-token">' + macStr + ':' + safePreimage + '</div></div>';
         successHtml += '<button class="btn btn-success" onclick="copyToken()">Copy L402 Token</button>';
       }
+    } else if (macStr) {
+      // Cashu path: no preimage, use "settled" as the auth placeholder
+      successHtml += '<div><div class="token-label">L402 Token</div><div class="token-box" id="l402-token">' + macStr + ':settled</div></div>';
+      successHtml += '<button class="btn btn-success" onclick="copyToken()">Copy L402 Token</button>';
     }
     status.insertAdjacentHTML('afterend', successHtml);
   }

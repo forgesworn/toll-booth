@@ -217,6 +217,62 @@ describe('tollBooth middleware', () => {
       })
       expect(res.status).toBe(402)
     })
+
+    it('accepts L402 token without valid preimage when invoice is settled (Cashu path)', async () => {
+      const { preimage, paymentHash } = makePreimageAndHash()
+      const backend: LightningBackend = {
+        createInvoice: vi.fn().mockResolvedValue({
+          bolt11: 'lnbc100n1mock...',
+          paymentHash,
+        }),
+        checkInvoice: vi.fn(),
+      }
+
+      // Create app with shared meter so we can pre-settle the invoice
+      const db = new Database(':memory:')
+      db.pragma('journal_mode = WAL')
+      const { CreditMeter } = await import('./meter.js')
+      const meter = new CreditMeter(db)
+
+      const app = new Hono()
+      const booth = tollBooth({
+        backend,
+        pricing: { '/route': 2 },
+        upstream: 'http://localhost:8002',
+        rootKey: ROOT_KEY,
+        freeTier: undefined,
+        _meter: meter,
+      })
+      app.use('/*', booth)
+
+      // Pre-settle the invoice (simulates Cashu redemption)
+      meter.creditOnce(paymentHash, 1000)
+
+      // Use "settled" as placeholder — no valid preimage
+      const macaroon = mintMacaroon(ROOT_KEY, paymentHash, 1000)
+      const authToken = `L402 ${macaroon}:settled`
+
+      const res = await app.request('/route', {
+        method: 'POST',
+        headers: { 'Authorization': authToken },
+      })
+      // Should proxy (502 because upstream is not running, but NOT 402)
+      expect(res.status).not.toBe(402)
+    })
+
+    it('rejects L402 token with wrong preimage when invoice is NOT settled', async () => {
+      const { paymentHash } = makePreimageAndHash()
+
+      const macaroon = mintMacaroon(ROOT_KEY, paymentHash, 1000)
+      const authToken = `L402 ${macaroon}:not-a-preimage`
+
+      const app = createApp(mockBackend(), { freeTier: undefined })
+      const res = await app.request('/route', {
+        method: 'POST',
+        headers: { 'Authorization': authToken },
+      })
+      expect(res.status).toBe(402)
+    })
   })
 
   describe('credit management', () => {

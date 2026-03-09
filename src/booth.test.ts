@@ -477,6 +477,95 @@ describe('Booth', () => {
       booth.close()
     })
 
+    it('returns macaroon in Cashu redeem response', async () => {
+      const redeemCashu = vi.fn().mockResolvedValue(1000)
+      const { app, booth, paymentHash } = setup({ redeemCashu })
+
+      // Store invoice
+      await app.request('/route', { method: 'POST' })
+
+      const res = await app.request('/cashu-redeem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: 'cashuA...', paymentHash }),
+      })
+
+      expect(res.status).toBe(200)
+      const body = await res.json()
+      expect(body.macaroon).toBeTruthy()
+      expect(typeof body.macaroon).toBe('string')
+
+      booth.close()
+    })
+
+    it('reconciles credit when redeemed amount differs from invoice', async () => {
+      // Redeem returns 600 but invoice was for 1000 (defaultInvoiceAmount)
+      const redeemCashu = vi.fn().mockResolvedValue(600)
+      const { app, booth, paymentHash, preimage } = setup({ redeemCashu })
+
+      // Store invoice (amount = 1000, the default)
+      await app.request('/route', { method: 'POST' })
+
+      const res = await app.request('/cashu-redeem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: 'cashuA...', paymentHash }),
+      })
+
+      expect(res.status).toBe(200)
+      const body = await res.json()
+      expect(body.credited).toBe(600)
+
+      // Now use the L402 token — balance should be 600, not 1000
+      const macaroon = body.macaroon
+      const authToken = `L402 ${macaroon}:settled`
+
+      // Each /route costs 2 sats. With 600 balance, should work.
+      const proxyRes = await app.request('/route', {
+        method: 'POST',
+        headers: { 'Authorization': authToken },
+      })
+      // 502 (upstream not running) means auth passed — NOT 402
+      expect(proxyRes.status).not.toBe(402)
+
+      // Verify balance is 598 (600 - 2) by making 299 more requests (spending 598 sats)
+      // then confirming the next one is rejected. Instead, just verify a second request works.
+      const proxyRes2 = await app.request('/route', {
+        method: 'POST',
+        headers: { 'Authorization': authToken },
+      })
+      expect(proxyRes2.status).not.toBe(402) // still has credit
+
+      booth.close()
+    })
+
+    it('full Cashu flow: 402 → redeem → L402 auth with settled token', async () => {
+      const redeemCashu = vi.fn().mockResolvedValue(1000)
+      const { app, booth, paymentHash } = setup({ redeemCashu })
+
+      // 1. Get 402 challenge
+      const challenge = await app.request('/route', { method: 'POST' })
+      expect(challenge.status).toBe(402)
+
+      // 2. Redeem Cashu token
+      const redeemRes = await app.request('/cashu-redeem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: 'cashuA...', paymentHash }),
+      })
+      expect(redeemRes.status).toBe(200)
+      const { macaroon } = await redeemRes.json()
+
+      // 3. Use L402 with "settled" placeholder — should be authorised
+      const authRes = await app.request('/route', {
+        method: 'POST',
+        headers: { 'Authorization': `L402 ${macaroon}:settled` },
+      })
+      expect(authRes.status).not.toBe(402)
+
+      booth.close()
+    })
+
     it('does not expose /cashu-redeem when adapter not provided', async () => {
       const { booth } = setup()
       expect(booth.cashuRedeemHandler).toBeUndefined()

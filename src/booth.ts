@@ -206,8 +206,18 @@ export class Booth {
             throw err // Re-throw to hit the outer catch block
           }
 
+          // Reconcile if redeemed amount differs from the locked amount
+          if (credited !== stored.amountSats) {
+            const diff = credited - stored.amountSats
+            if (diff > 0) {
+              meter.credit(paymentHash, diff)
+            } else if (diff < 0) {
+              meter.debit(paymentHash, -diff)
+            }
+          }
+
           stats.recordCashuRedemption(credited)
-          return c.json({ credited })
+          return c.json({ credited, macaroon: stored.macaroon })
         } catch (err) {
           return c.json({ error: err instanceof Error ? err.message : 'Cashu redemption failed' }, 500)
         }

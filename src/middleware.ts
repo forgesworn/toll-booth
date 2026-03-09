@@ -170,11 +170,14 @@ function handleL402Auth(
     const result = verifyMacaroon(rootKey, macaroonBase64)
     if (!result.valid || !result.paymentHash) return { authorised: false, remaining: 0 }
 
-    // Verify the preimage is proof of payment: sha256(preimage) must equal payment_hash
-    const computedHash = createHash('sha256')
-      .update(Buffer.from(preimage, 'hex'))
-      .digest('hex')
-    if (computedHash !== result.paymentHash) return { authorised: false, remaining: 0 }
+    // Verify proof of payment: either a valid preimage or an already-settled invoice.
+    // Settled invoices (e.g. Cashu redemptions) have no preimage — the settlement
+    // record itself is the proof that payment was received through an alternative path.
+    const preimageValid = /^[0-9a-f]+$/i.test(preimage) && preimage.length > 0
+      && createHash('sha256').update(Buffer.from(preimage, 'hex')).digest('hex') === result.paymentHash
+    if (!preimageValid && !meter.isSettled(result.paymentHash)) {
+      return { authorised: false, remaining: 0 }
+    }
 
     // Credit only once per settled invoice
     let creditedAmount: number | undefined
