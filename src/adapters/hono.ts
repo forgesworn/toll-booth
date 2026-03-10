@@ -163,57 +163,43 @@ export function createHonoNwcHandler(
 /**
  * Returns a Hono handler that redeems a Cashu token as payment.
  *
- * Expects JSON body with `{ token, paymentHash }`. Uses a per-paymentHash
- * lock to serialise redemption attempts (prevents concurrent mint drains)
- * and settleWithCredit for crash-safe atomic settlement+credit.
+ * Expects JSON body with `{ token, paymentHash }`. Uses a durable
+ * write-ahead claim (persisted to storage) before calling the external
+ * Cashu mint, so that:
+ * - Multiple app instances sharing the same DB cannot both call redeem()
+ * - If the process crashes after redeem() but before settlement, the
+ *   claim survives for recovery on restart via pendingClaims()
  */
 export function createHonoCashuHandler(
   redeem: (token: string, paymentHash: string) => Promise<number>,
   storage: StorageBackend,
 ): (c: Context) => Promise<Response> {
-  // Per-paymentHash lock to serialise concurrent redemption attempts
-  const pending = new Map<string, Promise<{ credited: number; macaroon?: string }>>()
-
   return async (c) => {
     try {
       const { token, paymentHash } = await c.req.json()
 
-      // Fast path: already settled, no lock needed
+      // Fast path: already settled
       if (storage.isSettled(paymentHash)) {
         const invoice = storage.getInvoice(paymentHash)
         return c.json({ credited: 0, macaroon: invoice?.macaroon })
       }
 
-      // Serialise per paymentHash — only one request hits the mint
-      const inflight = pending.get(paymentHash)
-      if (inflight) {
-        const result = await inflight
-        return c.json(result)
-      }
-
-      const work = (async () => {
-        // Re-check after acquiring the logical lock
-        if (storage.isSettled(paymentHash)) {
-          const invoice = storage.getInvoice(paymentHash)
-          return { credited: 0, macaroon: invoice?.macaroon }
-        }
-
-        const credited = await redeem(token, paymentHash)
-
-        // Atomic settle+credit — crash-safe, no lost credit
-        storage.settleWithCredit(paymentHash, credited)
-
+      // Durable claim — written to DB before the irreversible mint call.
+      // Only one process/instance wins the claim (atomic INSERT).
+      if (!storage.claimForRedeem(paymentHash, token)) {
+        // Already claimed by another request/instance, or already settled
         const invoice = storage.getInvoice(paymentHash)
-        return { credited, macaroon: invoice?.macaroon }
-      })()
-
-      pending.set(paymentHash, work)
-      try {
-        const result = await work
-        return c.json(result)
-      } finally {
-        pending.delete(paymentHash)
+        return c.json({ credited: 0, macaroon: invoice?.macaroon })
       }
+
+      // We hold the exclusive claim — call the external mint
+      const credited = await redeem(token, paymentHash)
+
+      // Atomic settle+credit — upgrades claim to settled
+      storage.settleWithCredit(paymentHash, credited)
+
+      const invoice = storage.getInvoice(paymentHash)
+      return c.json({ credited, macaroon: invoice?.macaroon })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Cashu redemption failed'
       return c.json({ error: message }, 500)

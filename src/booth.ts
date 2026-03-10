@@ -140,6 +140,29 @@ export class Booth {
     this.engine.freeTier?.reset()
   }
 
+  /**
+   * Recover Cashu redemptions that were claimed but never settled (crash recovery).
+   * Call this on startup when Cashu is enabled. For each pending claim, retries
+   * the redeem call and settles on success. Returns the number of recovered claims.
+   */
+  async recoverPendingClaims(
+    redeemFn: (token: string, paymentHash: string) => Promise<number>,
+  ): Promise<number> {
+    const claims = this.storage.pendingClaims()
+    let recovered = 0
+    for (const claim of claims) {
+      try {
+        const credited = await redeemFn(claim.token, claim.paymentHash)
+        this.storage.settleWithCredit(claim.paymentHash, credited)
+        recovered++
+      } catch {
+        // Mint may reject (already redeemed) — settle with 0 to clear the claim
+        this.storage.settleWithCredit(claim.paymentHash, 0)
+      }
+    }
+    return recovered
+  }
+
   close(): void {
     this.storage.close()
   }

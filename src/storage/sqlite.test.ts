@@ -98,4 +98,39 @@ describe('sqliteStorage', () => {
     expect(storage.settleWithCredit('hash1', 500)).toBe(false)
     expect(storage.balance('hash1')).toBe(500) // not 1000
   })
+
+  it('claimForRedeem returns true on first call, false on duplicate', () => {
+    storage = sqliteStorage()
+    expect(storage.claimForRedeem('hash1', 'cashuA...')).toBe(true)
+    expect(storage.claimForRedeem('hash1', 'cashuA...')).toBe(false)
+  })
+
+  it('claimForRedeem rejects if already settled', () => {
+    storage = sqliteStorage()
+    storage.settle('hash1')
+    expect(storage.claimForRedeem('hash1', 'cashuA...')).toBe(false)
+  })
+
+  it('pendingClaims returns unsettled claims', () => {
+    storage = sqliteStorage()
+    storage.claimForRedeem('hash1', 'tokenA')
+    storage.claimForRedeem('hash2', 'tokenB')
+
+    // Settle hash1
+    storage.settleWithCredit('hash1', 100)
+
+    const pending = storage.pendingClaims()
+    expect(pending).toHaveLength(1)
+    expect(pending[0].paymentHash).toBe('hash2')
+    expect(pending[0].token).toBe('tokenB')
+  })
+
+  it('settleWithCredit clears the claim row', () => {
+    storage = sqliteStorage()
+    storage.claimForRedeem('hash1', 'tokenA')
+    expect(storage.pendingClaims()).toHaveLength(1)
+
+    storage.settleWithCredit('hash1', 500)
+    expect(storage.pendingClaims()).toHaveLength(0)
+  })
 })

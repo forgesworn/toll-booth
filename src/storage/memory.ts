@@ -1,10 +1,11 @@
 // src/storage/memory.ts
-import type { StorageBackend, DebitResult, StoredInvoice } from './interface.js'
+import type { StorageBackend, DebitResult, StoredInvoice, PendingClaim } from './interface.js'
 
 export function memoryStorage(): StorageBackend {
   const balances = new Map<string, number>()
   const invoices = new Map<string, StoredInvoice>()
   const settled = new Set<string>()
+  const claims = new Map<string, { token: string; claimedAt: string }>()
 
   return {
     credit(paymentHash: string, amount: number): void {
@@ -39,9 +40,22 @@ export function memoryStorage(): StorageBackend {
     settleWithCredit(paymentHash: string, amount: number): boolean {
       if (settled.has(paymentHash)) return false
       settled.add(paymentHash)
+      claims.delete(paymentHash)
       const current = balances.get(paymentHash) ?? 0
       balances.set(paymentHash, current + amount)
       return true
+    },
+
+    claimForRedeem(paymentHash: string, token: string): boolean {
+      if (settled.has(paymentHash) || claims.has(paymentHash)) return false
+      claims.set(paymentHash, { token, claimedAt: new Date().toISOString() })
+      return true
+    },
+
+    pendingClaims(): PendingClaim[] {
+      return Array.from(claims.entries()).map(([paymentHash, { token, claimedAt }]) => ({
+        paymentHash, token, claimedAt,
+      }))
     },
 
     storeInvoice(paymentHash: string, bolt11: string, amountSats: number, macaroon: string): void {
@@ -63,6 +77,7 @@ export function memoryStorage(): StorageBackend {
       balances.clear()
       invoices.clear()
       settled.clear()
+      claims.clear()
     },
   }
 }

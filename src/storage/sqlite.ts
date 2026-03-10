@@ -1,6 +1,6 @@
 // src/storage/sqlite.ts
 import Database from 'better-sqlite3'
-import type { StorageBackend, DebitResult, StoredInvoice } from './interface.js'
+import type { StorageBackend, DebitResult, StoredInvoice, PendingClaim } from './interface.js'
 
 export interface SqliteStorageConfig {
   path?: string
@@ -33,6 +33,14 @@ export function sqliteStorage(config?: SqliteStorageConfig): StorageBackend {
     CREATE TABLE IF NOT EXISTS settlements (
       payment_hash TEXT PRIMARY KEY,
       settled_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `)
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS claims (
+      payment_hash TEXT PRIMARY KEY,
+      token TEXT NOT NULL,
+      claimed_at TEXT NOT NULL DEFAULT (datetime('now'))
     )
   `)
 
@@ -70,10 +78,34 @@ export function sqliteStorage(config?: SqliteStorageConfig): StorageBackend {
     'SELECT 1 FROM settlements WHERE payment_hash = ?'
   )
 
+  const stmtClaim = db.prepare(
+    'INSERT OR IGNORE INTO claims (payment_hash, token) VALUES (?, ?)'
+  )
+
+  const stmtPendingClaims = db.prepare(`
+    SELECT c.payment_hash, c.token, c.claimed_at
+    FROM claims c
+    LEFT JOIN settlements s ON c.payment_hash = s.payment_hash
+    WHERE s.payment_hash IS NULL
+  `)
+
+  const stmtDeleteClaim = db.prepare(
+    'DELETE FROM claims WHERE payment_hash = ?'
+  )
+
+  const txnClaimForRedeem = db.transaction((paymentHash: string, token: string) => {
+    // Reject if already settled
+    if (stmtIsSettled.get(paymentHash)) return false
+    // Try to claim (INSERT OR IGNORE — fails silently if already claimed)
+    const r = stmtClaim.run(paymentHash, token)
+    return r.changes > 0
+  })
+
   const txnSettleWithCredit = db.transaction((paymentHash: string, amount: number) => {
     const r = stmtSettle.run(paymentHash)
     if (r.changes > 0) {
       stmtCredit.run(paymentHash, amount)
+      stmtDeleteClaim.run(paymentHash)
       return true
     }
     return false
@@ -112,6 +144,23 @@ export function sqliteStorage(config?: SqliteStorageConfig): StorageBackend {
 
     settleWithCredit(paymentHash: string, amount: number): boolean {
       return txnSettleWithCredit(paymentHash, amount)
+    },
+
+    claimForRedeem(paymentHash: string, token: string): boolean {
+      return txnClaimForRedeem(paymentHash, token)
+    },
+
+    pendingClaims(): PendingClaim[] {
+      const rows = stmtPendingClaims.all() as Array<{
+        payment_hash: string
+        token: string
+        claimed_at: string
+      }>
+      return rows.map((r) => ({
+        paymentHash: r.payment_hash,
+        token: r.token,
+        claimedAt: r.claimed_at,
+      }))
     },
 
     storeInvoice(paymentHash: string, bolt11: string, amountSats: number, macaroon: string): void {
