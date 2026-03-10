@@ -173,9 +173,22 @@ export function createHonoCashuHandler(
   return async (c) => {
     try {
       const { token, paymentHash } = await c.req.json()
+
+      // Idempotence: if already settled, don't redeem or credit again
+      if (storage.isSettled(paymentHash)) {
+        const invoice = storage.getInvoice(paymentHash)
+        return c.json({ credited: 0, macaroon: invoice?.macaroon })
+      }
+
       const credited = await redeem(token, paymentHash)
-      storage.credit(paymentHash, credited)
-      return c.json({ credited })
+
+      // Atomic settle — handles concurrent requests
+      if (storage.settle(paymentHash)) {
+        storage.credit(paymentHash, credited)
+      }
+
+      const invoice = storage.getInvoice(paymentHash)
+      return c.json({ credited, macaroon: invoice?.macaroon })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Cashu redemption failed'
       return c.json({ error: message }, 500)

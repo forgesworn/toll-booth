@@ -225,7 +225,66 @@ describe('Booth', () => {
       expect(res.status).toBe(200)
       const body = await res.json()
       expect(body.credited).toBe(500)
+      expect(body.macaroon).toBeTruthy()
       expect(redeemCashu).toHaveBeenCalledWith('cashuA...', paymentHash)
+
+      booth.close()
+    })
+
+    it('is idempotent on duplicate Cashu redemption', async () => {
+      const redeemCashu = vi.fn().mockResolvedValue(500)
+      const { app, booth, paymentHash } = setup({ redeemCashu })
+
+      // Trigger a 402 to store the invoice
+      await app.request('/route', { method: 'POST' })
+
+      // First redemption
+      await app.request('/cashu-redeem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: 'cashuA...', paymentHash }),
+      })
+
+      // Second redemption — should not call redeem again or double-credit
+      const res2 = await app.request('/cashu-redeem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: 'cashuA...', paymentHash }),
+      })
+
+      expect(res2.status).toBe(200)
+      const body2 = await res2.json()
+      expect(body2.credited).toBe(0)
+      expect(redeemCashu).toHaveBeenCalledTimes(1)
+
+      booth.close()
+    })
+
+    it('Cashu redemption produces a token that authorises access', async () => {
+      const redeemCashu = vi.fn().mockResolvedValue(500)
+      const { app, booth, paymentHash } = setup({ redeemCashu })
+
+      // Trigger a 402 to store the invoice
+      const challengeRes = await app.request('/route', { method: 'POST' })
+      const challengeBody = await challengeRes.json()
+      const macaroon = challengeBody.macaroon
+
+      // Redeem Cashu token
+      await app.request('/cashu-redeem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: 'cashuA...', paymentHash }),
+      })
+
+      // Use the macaroon with 'settled' as preimage — should authorise
+      const authedRes = await app.request('/route', {
+        method: 'POST',
+        headers: { Authorization: `L402 ${macaroon}:settled` },
+      })
+
+      // The middleware proxies upstream, but since upstream isn't running,
+      // we check that the result is NOT a 402 challenge
+      expect(authedRes.status).not.toBe(402)
 
       booth.close()
     })

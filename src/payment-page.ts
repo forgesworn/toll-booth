@@ -298,8 +298,9 @@ function clientScript(): string {
     })
     .then(function(r){return r.json()})
     .then(function(d){
-      if (d.credited) showPaid(null, d.credited, d.macaroon);
-      else if (d.error) alert(d.error);
+      if (d.error) { alert(d.error); return; }
+      var mac = d.macaroon || card.dataset.macaroon;
+      showPaid(null, d.credited, mac);
     })
     .catch(function(e){ alert('Cashu redemption failed: ' + e.message) });
   };

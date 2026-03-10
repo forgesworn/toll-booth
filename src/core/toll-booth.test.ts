@@ -175,4 +175,54 @@ describe('TollBoothEngine (core)', () => {
       }),
     )
   })
+
+  it('does not re-credit after balance is drained to zero (replay protection)', async () => {
+    const { preimage, paymentHash } = makePreimageAndHash()
+    const storage = memoryStorage()
+    const onPayment = vi.fn()
+    const config = makeConfig({
+      storage,
+      onPayment,
+      pricing: { '/route': 1000 }, // cost equals full credit
+    })
+    const engine = createTollBooth(config)
+
+    const macaroon = mintMacaroon(ROOT_KEY, paymentHash, 1000)
+    const req = makeRequest({
+      headers: { authorization: `L402 ${macaroon}:${preimage}` },
+    })
+
+    // First request: settles, credits 1000, debits 1000 → balance 0
+    const r1 = await engine.handle(req)
+    expect(r1.action).toBe('proxy')
+    if (r1.action === 'proxy') expect(r1.creditBalance).toBe(0)
+    expect(onPayment).toHaveBeenCalledTimes(1)
+
+    // Replay after drain: should NOT re-credit — must reject (insufficient balance)
+    const r2 = await engine.handle(req)
+    expect(r2.action).toBe('challenge') // falls through: 0 balance, no re-credit
+    expect(onPayment).toHaveBeenCalledTimes(1) // still only once
+  })
+
+  it('accepts settled macaroon without preimage (Cashu path)', async () => {
+    const { paymentHash } = makePreimageAndHash()
+    const storage = memoryStorage()
+    const config = makeConfig({ storage })
+    const engine = createTollBooth(config)
+
+    const macaroon = mintMacaroon(ROOT_KEY, paymentHash, 1000)
+
+    // Simulate Cashu settlement: settle + credit externally
+    storage.settle(paymentHash)
+    storage.credit(paymentHash, 1000)
+
+    // Use macaroon with a non-preimage value (as Cashu clients do)
+    const req = makeRequest({
+      headers: { authorization: `L402 ${macaroon}:settled` },
+    })
+
+    const result = await engine.handle(req)
+    expect(result.action).toBe('proxy')
+    if (result.action === 'proxy') expect(result.creditBalance).toBe(990)
+  })
 })

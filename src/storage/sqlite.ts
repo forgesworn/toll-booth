@@ -29,6 +29,13 @@ export function sqliteStorage(config?: SqliteStorageConfig): StorageBackend {
     )
   `)
 
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS settlements (
+      payment_hash TEXT PRIMARY KEY,
+      settled_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `)
+
   const stmtCredit = db.prepare(`
     INSERT INTO credits (payment_hash, balance)
     VALUES (?, ?)
@@ -55,6 +62,14 @@ export function sqliteStorage(config?: SqliteStorageConfig): StorageBackend {
     'SELECT payment_hash, bolt11, amount_sats, macaroon, created_at FROM invoices WHERE payment_hash = ?'
   )
 
+  const stmtSettle = db.prepare(
+    'INSERT OR IGNORE INTO settlements (payment_hash) VALUES (?)'
+  )
+
+  const stmtIsSettled = db.prepare(
+    'SELECT 1 FROM settlements WHERE payment_hash = ?'
+  )
+
   return {
     credit(paymentHash: string, amount: number): void {
       stmtCredit.run(paymentHash, amount)
@@ -75,6 +90,15 @@ export function sqliteStorage(config?: SqliteStorageConfig): StorageBackend {
     balance(paymentHash: string): number {
       const row = stmtBalance.get(paymentHash) as { balance: number } | undefined
       return row?.balance ?? 0
+    },
+
+    settle(paymentHash: string): boolean {
+      const result = stmtSettle.run(paymentHash)
+      return result.changes > 0
+    },
+
+    isSettled(paymentHash: string): boolean {
+      return !!stmtIsSettled.get(paymentHash)
     },
 
     storeInvoice(paymentHash: string, bolt11: string, amountSats: number, macaroon: string): void {

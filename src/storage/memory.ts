@@ -4,6 +4,7 @@ import type { StorageBackend, DebitResult, StoredInvoice } from './interface.js'
 export function memoryStorage(): StorageBackend {
   const balances = new Map<string, number>()
   const invoices = new Map<string, StoredInvoice>()
+  const settled = new Set<string>()
 
   return {
     credit(paymentHash: string, amount: number): void {
@@ -25,6 +26,16 @@ export function memoryStorage(): StorageBackend {
       return balances.get(paymentHash) ?? 0
     },
 
+    settle(paymentHash: string): boolean {
+      if (settled.has(paymentHash)) return false
+      settled.add(paymentHash)
+      return true
+    },
+
+    isSettled(paymentHash: string): boolean {
+      return settled.has(paymentHash)
+    },
+
     storeInvoice(paymentHash: string, bolt11: string, amountSats: number, macaroon: string): void {
       if (invoices.has(paymentHash)) return
       invoices.set(paymentHash, {
@@ -43,6 +54,7 @@ export function memoryStorage(): StorageBackend {
     close(): void {
       balances.clear()
       invoices.clear()
+      settled.clear()
     },
   }
 }

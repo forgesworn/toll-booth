@@ -134,19 +134,26 @@ function handleL402Auth(
     const result = verifyMacaroon(rootKey, macaroonBase64)
     if (!result.valid || !result.paymentHash) return { authorised: false, remaining: 0 }
 
-    // Verify preimage: sha256(preimage) must equal payment_hash
-    const computedHash = createHash('sha256')
-      .update(Buffer.from(preimage, 'hex'))
-      .digest('hex')
-    if (computedHash !== result.paymentHash) return { authorised: false, remaining: 0 }
+    // Check if this payment hash has already been settled (Lightning or Cashu)
+    const alreadySettled = storage.isSettled(result.paymentHash)
 
-    // Credit on first valid presentation of preimage
     let creditedAmount: number | undefined
-    if (storage.balance(result.paymentHash) === 0) {
-      const amount = result.creditBalance ?? defaultAmount
-      storage.credit(result.paymentHash, amount)
-      creditedAmount = amount
+    if (!alreadySettled) {
+      // First-time settlement via Lightning: verify preimage
+      const computedHash = createHash('sha256')
+        .update(Buffer.from(preimage, 'hex'))
+        .digest('hex')
+      if (computedHash !== result.paymentHash) return { authorised: false, remaining: 0 }
+
+      // Atomically settle and credit (handles concurrent requests)
+      if (storage.settle(result.paymentHash)) {
+        const amount = result.creditBalance ?? defaultAmount
+        storage.credit(result.paymentHash, amount)
+        creditedAmount = amount
+      }
     }
+    // If already settled (e.g. via Cashu), the macaroon alone is sufficient —
+    // the server has already verified payment out-of-band
 
     // Debit credit for this request
     const debit = storage.debit(result.paymentHash, cost)

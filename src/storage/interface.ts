@@ -17,6 +17,10 @@ export interface StorageBackend {
   credit(paymentHash: string, amount: number): void
   debit(paymentHash: string, amount: number): DebitResult
   balance(paymentHash: string): number
+  /** Atomically mark a payment hash as settled. Returns true if newly settled, false if already was. */
+  settle(paymentHash: string): boolean
+  /** Check whether a payment hash has been settled. */
+  isSettled(paymentHash: string): boolean
   storeInvoice(paymentHash: string, bolt11: string, amountSats: number, macaroon: string): void
   getInvoice(paymentHash: string): StoredInvoice | undefined
   close(): void

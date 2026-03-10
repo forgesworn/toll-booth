@@ -70,4 +70,18 @@ describe('sqliteStorage', () => {
     expect(invoice!.bolt11).toBe('lnbc1...')
     expect(invoice!.amountSats).toBe(1000)
   })
+
+  it('settle returns true on first call, false on subsequent', () => {
+    storage = sqliteStorage()
+    expect(storage.settle('hash1')).toBe(true)
+    expect(storage.settle('hash1')).toBe(false)
+    expect(storage.settle('hash1')).toBe(false)
+  })
+
+  it('isSettled reflects settlement state', () => {
+    storage = sqliteStorage()
+    expect(storage.isSettled('hash1')).toBe(false)
+    storage.settle('hash1')
+    expect(storage.isSettled('hash1')).toBe(true)
+  })
 })
