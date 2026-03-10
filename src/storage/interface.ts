@@ -21,6 +21,8 @@ export interface StorageBackend {
   settle(paymentHash: string): boolean
   /** Check whether a payment hash has been settled. */
   isSettled(paymentHash: string): boolean
+  /** Atomically settle and credit in one operation. Returns true if newly settled, false if already was. */
+  settleWithCredit(paymentHash: string, amount: number): boolean
   storeInvoice(paymentHash: string, bolt11: string, amountSats: number, macaroon: string): void
   getInvoice(paymentHash: string): StoredInvoice | undefined
   close(): void

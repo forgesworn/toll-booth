@@ -36,6 +36,14 @@ export function memoryStorage(): StorageBackend {
       return settled.has(paymentHash)
     },
 
+    settleWithCredit(paymentHash: string, amount: number): boolean {
+      if (settled.has(paymentHash)) return false
+      settled.add(paymentHash)
+      const current = balances.get(paymentHash) ?? 0
+      balances.set(paymentHash, current + amount)
+      return true
+    },
+
     storeInvoice(paymentHash: string, bolt11: string, amountSats: number, macaroon: string): void {
       if (invoices.has(paymentHash)) return
       invoices.set(paymentHash, {

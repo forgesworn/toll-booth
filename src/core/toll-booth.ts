@@ -145,10 +145,9 @@ function handleL402Auth(
         .digest('hex')
       if (computedHash !== result.paymentHash) return { authorised: false, remaining: 0 }
 
-      // Atomically settle and credit (handles concurrent requests)
-      if (storage.settle(result.paymentHash)) {
-        const amount = result.creditBalance ?? defaultAmount
-        storage.credit(result.paymentHash, amount)
+      // Atomically settle and credit (handles concurrent requests, crash-safe)
+      const amount = result.creditBalance ?? defaultAmount
+      if (storage.settleWithCredit(result.paymentHash, amount)) {
         creditedAmount = amount
       }
     }

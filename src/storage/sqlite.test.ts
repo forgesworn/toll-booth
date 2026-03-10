@@ -84,4 +84,18 @@ describe('sqliteStorage', () => {
     storage.settle('hash1')
     expect(storage.isSettled('hash1')).toBe(true)
   })
+
+  it('settleWithCredit atomically settles and credits', () => {
+    storage = sqliteStorage()
+    expect(storage.settleWithCredit('hash1', 500)).toBe(true)
+    expect(storage.isSettled('hash1')).toBe(true)
+    expect(storage.balance('hash1')).toBe(500)
+  })
+
+  it('settleWithCredit rejects if already settled (no double credit)', () => {
+    storage = sqliteStorage()
+    expect(storage.settleWithCredit('hash1', 500)).toBe(true)
+    expect(storage.settleWithCredit('hash1', 500)).toBe(false)
+    expect(storage.balance('hash1')).toBe(500) // not 1000
+  })
 })

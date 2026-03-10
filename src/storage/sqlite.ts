@@ -70,6 +70,15 @@ export function sqliteStorage(config?: SqliteStorageConfig): StorageBackend {
     'SELECT 1 FROM settlements WHERE payment_hash = ?'
   )
 
+  const txnSettleWithCredit = db.transaction((paymentHash: string, amount: number) => {
+    const r = stmtSettle.run(paymentHash)
+    if (r.changes > 0) {
+      stmtCredit.run(paymentHash, amount)
+      return true
+    }
+    return false
+  })
+
   return {
     credit(paymentHash: string, amount: number): void {
       stmtCredit.run(paymentHash, amount)
@@ -99,6 +108,10 @@ export function sqliteStorage(config?: SqliteStorageConfig): StorageBackend {
 
     isSettled(paymentHash: string): boolean {
       return !!stmtIsSettled.get(paymentHash)
+    },
+
+    settleWithCredit(paymentHash: string, amount: number): boolean {
+      return txnSettleWithCredit(paymentHash, amount)
     },
 
     storeInvoice(paymentHash: string, bolt11: string, amountSats: number, macaroon: string): void {

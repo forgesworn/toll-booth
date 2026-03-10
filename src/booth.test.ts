@@ -260,6 +260,52 @@ describe('Booth', () => {
       booth.close()
     })
 
+    it('serialises concurrent Cashu redemptions (only one hits the mint)', async () => {
+      let resolveRedeem!: (value: number) => void
+      const redeemCashu = vi.fn().mockImplementation(
+        () => new Promise<number>((resolve) => { resolveRedeem = resolve }),
+      )
+      const { app, booth, paymentHash } = setup({ redeemCashu })
+
+      // Trigger a 402 to store the invoice
+      await app.request('/route', { method: 'POST' })
+
+      const makeOpts = () => ({
+        method: 'POST' as const,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: 'cashuA...', paymentHash }),
+      })
+
+      // Fire two concurrent requests
+      const p1 = app.request('/cashu-redeem', makeOpts())
+      const p2 = app.request('/cashu-redeem', makeOpts())
+
+      // Yield so both requests enter the handler and one calls redeem()
+      await new Promise((r) => setTimeout(r, 10))
+
+      // Let the single redeem() call resolve
+      resolveRedeem(500)
+
+      const [r1, r2] = await Promise.all([p1, p2])
+      expect(r1.status).toBe(200)
+      expect(r2.status).toBe(200)
+
+      // Only one call to the external Cashu mint
+      expect(redeemCashu).toHaveBeenCalledTimes(1)
+
+      // Verify actual stored credit by attempting to use it:
+      // route costs 2 sats, so 500 sats credit allows 250 requests.
+      // If double-credited (1000), we'd have more. Check via a debit proxy.
+      // Use the auth token to make a request — balance header confirms actual credit.
+      // (The proxy will fail with ECONNREFUSED but we check the balance header isn't doubled)
+      // Instead, just do a sequential follow-up — it should report already settled
+      const res3 = await app.request('/cashu-redeem', makeOpts())
+      const b3 = await res3.json()
+      expect(b3.credited).toBe(0) // already settled
+
+      booth.close()
+    })
+
     it('Cashu redemption produces a token that authorises access', async () => {
       const redeemCashu = vi.fn().mockResolvedValue(500)
       const { app, booth, paymentHash } = setup({ redeemCashu })
