@@ -49,6 +49,7 @@ export class Booth {
   private readonly storage: StorageBackend
   private readonly engine: TollBoothEngine
   private readonly rootKey: string
+  private readonly redeemCashu?: (token: string, paymentHash: string) => Promise<number>
 
   constructor(config: BoothOptions & EventHandler) {
     const rootKeyInput = config.rootKey ?? randomBytes(32).toString('hex')
@@ -117,6 +118,7 @@ export class Booth {
           this.nwcPayHandler = createHonoNwcHandler(config.nwcPayInvoice)
         }
         if (config.redeemCashu) {
+          this.redeemCashu = config.redeemCashu
           this.cashuRedeemHandler = createHonoCashuHandler(config.redeemCashu, this.storage)
         }
         break
@@ -133,6 +135,14 @@ export class Booth {
         this.createInvoiceHandler = createWebStandardCreateInvoiceHandler(createInvoiceDeps)
         break
     }
+
+    // Auto-recover any pending Cashu claims from a previous crash
+    if (this.redeemCashu) {
+      const fn = this.redeemCashu
+      this.recoverPendingClaims(fn).catch(() => {
+        // Recovery failures are non-fatal; claims stay pending for next restart
+      })
+    }
   }
 
   /** Reset free-tier counters for all IPs. */
@@ -142,8 +152,12 @@ export class Booth {
 
   /**
    * Recover Cashu redemptions that were claimed but never settled (crash recovery).
-   * Call this on startup when Cashu is enabled. For each pending claim, retries
-   * the redeem call and settles on success. Returns the number of recovered claims.
+   * Automatically called on startup when Cashu is enabled. Can also be called
+   * manually. For each pending claim, retries the redeem call:
+   * - On success: settles with the credited amount
+   * - On failure: leaves the claim pending for the next recovery attempt
+   *
+   * Returns the number of successfully recovered claims.
    */
   async recoverPendingClaims(
     redeemFn: (token: string, paymentHash: string) => Promise<number>,
@@ -156,8 +170,8 @@ export class Booth {
         this.storage.settleWithCredit(claim.paymentHash, credited)
         recovered++
       } catch {
-        // Mint may reject (already redeemed) — settle with 0 to clear the claim
-        this.storage.settleWithCredit(claim.paymentHash, 0)
+        // Transient failure (network, mint outage) — leave claim pending
+        // for the next recovery attempt. Do NOT settle with 0.
       }
     }
     return recovered

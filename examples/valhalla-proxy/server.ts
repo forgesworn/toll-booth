@@ -51,13 +51,11 @@ app.get('/invoice-status/:paymentHash', booth.invoiceStatusHandler as any)
 app.post('/create-invoice', booth.createInvoiceHandler as any)
 app.use('/*', booth.middleware as any)
 
-// Hourly cleanup: remove expired invoices, drained credits, stale claims
-const cleanupTimer = setInterval(() => {
-  const result = booth.cleanup()
-  if (result.invoicesRemoved || result.creditsRemoved || result.staleClaimsRemoved) {
-    console.log(`[cleanup] invoices=${result.invoicesRemoved} credits=${result.creditsRemoved} staleClaims=${result.staleClaimsRemoved}`)
-  }
-}, 3_600_000)
+// Daily free-tier reset
+const freeTierTimer = setInterval(() => {
+  booth.resetFreeTier()
+  console.log('[free-tier] daily counters reset')
+}, 86_400_000)
 
 const port = parseInt(process.env.PORT ?? '3000', 10)
 const server = serve({ fetch: app.fetch, port }, () => {
@@ -66,7 +64,7 @@ const server = serve({ fetch: app.fetch, port }, () => {
 
 function shutdown() {
   console.log('shutting down…')
-  clearInterval(cleanupTimer)
+  clearInterval(freeTierTimer)
   server.close()
   booth.close()
   process.exit(0)

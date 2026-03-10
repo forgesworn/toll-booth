@@ -350,6 +350,61 @@ describe('Booth', () => {
       booth.close()
     })
 
+    it('recoverPendingClaims preserves claims on transient failure', async () => {
+      const redeemCashu = vi.fn().mockRejectedValue(new Error('ECONNREFUSED'))
+      const storage = memoryStorage()
+
+      // Simulate a crash: claim was written but never settled
+      storage.claimForRedeem('abc123', 'cashuA...')
+
+      const booth = new Booth({
+        adapter: 'hono',
+        backend: { createInvoice: vi.fn(), checkInvoice: vi.fn() },
+        pricing: {},
+        upstream: 'http://localhost',
+        rootKey: ROOT_KEY,
+        storage,
+      })
+
+      const recovered = await booth.recoverPendingClaims(redeemCashu)
+      expect(recovered).toBe(0)
+
+      // Claim is still pending — NOT erased
+      expect(storage.pendingClaims()).toHaveLength(1)
+      expect(storage.isSettled('abc123')).toBe(false)
+      expect(storage.balance('abc123')).toBe(0)
+
+      booth.close()
+    })
+
+    it('auto-recovers pending claims when redeemCashu is provided', async () => {
+      const redeemCashu = vi.fn().mockResolvedValue(500)
+      const storage = memoryStorage()
+
+      // Simulate a crash: claim was written but never settled
+      storage.claimForRedeem('abc123', 'cashuA...')
+
+      const booth = new Booth({
+        adapter: 'hono',
+        backend: { createInvoice: vi.fn(), checkInvoice: vi.fn() },
+        pricing: {},
+        upstream: 'http://localhost',
+        rootKey: ROOT_KEY,
+        storage,
+        redeemCashu,
+      })
+
+      // Auto-recovery runs asynchronously — give it a tick
+      await new Promise((r) => setTimeout(r, 10))
+
+      expect(redeemCashu).toHaveBeenCalledWith('cashuA...', 'abc123')
+      expect(storage.isSettled('abc123')).toBe(true)
+      expect(storage.balance('abc123')).toBe(500)
+      expect(storage.pendingClaims()).toHaveLength(0)
+
+      booth.close()
+    })
+
     it('does not expose /cashu-redeem when adapter not provided', async () => {
       const { booth } = setup()
       expect(booth.cashuRedeemHandler).toBeUndefined()
