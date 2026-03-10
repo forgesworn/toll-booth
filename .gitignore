@@ -6,3 +6,6 @@ valhalla-tiles/
 .env
 .env.*
 .worktrees/
+*.db
+*.db-shm
+*.db-wal
