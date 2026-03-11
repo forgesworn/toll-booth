@@ -7,6 +7,8 @@ L402 Lightning payment middleware for Node.js. Gate any HTTP API behind a paywal
 
 Supports **Express 5**, **Deno**, **Bun**, and **Cloudflare Workers** via the Web Standard adapter.
 
+**[Why L402?](docs/vision.md)** — the case for permissionless, machine-to-machine payments on the web.
+
 ## Features
 
 - **L402 protocol** — industry-standard HTTP 402 payment flow with macaroon credentials
