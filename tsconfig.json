@@ -14,5 +14,5 @@
     "skipLibCheck": true
   },
   "include": ["src"],
-  "exclude": ["src/**/*.test.ts"]
+  "exclude": ["src/**/*.test.ts", "src/**/*.integration.test.ts", "src/backends/conformance.ts", "src/e2e"]
 }

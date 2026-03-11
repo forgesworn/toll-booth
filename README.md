@@ -48,7 +48,7 @@ const booth = new Booth({
 
 app.get('/invoice-status/:paymentHash', booth.invoiceStatusHandler as express.RequestHandler)
 app.post('/create-invoice', booth.createInvoiceHandler as express.RequestHandler)
-app.use('/*', booth.middleware as express.RequestHandler)
+app.use('/', booth.middleware as express.RequestHandler)
 
 app.listen(3000)
 \`\`\`
