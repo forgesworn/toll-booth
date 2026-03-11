@@ -33,11 +33,11 @@ Five backends. Phoenixd if you want the simplest self-hosted setup. LND if that'
 You shouldn't have to switch Lightning implementations to use a payment middleware. Use what you already have.
 
 ```typescript
-import { phoenixdBackend } from 'toll-booth/backends/phoenixd'
-import { lndBackend } from 'toll-booth/backends/lnd'
-import { clnBackend } from 'toll-booth/backends/cln'
-import { lnbitsBackend } from 'toll-booth/backends/lnbits'
-import { albyBackend } from 'toll-booth/backends/alby'
+import { phoenixdBackend } from '@thecryptodonkey/toll-booth/backends/phoenixd'
+import { lndBackend } from '@thecryptodonkey/toll-booth/backends/lnd'
+import { clnBackend } from '@thecryptodonkey/toll-booth/backends/cln'
+import { lnbitsBackend } from '@thecryptodonkey/toll-booth/backends/lnbits'
+import { albyBackend } from '@thecryptodonkey/toll-booth/backends/alby'
 ```
 
 ### Cashu — the edge computing play
@@ -73,8 +73,8 @@ For Nostr-native applications — and TROTT is one — this is the natural payme
 Ten lines to gate any API:
 
 ```typescript
-import { Booth } from 'toll-booth'
-import { phoenixdBackend } from 'toll-booth/backends/phoenixd'
+import { Booth } from '@thecryptodonkey/toll-booth'
+import { phoenixdBackend } from '@thecryptodonkey/toll-booth/backends/phoenixd'
 
 const booth = new Booth({
   adapter: 'express',
@@ -106,7 +106,7 @@ toll-booth is my contribution to making that web a little easier to build.
 
 ---
 
-`npm install toll-booth`
+`npm install @thecryptodonkey/toll-booth`
 
 GitHub: https://github.com/TheCryptoDonkey/toll-booth
 

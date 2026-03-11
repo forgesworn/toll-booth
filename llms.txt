@@ -9,13 +9,13 @@ The closest alternative is Aperture (Lightning Labs), a Go reverse proxy that re
 ## Getting Started
 
 ```bash
-npm install toll-booth
+npm install @thecryptodonkey/toll-booth
 ```
 
 ```typescript
 import express from 'express'
-import { Booth } from 'toll-booth'
-import { phoenixdBackend } from 'toll-booth/backends/phoenixd'
+import { Booth } from '@thecryptodonkey/toll-booth'
+import { phoenixdBackend } from '@thecryptodonkey/toll-booth/backends/phoenixd'
 
 const app = express()
 app.use(express.json())
@@ -62,18 +62,18 @@ const booth = new Booth({
 
 ## API Surface
 
-Main entry point: `import { Booth } from 'toll-booth'`
+Main entry point: `import { Booth } from '@thecryptodonkey/toll-booth'`
 
 Subpath imports for tree-shaking:
-- `toll-booth/backends/phoenixd` — Phoenixd backend
-- `toll-booth/backends/lnd` — LND backend
-- `toll-booth/backends/cln` — Core Lightning backend
-- `toll-booth/backends/lnbits` — LNbits backend
-- `toll-booth/backends/alby` — Alby / NWC backend
-- `toll-booth/storage/sqlite` — SQLite storage (default)
-- `toll-booth/storage/memory` — in-memory storage (testing)
-- `toll-booth/adapters/express` — Express middleware factory
-- `toll-booth/adapters/web-standard` — Web Standard handler factory
+- `@thecryptodonkey/toll-booth/backends/phoenixd` — Phoenixd backend
+- `@thecryptodonkey/toll-booth/backends/lnd` — LND backend
+- `@thecryptodonkey/toll-booth/backends/cln` — Core Lightning backend
+- `@thecryptodonkey/toll-booth/backends/lnbits` — LNbits backend
+- `@thecryptodonkey/toll-booth/backends/alby` — Alby / NWC backend
+- `@thecryptodonkey/toll-booth/storage/sqlite` — SQLite storage (default)
+- `@thecryptodonkey/toll-booth/storage/memory` — in-memory storage (testing)
+- `@thecryptodonkey/toll-booth/adapters/express` — Express middleware factory
+- `@thecryptodonkey/toll-booth/adapters/web-standard` — Web Standard handler factory
 
 Booth instance properties:
 - `.middleware` — main request handler (checks auth, proxies upstream)

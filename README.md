@@ -24,15 +24,15 @@ Supports **Express 5**, **Deno**, **Bun**, and **Cloudflare Workers** via the We
 ## Quick start
 
 \`\`\`bash
-npm install toll-booth
+npm install @thecryptodonkey/toll-booth
 \`\`\`
 
 ### Express
 
 \`\`\`typescript
 import express from 'express'
-import { Booth } from 'toll-booth'
-import { phoenixdBackend } from 'toll-booth/backends/phoenixd'
+import { Booth } from '@thecryptodonkey/toll-booth'
+import { phoenixdBackend } from '@thecryptodonkey/toll-booth/backends/phoenixd'
 
 const app = express()
 app.use(express.json())
@@ -58,8 +58,8 @@ app.listen(3000)
 ### Web Standard (Deno / Bun / Workers)
 
 \`\`\`typescript
-import { Booth } from 'toll-booth'
-import { lndBackend } from 'toll-booth/backends/lnd'
+import { Booth } from '@thecryptodonkey/toll-booth'
+import { lndBackend } from '@thecryptodonkey/toll-booth/backends/lnd'
 
 const booth = new Booth({
   adapter: 'web-standard',
@@ -85,7 +85,7 @@ Deno.serve({ port: 3000 }, async (req: Request) => {
 ### Cashu-only (no Lightning node)
 
 \`\`\`typescript
-import { Booth } from 'toll-booth'
+import { Booth } from '@thecryptodonkey/toll-booth'
 
 const booth = new Booth({
   adapter: 'web-standard',
@@ -128,11 +128,11 @@ The \`Booth\` constructor accepts:
 ## Lightning backends
 
 \`\`\`typescript
-import { phoenixdBackend } from 'toll-booth/backends/phoenixd'
-import { lndBackend } from 'toll-booth/backends/lnd'
-import { clnBackend } from 'toll-booth/backends/cln'
-import { lnbitsBackend } from 'toll-booth/backends/lnbits'
-import { albyBackend } from 'toll-booth/backends/alby'
+import { phoenixdBackend } from '@thecryptodonkey/toll-booth/backends/phoenixd'
+import { lndBackend } from '@thecryptodonkey/toll-booth/backends/lnd'
+import { clnBackend } from '@thecryptodonkey/toll-booth/backends/cln'
+import { lnbitsBackend } from '@thecryptodonkey/toll-booth/backends/lnbits'
+import { albyBackend } from '@thecryptodonkey/toll-booth/backends/alby'
 \`\`\`
 
 Each backend implements the `LightningBackend` interface (`createInvoice` + `checkInvoice`).
@@ -150,12 +150,12 @@ Each backend implements the `LightningBackend` interface (`createInvoice` + `che
 Tree-shakeable imports for bundlers:
 
 \`\`\`typescript
-import { Booth } from 'toll-booth'
-import { phoenixdBackend } from 'toll-booth/backends/phoenixd'
-import { sqliteStorage } from 'toll-booth/storage/sqlite'
-import { memoryStorage } from 'toll-booth/storage/memory'
-import { createExpressMiddleware } from 'toll-booth/adapters/express'
-import { createWebStandardMiddleware } from 'toll-booth/adapters/web-standard'
+import { Booth } from '@thecryptodonkey/toll-booth'
+import { phoenixdBackend } from '@thecryptodonkey/toll-booth/backends/phoenixd'
+import { sqliteStorage } from '@thecryptodonkey/toll-booth/storage/sqlite'
+import { memoryStorage } from '@thecryptodonkey/toll-booth/storage/memory'
+import { createExpressMiddleware } from '@thecryptodonkey/toll-booth/adapters/express'
+import { createWebStandardMiddleware } from '@thecryptodonkey/toll-booth/adapters/web-standard'
 \`\`\`
 
 ## Payment flow

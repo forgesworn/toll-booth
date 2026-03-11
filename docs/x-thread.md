@@ -10,7 +10,7 @@ HTTP 402 was reserved in 1999. Lightning + Cashu finally make it real.
 
 I built the middleware. It's called toll-booth.
 
-npm install toll-booth
+npm install @thecryptodonkey/toll-booth
 
 ---
 
@@ -31,9 +31,9 @@ Phoenixd. LND. Core Lightning. LNbits. Alby.
 Use what you already run. toll-booth doesn't care.
 
 ```typescript
-import { phoenixdBackend } from 'toll-booth/backends/phoenixd'
-import { lndBackend } from 'toll-booth/backends/lnd'
-import { clnBackend } from 'toll-booth/backends/cln'
+import { phoenixdBackend } from '@thecryptodonkey/toll-booth/backends/phoenixd'
+import { lndBackend } from '@thecryptodonkey/toll-booth/backends/lnd'
+import { clnBackend } from '@thecryptodonkey/toll-booth/backends/cln'
 ```
 
 ---
@@ -70,7 +70,7 @@ Free tier for discovery. Volume discounts for commitment. Self-service payment p
 
 The web should work like a vending machine. See the price. Pay. Get the thing.
 
-npm install toll-booth
+npm install @thecryptodonkey/toll-booth
 GitHub: github.com/TheCryptoDonkey/toll-booth
 
 Express, Deno, Bun, Cloudflare Workers. MIT licence.

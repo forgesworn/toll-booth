@@ -1,5 +1,5 @@
 {
-  "name": "toll-booth",
+  "name": "@thecryptodonkey/toll-booth",
   "version": "1.0.0",
   "type": "module",
   "description": "L402 Lightning payment middleware for any Node.js framework — Express, Deno, Bun",

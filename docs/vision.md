@@ -49,5 +49,5 @@ toll-booth is middleware that turns any HTTP API into a vending machine. It hand
 The protocol is the contract. The payment is the authentication. The web becomes a marketplace.
 
 ```
-npm install toll-booth
+npm install @thecryptodonkey/toll-booth
 ```
