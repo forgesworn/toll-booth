@@ -1,104 +1,137 @@
 # toll-booth
 
-[![MIT licence](https://img.shields.io/badge/licence-MIT-blue.svg)](./package.json)
-[![Nostr](https://img.shields.io/badge/Nostr-Zap%20me-purple)](https://primal.net/p/npub1mgvlrnf5hm9yf0n5mf9nqmvarhvxkc6remu5ec3vf8r0txqkuk7su0e7q2)
+L402 Lightning payment middleware for Node.js. Gate any HTTP API behind a paywall with a single function call.
 
-Embeddable [L402](https://docs.lightning.engineering/the-lightning-network/l402) middleware for JavaScript. Gate any HTTP API behind Lightning payments — no separate proxy, no LND required.
+Supports **Express 5**, **Deno**, **Bun**, and **Cloudflare Workers** via the Web Standard adapter.
 
-```ts
+## Features
+
+- **L402 protocol** — industry-standard HTTP 402 payment flow with macaroon credentials
+- **Multiple Lightning backends** — Phoenixd, LND, CLN, LNbits, Alby
+- **Alternative payment methods** — Nostr Wallet Connect (NWC) and Cashu ecash tokens
+- **Cashu-only mode** — no Lightning node required
+- **Credit system** — pre-paid balance with volume discount tiers
+- **Free tier** — configurable daily allowance per IP
+- **Self-service payment page** — QR codes, tier selector, wallet adapter buttons
+- **SQLite persistence** — WAL mode, automatic invoice expiry pruning
+- **Framework-agnostic core** — use the \`Booth\` facade or wire handlers directly
+
+## Quick start
+
+\`\`\`bash
+npm install toll-booth
+\`\`\`
+
+### Express
+
+\`\`\`typescript
 import express from 'express'
 import { Booth } from 'toll-booth'
 import { phoenixdBackend } from 'toll-booth/backends/phoenixd'
 
 const app = express()
+app.use(express.json())
 
 const booth = new Booth({
   adapter: 'express',
-  backend: phoenixdBackend({ url: 'http://localhost:9740', password: 'your-password' }),
-  pricing: {
-    '/api/route': 2,        // must match the mounted paths the middleware sees
-    '/api/isochrone': 5,
-    '/api/sources_to_targets': 10,
-  },
-  freeTier: { requestsPerDay: 10 },
-  upstream: 'http://localhost:8002',
-  rootKey: process.env.ROOT_KEY, // 32-byte hex key
-  dbPath: './toll-booth.db',
-  trustProxy: true, // only behind a trusted reverse proxy that sets client IP headers
-  strictPricing: true, // reject unpriced routes with 402 instead of passing them through
+  backend: phoenixdBackend({
+    url: 'http://localhost:9740',
+    password: process.env.PHOENIXD_PASSWORD!,
+  }),
+  pricing: { '/api': 10 },           // 10 sats per request
+  upstream: 'http://localhost:8080',  // your API
+  rootKey: process.env.ROOT_KEY,      // 64 hex chars, required for production
 })
 
-app.get('/invoice-status/:paymentHash', booth.invoiceStatusHandler as any)
-app.post('/create-invoice', booth.createInvoiceHandler as any)
-app.use('/api/*', booth.middleware as any)
-```
+app.get('/invoice-status/:paymentHash', booth.invoiceStatusHandler as express.RequestHandler)
+app.post('/create-invoice', booth.createInvoiceHandler as express.RequestHandler)
+app.use('/*', booth.middleware as express.RequestHandler)
 
-## Why not Aperture?
+app.listen(3000)
+\`\`\`
 
-[Aperture](https://github.com/lightninglabs/aperture) is Lightning Labs' production L402 reverse proxy. It's battle-tested and feature-rich. Use it if you can.
+### Web Standard (Deno / Bun / Workers)
 
-toll-booth exists for the cases where Aperture doesn't fit:
+\`\`\`typescript
+import { Booth } from 'toll-booth'
+import { lndBackend } from 'toll-booth/backends/lnd'
 
-| | Aperture | toll-booth |
-|---|---|---|
-| **Language** | Go binary | TypeScript middleware |
-| **Deployment** | Standalone reverse proxy | Embeds in your existing app |
-| **Lightning node** | Requires LND | Phoenixd, LND, or CLN |
-| **Serverless** | No — long-running process | Yes — Web Standard adapter runs on Cloudflare Workers, Deno, Bun |
-| **Configuration** | YAML file | Programmatic (code) |
-| **Maturity** | Production (powers Lightning Loop) | Stable |
+const booth = new Booth({
+  adapter: 'web-standard',
+  backend: lndBackend({
+    url: 'https://localhost:8080',
+    macaroon: process.env.LND_MACAROON!,
+  }),
+  pricing: { '/api': 5 },
+  upstream: 'http://localhost:8080',
+})
 
-**Use Aperture** if you run LND and want a proven, standalone proxy with TLS, Tor, Prometheus, and dynamic pricing.
+// Wire booth.middleware, booth.invoiceStatusHandler, booth.createInvoiceHandler
+// into your framework's router
+\`\`\`
 
-**Use toll-booth** if you want L402 as middleware in a JS app, need Phoenixd support, or deploy to serverless/edge runtimes where a Go binary isn't an option.
+## Configuration
+
+The \`Booth\` constructor accepts:
+
+| Option | Type | Description |
+|--------|------|-------------|
+| \`adapter\` | \`'express' \| 'web-standard'\` | Framework integration to use |
+| \`backend\` | \`LightningBackend\` | Lightning node (optional if using Cashu-only) |
+| \`pricing\` | \`Record<string, number>\` | Route pattern → cost in sats |
+| \`upstream\` | \`string\` | URL to proxy authorised requests to |
+| \`rootKey\` | \`string\` | Macaroon signing key (64 hex chars). Random if omitted |
+| \`dbPath\` | \`string\` | SQLite path. Default: \`./toll-booth.db\` |
+| \`storage\` | \`StorageBackend\` | Custom storage (alternative to \`dbPath\`) |
+| \`freeTier\` | \`{ requestsPerDay: number }\` | Daily free allowance per IP |
+| \`strictPricing\` | \`boolean\` | Challenge unpriced routes instead of passing through |
+| \`creditTiers\` | \`CreditTier[]\` | Volume discount tiers |
+| \`trustProxy\` | \`boolean\` | Trust \`X-Forwarded-For\` / \`X-Real-IP\` |
+| \`getClientIp\` | \`(req) => string\` | Custom IP resolver for non-standard runtimes |
+| \`responseHeaders\` | \`Record<string, string>\` | Extra headers on every response |
+| \`nwcPayInvoice\` | \`(uri, bolt11) => Promise<string>\` | NWC payment callback |
+| \`redeemCashu\` | \`(token, hash) => Promise<number>\` | Cashu redemption callback |
+| \`invoiceMaxAgeMs\` | \`number\` | Invoice pruning age. Default: 24h. \`0\` to disable |
+| \`upstreamTimeout\` | \`number\` | Proxy timeout in ms. Default: 30s |
+
+## Lightning backends
+
+\`\`\`typescript
+import { phoenixdBackend } from 'toll-booth/backends/phoenixd'
+import { lndBackend } from 'toll-booth/backends/lnd'
+import { clnBackend } from 'toll-booth/backends/cln'
+import { lnbitsBackend } from 'toll-booth/backends/lnbits'
+import { albyBackend } from 'toll-booth/backends/alby'
+\`\`\`
+
+Each backend implements the \`LightningBackend\` interface (\`createInvoice\` + \`checkInvoice\`).
+
+## Subpath exports
+
+Tree-shakeable imports for bundlers:
+
+\`\`\`typescript
+import { Booth } from 'toll-booth'
+import { phoenixdBackend } from 'toll-booth/backends/phoenixd'
+import { sqliteStorage } from 'toll-booth/storage/sqlite'
+import { memoryStorage } from 'toll-booth/storage/memory'
+import { createExpressMiddleware } from 'toll-booth/adapters/express'
+import { createWebStandardMiddleware } from 'toll-booth/adapters/web-standard'
+\`\`\`
 
 ## Payment flow
 
-1. Client requests an endpoint without credentials — free tier is checked.
-2. Free tier exhausted → **402 response** containing a Lightning invoice and a macaroon.
-3. Client pays the invoice and receives a preimage from their wallet.
-4. Client sends `Authorization: L402 <macaroon>:<preimage>` on subsequent requests.
-5. Each authenticated request deducts from the credit balance encoded in the macaroon.
-6. Credits exhausted → new 402 with a fresh invoice.
+1. Client requests a priced endpoint without credentials
+2. Free tier checked — if allowance remains, request passes through
+3. If exhausted → **402** response with BOLT-11 invoice + macaroon
+4. Client pays via Lightning, NWC, or Cashu
+5. Client sends \`Authorization: L402 <macaroon>:<preimage>\`
+6. Macaroon verified, credit deducted, request proxied upstream
 
-The `payment_url` returned in a 402 is the canonical invoice-status URL. It now includes a per-invoice lookup secret; treat it like a bearer URL and avoid logging or sharing it.
+## Example deployment
 
-## Free tier
+See [\`examples/valhalla-proxy/\`](examples/valhalla-proxy/) for a complete Docker Compose deployment gating a Valhalla routing API behind Lightning payments.
 
-Each IP address gets a configurable number of free requests per day — no signup required. Once the free allowance is consumed, the client must pay to continue.
+## Licence
 
-`X-Forwarded-For` is only used when `trustProxy: true`. Keep this disabled unless you run behind a trusted reverse proxy that overwrites client IP headers.
-
-## Production checklist
-
-- Set a persistent `rootKey` (32-byte hex), otherwise tokens are invalidated on restart.
-- Use a persistent `dbPath` (default: `./toll-booth.db`).
-- Enable `strictPricing: true` to prevent unpriced routes from bypassing billing.
-- Ensure your `pricing` keys match the paths the middleware actually sees (after mounting).
-- Set `trustProxy: true` when behind a reverse proxy, or provide a `getClientIp` callback for per-client free-tier isolation.
-- Treat `payment_url` as sensitive because it carries the invoice-status lookup token.
-- If you implement `redeemCashu`, make it idempotent for the same `paymentHash`; post-crash recovery cannot be correct otherwise.
-- Rate-limit `/create-invoice` at your reverse proxy (nginx, Cloudflare, etc.) — each call creates a real Lightning invoice, so unthrottled access can exhaust node resources.
-- For the web-standard adapter, ensure your framework enforces request body size limits (the adapter rejects JSON bodies over 64 KiB by default, but the upstream proxy path streams without limit).
-- Upgrade/patch dependencies regularly (`npm audit`).
-
-## Backends
-
-| Backend    | Status      | Notes |
-|------------|-------------|-------|
-| Phoenixd   | Implemented | Simplest self-hosted option |
-| LND        | Implemented | Industry standard |
-| CLN        | Implemented | Core Lightning REST API |
-| LNbits     | Implemented | Any LNbits instance — self-hosted or hosted |
-| Alby (NWC) | Experimental | Disabled by default. The current JSON relay transport is unauthenticated; only enable with `allowInsecureRelay: true` for local testing or a fully trusted relay shim |
-
-## Reference deployment
-
-See [`examples/valhalla-proxy/`](./examples/valhalla-proxy/) for a complete Docker Compose setup that gates a [Valhalla](https://github.com/valhalla/valhalla) routing engine behind toll-booth.
-
-## Support
-
-If you find toll-booth useful, consider sending a tip:
-
-- **Lightning:** `thedonkey@strike.me`
-- **Nostr zaps:** `npub1mgvlrnf5hm9yf0n5mf9nqmvarhvxkc6remu5ec3vf8r0txqkuk7su0e7q2`
+[MIT](LICENSE)
