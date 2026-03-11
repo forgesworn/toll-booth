@@ -1,0 +1,91 @@
+# toll-booth
+
+> APIs gate access through accounts, API keys, and credit cards — mechanisms that assume a human on the other end. Machines and AI agents can't sign up for accounts. toll-booth is L402 payment middleware that lets any HTTP API accept instant payments — Lightning, Cashu ecash, or Nostr Wallet Connect — with no accounts, no API keys, and no PII exchanged.
+
+toll-booth embeds in your existing Node.js application as middleware (not a separate proxy). It supports Express 5, Deno, Bun, and Cloudflare Workers. Five Lightning backends are supported (Phoenixd, LND, Core Lightning, LNbits, Alby), or you can run in Cashu-only mode with no Lightning node at all — ideal for serverless and edge deployments.
+
+The closest alternative is Aperture (Lightning Labs), a Go reverse proxy that requires LND. toll-booth is TypeScript middleware that works with any Lightning backend, runs serverless, and supports Cashu ecash payments.
+
+## Getting Started
+
+```bash
+npm install toll-booth
+```
+
+```typescript
+import express from 'express'
+import { Booth } from 'toll-booth'
+import { phoenixdBackend } from 'toll-booth/backends/phoenixd'
+
+const app = express()
+app.use(express.json())
+
+const booth = new Booth({
+  adapter: 'express',
+  backend: phoenixdBackend({
+    url: 'http://localhost:9740',
+    password: process.env.PHOENIXD_PASSWORD!,
+  }),
+  pricing: { '/api': 10 },
+  upstream: 'http://localhost:8080',
+})
+
+app.get('/invoice-status/:paymentHash', booth.invoiceStatusHandler as any)
+app.post('/create-invoice', booth.createInvoiceHandler as any)
+app.use('/', booth.middleware as any)
+app.listen(3000)
+```
+
+For Cashu-only mode (no Lightning node required):
+
+```typescript
+const booth = new Booth({
+  adapter: 'web-standard',
+  redeemCashu: async (token, paymentHash) => {
+    // Verify and redeem the ecash token with your Cashu mint
+    return amountRedeemed
+  },
+  pricing: { '/api': 5 },
+  upstream: 'http://localhost:8080',
+})
+```
+
+## Key Concepts
+
+- **Booth** — the main facade class. Instantiate with a config object, then wire `.middleware`, `.invoiceStatusHandler`, and `.createInvoiceHandler` into your router.
+- **LightningBackend** — interface with two methods: `createInvoice(amountSats, memo?)` and `checkInvoice(paymentHash)`. Five implementations provided; implement your own for custom backends.
+- **L402 flow** — client requests a priced endpoint, receives HTTP 402 with a Lightning invoice and macaroon, pays the invoice, then sends `Authorization: L402 <macaroon>:<preimage>` to access the API.
+- **Payment methods** — Lightning (via any backend), Cashu ecash tokens (via `redeemCashu` callback), or Nostr Wallet Connect (via `nwcPayInvoice` callback). Methods can be combined.
+- **Credit system** — payments grant a credit balance. Each request deducts from the balance. Volume discount tiers available via `creditTiers`.
+- **Free tier** — optional per-IP daily request allowance (`freeTier: { requestsPerDay: N }`). Requests under the limit bypass payment.
+- **Adapters** — `'express'` for Express 4/5, `'web-standard'` for Deno, Bun, and Cloudflare Workers.
+
+## API Surface
+
+Main entry point: `import { Booth } from 'toll-booth'`
+
+Subpath imports for tree-shaking:
+- `toll-booth/backends/phoenixd` — Phoenixd backend
+- `toll-booth/backends/lnd` — LND backend
+- `toll-booth/backends/cln` — Core Lightning backend
+- `toll-booth/backends/lnbits` — LNbits backend
+- `toll-booth/backends/alby` — Alby / NWC backend
+- `toll-booth/storage/sqlite` — SQLite storage (default)
+- `toll-booth/storage/memory` — in-memory storage (testing)
+- `toll-booth/adapters/express` — Express middleware factory
+- `toll-booth/adapters/web-standard` — Web Standard handler factory
+
+Booth instance properties:
+- `.middleware` — main request handler (checks auth, proxies upstream)
+- `.invoiceStatusHandler` — GET /invoice-status/:paymentHash
+- `.createInvoiceHandler` — POST /create-invoice
+- `.nwcPayHandler` — POST /nwc-pay (when nwcPayInvoice configured)
+- `.cashuRedeemHandler` — POST /cashu-redeem (when redeemCashu configured)
+- `.resetFreeTier()` — reset daily free-tier counters
+- `.close()` — clean up timers and database connections
+
+## Optional
+
+- [Vision: The Vending Machine Web](docs/vision.md) — why L402 and permissionless machine-to-machine payments matter
+- [Example: Valhalla routing proxy](examples/valhalla-proxy/) — complete Docker Compose deployment gating a routing engine behind Lightning payments
+- [Production checklist](README.md#production-checklist) — deployment best practices

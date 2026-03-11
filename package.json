@@ -4,6 +4,17 @@
   "type": "module",
   "description": "L402 Lightning payment middleware for any Node.js framework — Express, Deno, Bun",
   "license": "MIT",
+  "keywords": [
+    "l402", "lightning", "paywall", "micropayments", "middleware",
+    "cashu", "ecash", "nostr", "nwc", "bitcoin",
+    "express", "deno", "bun", "cloudflare-workers", "serverless",
+    "macaroon", "http-402", "api-monetisation", "payment-gateway"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TheCryptoDonkey/toll-booth.git"
+  },
+  "homepage": "https://github.com/TheCryptoDonkey/toll-booth#readme",
   "exports": {
     ".": {
       "import": "./dist/index.js",
