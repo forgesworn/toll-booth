@@ -1,5 +1,8 @@
 # toll-booth
 
+[![MIT licence](https://img.shields.io/badge/licence-MIT-blue.svg)](./LICENSE)
+[![Nostr](https://img.shields.io/badge/Nostr-Zap%20me-purple)](https://primal.net/p/npub1mgvlrnf5hm9yf0n5mf9nqmvarhvxkc6remu5ec3vf8r0txqkuk7su0e7q2)
+
 L402 Lightning payment middleware for Node.js. Gate any HTTP API behind a paywall with a single function call.
 
 Supports **Express 5**, **Deno**, **Bun**, and **Cloudflare Workers** via the Web Standard adapter.
@@ -104,7 +107,15 @@ import { lnbitsBackend } from 'toll-booth/backends/lnbits'
 import { albyBackend } from 'toll-booth/backends/alby'
 \`\`\`
 
-Each backend implements the \`LightningBackend\` interface (\`createInvoice\` + \`checkInvoice\`).
+Each backend implements the `LightningBackend` interface (`createInvoice` + `checkInvoice`).
+
+| Backend | Status | Notes |
+|---------|--------|-------|
+| Phoenixd | Stable | Simplest self-hosted option |
+| LND | Stable | Industry standard |
+| CLN | Stable | Core Lightning REST API |
+| LNbits | Stable | Any LNbits instance — self-hosted or hosted |
+| Alby (NWC) | Experimental | JSON relay transport is unauthenticated; only enable with `allowInsecureRelay: true` for local testing or a fully trusted relay |
 
 ## Subpath exports
 
@@ -128,9 +139,38 @@ import { createWebStandardMiddleware } from 'toll-booth/adapters/web-standard'
 5. Client sends \`Authorization: L402 <macaroon>:<preimage>\`
 6. Macaroon verified, credit deducted, request proxied upstream
 
+## Why not Aperture?
+
+[Aperture](https://github.com/lightninglabs/aperture) is Lightning Labs' production L402 reverse proxy. It's battle-tested and feature-rich. Use it if you can.
+
+| | Aperture | toll-booth |
+|---|---|---|
+| **Language** | Go binary | TypeScript middleware |
+| **Deployment** | Standalone reverse proxy | Embeds in your existing app |
+| **Lightning node** | Requires LND | Phoenixd, LND, CLN, LNbits, or none (Cashu-only) |
+| **Serverless** | No — long-running process | Yes — Web Standard adapter runs on Cloudflare Workers, Deno, Bun |
+| **Configuration** | YAML file | Programmatic (code) |
+
+## Production checklist
+
+- Set a persistent `rootKey` (64 hex chars / 32 bytes), otherwise tokens are invalidated on restart.
+- Use a persistent `dbPath` (default: `./toll-booth.db`).
+- Enable `strictPricing: true` to prevent unpriced routes from bypassing billing.
+- Ensure your `pricing` keys match the paths the middleware actually sees (after mounting).
+- Set `trustProxy: true` when behind a reverse proxy, or provide a `getClientIp` callback for per-client free-tier isolation.
+- If you implement `redeemCashu`, make it idempotent for the same `paymentHash` — crash recovery depends on it.
+- Rate-limit `/create-invoice` at your reverse proxy — each call creates a real Lightning invoice.
+
 ## Example deployment
 
-See [\`examples/valhalla-proxy/\`](examples/valhalla-proxy/) for a complete Docker Compose deployment gating a Valhalla routing API behind Lightning payments.
+See [`examples/valhalla-proxy/`](examples/valhalla-proxy/) for a complete Docker Compose setup gating a [Valhalla](https://github.com/valhalla/valhalla) routing engine behind Lightning payments.
+
+## Support
+
+If you find toll-booth useful, consider sending a tip:
+
+- **Lightning:** `thedonkey@strike.me`
+- **Nostr zaps:** `npub1mgvlrnf5hm9yf0n5mf9nqmvarhvxkc6remu5ec3vf8r0txqkuk7su0e7q2`
 
 ## Licence
 
