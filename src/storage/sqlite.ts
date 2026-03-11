@@ -111,21 +111,26 @@ export function sqliteStorage(config?: SqliteStorageConfig): StorageBackend {
     return false
   })
 
+  const txnDebit = db.transaction((paymentHash: string, amount: number): DebitResult => {
+    const row = stmtBalance.get(paymentHash) as { balance: number } | undefined
+    const current = row?.balance ?? 0
+    if (current < amount) {
+      return { success: false, remaining: current }
+    }
+    const result = stmtDebit.run(amount, paymentHash, amount)
+    if (result.changes === 0) {
+      return { success: false, remaining: current }
+    }
+    return { success: true, remaining: current - amount }
+  })
+
   return {
     credit(paymentHash: string, amount: number): void {
       stmtCredit.run(paymentHash, amount)
     },
 
     debit(paymentHash: string, amount: number): DebitResult {
-      const current = this.balance(paymentHash)
-      if (current < amount) {
-        return { success: false, remaining: current }
-      }
-      const result = stmtDebit.run(amount, paymentHash, amount)
-      if (result.changes === 0) {
-        return { success: false, remaining: this.balance(paymentHash) }
-      }
-      return { success: true, remaining: current - amount }
+      return txnDebit(paymentHash, amount)
     },
 
     balance(paymentHash: string): number {

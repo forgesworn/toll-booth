@@ -5,6 +5,7 @@ import type { CreateInvoiceRequest } from '../core/types.js'
 import type { InvoiceStatusDeps } from '../core/invoice-status.js'
 import { handleCreateInvoice } from '../core/create-invoice.js'
 import { handleInvoiceStatus, renderInvoiceStatusHtml } from '../core/invoice-status.js'
+import { PAYMENT_HASH_RE } from '../core/types.js'
 
 export type WebStandardHandler = (req: Request) => Promise<Response>
 
@@ -40,15 +41,30 @@ async function proxyUpstream(upstream: string, req: Request): Promise<Response> 
  * On `pass` or `proxy` results the request is forwarded to the upstream.
  * On `challenge` a 402 response is returned with invoice details.
  */
+export interface WebStandardMiddlewareConfig {
+  engine: TollBoothEngine
+  upstream: string
+  trustProxy?: boolean
+  responseHeaders?: Record<string, string>
+}
+
 export function createWebStandardMiddleware(
-  engine: TollBoothEngine,
-  upstream: string,
+  engineOrConfig: TollBoothEngine | WebStandardMiddlewareConfig,
+  upstreamArg?: string,
 ): WebStandardHandler {
-  const upstreamBase = upstream.replace(/\/$/, '')
+  // Support both old (engine, upstream) and new (config) signatures
+  const config: WebStandardMiddlewareConfig = typeof upstreamArg === 'string'
+    ? { engine: engineOrConfig as TollBoothEngine, upstream: upstreamArg }
+    : engineOrConfig as WebStandardMiddlewareConfig
+  const engine = config.engine
+  const upstreamBase = config.upstream.replace(/\/$/, '')
+  const extraHeaders = config.responseHeaders ?? {}
 
   return async (req: Request): Promise<Response> => {
     const url = new URL(req.url)
-    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? '127.0.0.1'
+    const ip = config.trustProxy
+      ? req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? req.headers.get('x-real-ip') ?? '127.0.0.1'
+      : '127.0.0.1'
     const headers = Object.fromEntries(req.headers.entries())
 
     const result = await engine.handle({
@@ -61,9 +77,11 @@ export function createWebStandardMiddleware(
 
     if (result.action === 'pass' || result.action === 'proxy') {
       const res = await proxyUpstream(upstreamBase, req)
-      // Copy any extra headers from the engine result
       const responseHeaders = new Headers(res.headers)
       for (const [key, value] of Object.entries(result.headers)) {
+        responseHeaders.set(key, value)
+      }
+      for (const [key, value] of Object.entries(extraHeaders)) {
         responseHeaders.set(key, value)
       }
       return new Response(res.body, {
@@ -74,9 +92,10 @@ export function createWebStandardMiddleware(
     }
 
     // challenge — 402
+    const challengeHeaders = { ...result.headers, ...extraHeaders }
     return Response.json(result.body, {
       status: 402,
-      headers: result.headers,
+      headers: challengeHeaders,
     })
   }
 }
@@ -97,6 +116,9 @@ export function createWebStandardInvoiceStatusHandler(
     const url = new URL(req.url)
     const segments = url.pathname.split('/').filter(Boolean)
     const paymentHash = segments[segments.length - 1] ?? ''
+    if (!PAYMENT_HASH_RE.test(paymentHash)) {
+      return Response.json({ error: 'Invalid payment hash' }, { status: 400 })
+    }
     const accept = req.headers.get('accept') ?? ''
 
     try {

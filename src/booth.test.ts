@@ -86,10 +86,9 @@ describe('Booth', () => {
     it('rejects non-hex payment hash in invoice status', async () => {
       const { app, booth } = setup()
       const res = await app.request('/invoice-status/not-a-valid-hash')
-      // The handler returns JSON with paid: false for unknown invoices
-      expect(res.status).toBe(200)
+      expect(res.status).toBe(400)
       const body = await res.json()
-      expect(body.paid).toBe(false)
+      expect(body.error).toBe('Invalid payment hash')
       booth.close()
     })
   })
@@ -401,6 +400,27 @@ describe('Booth', () => {
       expect(storage.isSettled('abc123')).toBe(true)
       expect(storage.balance('abc123')).toBe(500)
       expect(storage.pendingClaims()).toHaveLength(0)
+
+      booth.close()
+    })
+
+    it('rejects unknown paymentHash that has no stored invoice', async () => {
+      const redeemCashu = vi.fn().mockResolvedValue(500)
+      const { app, booth } = setup({ redeemCashu })
+
+      // Post with a valid-format but never-issued paymentHash
+      const unknownHash = 'c'.repeat(64)
+      const res = await app.request('/cashu-redeem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: 'cashuA...', paymentHash: unknownHash }),
+      })
+
+      expect(res.status).toBe(400)
+      const body = await res.json()
+      expect(body.error).toContain('Unknown payment hash')
+      // Must never call the external mint
+      expect(redeemCashu).not.toHaveBeenCalled()
 
       booth.close()
     })

@@ -6,6 +6,7 @@ import type { InvoiceStatusDeps } from '../core/invoice-status.js'
 import { handleCreateInvoice } from '../core/create-invoice.js'
 import { handleInvoiceStatus, renderInvoiceStatusHtml } from '../core/invoice-status.js'
 import type { StorageBackend } from '../storage/interface.js'
+import { PAYMENT_HASH_RE } from '../core/types.js'
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -36,6 +37,8 @@ async function proxyUpstream(upstream: string, req: Request): Promise<Response> 
 export interface HonoMiddlewareConfig {
   engine: TollBoothEngine
   upstream: string
+  trustProxy?: boolean
+  responseHeaders?: Record<string, string>
 }
 
 /**
@@ -47,9 +50,13 @@ export interface HonoMiddlewareConfig {
 export function createHonoMiddleware(config: HonoMiddlewareConfig): MiddlewareHandler {
   const upstream = config.upstream.replace(/\/$/, '')
 
+  const extraHeaders = config.responseHeaders ?? {}
+
   return async (c) => {
     const url = new URL(c.req.url)
-    const ip = c.req.header('X-Forwarded-For')?.split(',')[0]?.trim() ?? '127.0.0.1'
+    const ip = config.trustProxy
+      ? c.req.header('X-Forwarded-For')?.split(',')[0]?.trim() ?? c.req.header('X-Real-IP') ?? '127.0.0.1'
+      : '127.0.0.1'
     const headers = Object.fromEntries(c.req.raw.headers.entries())
 
     const result = await config.engine.handle({
@@ -62,11 +69,26 @@ export function createHonoMiddleware(config: HonoMiddlewareConfig): MiddlewareHa
 
     if (result.action === 'pass' || result.action === 'proxy') {
       const res = await proxyUpstream(upstream, c.req.raw)
-      return res
+      // Merge engine headers + responseHeaders onto the upstream response
+      const merged = new Headers(res.headers)
+      for (const [key, value] of Object.entries(result.headers)) {
+        merged.set(key, value)
+      }
+      for (const [key, value] of Object.entries(extraHeaders)) {
+        merged.set(key, value)
+      }
+      return new Response(res.body, {
+        status: res.status,
+        statusText: res.statusText,
+        headers: merged,
+      })
     }
 
     // challenge — 402
     for (const [key, value] of Object.entries(result.headers)) {
+      c.header(key, value)
+    }
+    for (const [key, value] of Object.entries(extraHeaders)) {
       c.header(key, value)
     }
     return c.json(result.body, 402)
@@ -87,6 +109,9 @@ export function createHonoInvoiceStatusHandler(
 ): (c: Context) => Promise<Response> {
   return async (c) => {
     const paymentHash = c.req.param('paymentHash') ?? ''
+    if (!PAYMENT_HASH_RE.test(paymentHash)) {
+      return c.json({ error: 'Invalid payment hash' }, 400)
+    }
     const accept = c.req.header('Accept') ?? ''
 
     try {
@@ -177,6 +202,14 @@ export function createHonoCashuHandler(
   return async (c) => {
     try {
       const { token, paymentHash } = await c.req.json()
+      if (typeof token !== 'string' || !token || !PAYMENT_HASH_RE.test(paymentHash)) {
+        return c.json({ error: 'Invalid request: token (string) and paymentHash (64 hex chars) required' }, 400)
+      }
+
+      // Reject unknown payment hashes — must have been issued by this server
+      if (!storage.getInvoice(paymentHash) && !storage.isSettled(paymentHash)) {
+        return c.json({ error: 'Unknown payment hash — no invoice found for this hash' }, 400)
+      }
 
       // Fast path: already settled
       if (storage.isSettled(paymentHash)) {

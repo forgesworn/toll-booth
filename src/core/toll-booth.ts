@@ -159,7 +159,8 @@ function handleL402Auth(
     if (!debit.success) return { authorised: false, remaining: debit.remaining }
 
     return { authorised: true, remaining: debit.remaining, paymentHash: result.paymentHash, creditedAmount }
-  } catch {
+  } catch (err) {
+    console.error('[toll-booth] L402 auth error:', err instanceof Error ? err.message : err)
     return { authorised: false, remaining: 0 }
   }
 }

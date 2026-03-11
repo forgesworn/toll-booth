@@ -109,9 +109,16 @@ export class Booth {
 
     const upstream = config.upstream.replace(/\/$/, '')
 
+    const adapterConfig = {
+      engine: this.engine,
+      upstream,
+      trustProxy: config.trustProxy,
+      responseHeaders: config.responseHeaders,
+    }
+
     switch (config.adapter) {
       case 'hono':
-        this.middleware = createHonoMiddleware({ engine: this.engine, upstream })
+        this.middleware = createHonoMiddleware(adapterConfig)
         this.invoiceStatusHandler = createHonoInvoiceStatusHandler(invoiceStatusDeps)
         this.createInvoiceHandler = createHonoCreateInvoiceHandler(createInvoiceDeps)
         if (config.nwcPayInvoice) {
@@ -124,13 +131,13 @@ export class Booth {
         break
 
       case 'express':
-        this.middleware = createExpressMiddleware(this.engine, upstream)
+        this.middleware = createExpressMiddleware(adapterConfig)
         this.invoiceStatusHandler = createExpressInvoiceStatusHandler(invoiceStatusDeps)
         this.createInvoiceHandler = createExpressCreateInvoiceHandler(createInvoiceDeps)
         break
 
       case 'web-standard':
-        this.middleware = createWebStandardMiddleware(this.engine, upstream)
+        this.middleware = createWebStandardMiddleware(adapterConfig)
         this.invoiceStatusHandler = createWebStandardInvoiceStatusHandler(invoiceStatusDeps)
         this.createInvoiceHandler = createWebStandardCreateInvoiceHandler(createInvoiceDeps)
         break

@@ -66,7 +66,8 @@ export async function handleCreateInvoice(
         qrSvg,
       },
     }
-  } catch {
+  } catch (err) {
+    console.error('[toll-booth] create invoice error:', err instanceof Error ? err.message : err)
     return { success: false, error: 'Failed to create invoice' }
   }
 }

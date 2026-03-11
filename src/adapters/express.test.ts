@@ -87,4 +87,49 @@ describe('Express adapter', () => {
     expect(body).toHaveProperty('payment_hash')
     expect(body).toHaveProperty('amount_sats', 1000)
   })
+
+  it('forwards parsed POST body to upstream when express.json() is mounted', async () => {
+    const { createServer } = await import('node:http')
+
+    // Upstream echo server — returns the received body
+    const upstream = createServer((req, res) => {
+      const chunks: Buffer[] = []
+      req.on('data', (c) => chunks.push(c))
+      req.on('end', () => {
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(Buffer.concat(chunks))
+      })
+    })
+    await new Promise<void>((r) => upstream.listen(0, r))
+    const upstreamPort = (upstream.address() as { port: number }).port
+
+    const backend = mockBackend()
+    const storage = memoryStorage()
+    const engine = createTollBooth({
+      backend,
+      storage,
+      pricing: {},  // no priced routes — everything passes through
+      upstream: `http://127.0.0.1:${upstreamPort}`,
+      rootKey: ROOT_KEY,
+    })
+
+    const app = express()
+    app.use(express.json())  // body parser before middleware
+    app.use('/api', createExpressMiddleware(engine, `http://127.0.0.1:${upstreamPort}`))
+
+    try {
+      const payload = { hello: 'world' }
+      const res = await request(app, '/api/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+
+      expect(res.status).toBe(200)
+      const body = await res.json()
+      expect(body).toEqual(payload)
+    } finally {
+      upstream.close()
+    }
+  })
 })

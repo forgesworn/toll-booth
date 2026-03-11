@@ -24,8 +24,9 @@ export { memoryStorage } from './storage/memory.js'
 // Adapters
 export { createHonoMiddleware, createHonoInvoiceStatusHandler, createHonoCreateInvoiceHandler } from './adapters/hono.js'
 export { createExpressMiddleware, createExpressInvoiceStatusHandler, createExpressCreateInvoiceHandler } from './adapters/express.js'
+export type { ExpressMiddlewareConfig } from './adapters/express.js'
 export { createWebStandardMiddleware, createWebStandardInvoiceStatusHandler, createWebStandardCreateInvoiceHandler } from './adapters/web-standard.js'
-export type { WebStandardHandler } from './adapters/web-standard.js'
+export type { WebStandardHandler, WebStandardMiddlewareConfig } from './adapters/web-standard.js'
 
 // Utilities
 export { mintMacaroon, verifyMacaroon, parseCaveats } from './macaroon.js'

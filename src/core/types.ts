@@ -2,6 +2,9 @@
 import type { LightningBackend, CreditTier, PaymentEvent, RequestEvent, ChallengeEvent } from '../types.js'
 import type { StorageBackend, StoredInvoice } from '../storage/interface.js'
 
+/** Matches a valid 64-char lowercase hex payment hash. */
+export const PAYMENT_HASH_RE = /^[0-9a-f]{64}$/
+
 export interface TollBoothRequest {
   method: string
   path: string

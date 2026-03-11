@@ -5,6 +5,7 @@ import type { CreateInvoiceDeps } from '../core/create-invoice.js'
 import type { InvoiceStatusDeps } from '../core/invoice-status.js'
 import { handleCreateInvoice } from '../core/create-invoice.js'
 import { handleInvoiceStatus, renderInvoiceStatusHtml } from '../core/invoice-status.js'
+import { PAYMENT_HASH_RE } from '../core/types.js'
 
 // -- Middleware ---------------------------------------------------------------
 
@@ -14,19 +15,36 @@ import { handleInvoiceStatus, renderInvoiceStatusHtml } from '../core/invoice-st
  * On `pass` or `proxy` results the request is forwarded to the upstream.
  * On `challenge` a 402 response is returned with invoice details.
  */
+export interface ExpressMiddlewareConfig {
+  engine: TollBoothEngine
+  upstream: string
+  trustProxy?: boolean
+  responseHeaders?: Record<string, string>
+}
+
 export function createExpressMiddleware(
-  engine: TollBoothEngine,
-  upstream: string,
+  engineOrConfig: TollBoothEngine | ExpressMiddlewareConfig,
+  upstreamArg?: string,
 ): RequestHandler {
-  const upstreamBase = upstream.replace(/\/$/, '')
+  // Support both old (engine, upstream) and new (config) signatures
+  const config: ExpressMiddlewareConfig = typeof upstreamArg === 'string'
+    ? { engine: engineOrConfig as TollBoothEngine, upstream: upstreamArg }
+    : engineOrConfig as ExpressMiddlewareConfig
+  const engine = config.engine
+  const upstreamBase = config.upstream.replace(/\/$/, '')
+  const extraHeaders = config.responseHeaders ?? {}
 
   return async (req: Request, res: Response, _next: NextFunction) => {
-    const ip =
-      (typeof req.headers['x-forwarded-for'] === 'string'
-        ? req.headers['x-forwarded-for'].split(',')[0]?.trim()
-        : undefined) ??
-      req.socket.remoteAddress ??
-      '127.0.0.1'
+    const ip = config.trustProxy
+      ? (typeof req.headers['x-forwarded-for'] === 'string'
+          ? req.headers['x-forwarded-for'].split(',')[0]?.trim()
+          : undefined) ??
+        (typeof req.headers['x-real-ip'] === 'string'
+          ? req.headers['x-real-ip'].trim()
+          : undefined) ??
+        req.socket.remoteAddress ??
+        '127.0.0.1'
+      : req.socket.remoteAddress ?? '127.0.0.1'
 
     const headers: Record<string, string | undefined> = {}
     for (const [key, value] of Object.entries(req.headers)) {
@@ -61,16 +79,27 @@ export function createExpressMiddleware(
         }
 
         if (req.method !== 'GET' && req.method !== 'HEAD') {
-          init.body = req.body
+          // If body-parsing middleware already consumed the stream, re-serialise
+          if (req.body !== undefined && req.body !== null && typeof req.body === 'object' && Object.keys(req.body).length > 0) {
+            const json = JSON.stringify(req.body)
+            init.body = json
+            fwdHeaders.set('content-length', Buffer.byteLength(json).toString())
+          } else {
+            init.body = req as unknown as ReadableStream
+          }
         }
 
         const upstream_res = await fetch(target, init as RequestInit)
-        // Copy response headers
+        // Copy response headers, skipping hop-by-hop headers we handle ourselves
         upstream_res.headers.forEach((value, key) => {
+          if (key === 'transfer-encoding') return  // we buffer the body, Express sets content-length
           res.setHeader(key, value)
         })
-        // Set extra headers from result
+        // Set extra headers from engine result
         for (const [key, value] of Object.entries(result.headers)) {
+          res.setHeader(key, value)
+        }
+        for (const [key, value] of Object.entries(extraHeaders)) {
           res.setHeader(key, value)
         }
         const buf = Buffer.from(await upstream_res.arrayBuffer())
@@ -80,6 +109,9 @@ export function createExpressMiddleware(
 
       // challenge -- 402
       for (const [key, value] of Object.entries(result.headers)) {
+        res.setHeader(key, value)
+      }
+      for (const [key, value] of Object.entries(extraHeaders)) {
         res.setHeader(key, value)
       }
       res.status(402).json(result.body)
@@ -105,6 +137,10 @@ export function createExpressInvoiceStatusHandler(
     const paymentHash = Array.isArray(req.params.paymentHash)
       ? req.params.paymentHash[0]
       : req.params.paymentHash
+    if (!PAYMENT_HASH_RE.test(paymentHash)) {
+      res.status(400).json({ error: 'Invalid payment hash' })
+      return
+    }
     const accept = req.headers.accept ?? ''
 
     try {
