@@ -58,7 +58,7 @@ jobs:
           cache: npm
           registry-url: https://registry.npmjs.org
 
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - run: npm run build
 
       - name: Publish to npm (OIDC trusted publishing)
