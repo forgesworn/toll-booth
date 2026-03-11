@@ -86,7 +86,7 @@ L402 gives machines a way to pay for what they use, instantly, without permissio
 ### Get started
 
 ```bash
-npm install toll-booth
+npm install @thecryptodonkey/toll-booth
 ```
 
 Express, Deno, Bun, and Cloudflare Workers. MIT licence.
