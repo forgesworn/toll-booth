@@ -107,7 +107,15 @@ export function sqliteStorage(config?: SqliteStorageConfig): StorageBackend {
     UPDATE claims
     SET lease_expires_at = ?
     WHERE payment_hash = ?
-      AND (lease_expires_at IS NULL OR lease_expires_at < datetime('now'))
+      AND (lease_expires_at IS NULL OR datetime(lease_expires_at) <= datetime('now'))
+      AND payment_hash NOT IN (SELECT payment_hash FROM settlements)
+  `)
+
+  const stmtExtendRecoveryLease = db.prepare(`
+    UPDATE claims
+    SET lease_expires_at = ?
+    WHERE payment_hash = ?
+      AND datetime(lease_expires_at) > datetime('now')
       AND payment_hash NOT IN (SELECT payment_hash FROM settlements)
   `)
 
@@ -211,6 +219,12 @@ export function sqliteStorage(config?: SqliteStorageConfig): StorageBackend {
     tryAcquireRecoveryLease(paymentHash: string, leaseMs: number): PendingClaim | undefined {
       const leaseExpiresAt = new Date(Date.now() + leaseMs).toISOString()
       return txnTryAcquireRecoveryLease(paymentHash, leaseExpiresAt)
+    },
+
+    extendRecoveryLease(paymentHash: string, leaseMs: number): boolean {
+      const leaseExpiresAt = new Date(Date.now() + leaseMs).toISOString()
+      const result = stmtExtendRecoveryLease.run(leaseExpiresAt, paymentHash)
+      return result.changes > 0
     },
 
     storeInvoice(paymentHash: string, bolt11: string, amountSats: number, macaroon: string): void {

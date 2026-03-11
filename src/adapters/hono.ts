@@ -196,6 +196,23 @@ export function createHonoNwcHandler(
  *   claim survives for recovery on restart via pendingClaims()
  */
 export const REDEEM_LEASE_MS = 30_000
+const REDEEM_LEASE_RENEW_MS = Math.max(1_000, Math.floor(REDEEM_LEASE_MS / 2))
+
+async function withLeaseKeepAlive<T>(
+  storage: StorageBackend,
+  paymentHash: string,
+  fn: () => Promise<T>,
+): Promise<T> {
+  const timer = setInterval(() => {
+    storage.extendRecoveryLease(paymentHash, REDEEM_LEASE_MS)
+  }, REDEEM_LEASE_RENEW_MS)
+
+  try {
+    return await fn()
+  } finally {
+    clearInterval(timer)
+  }
+}
 
 export function createHonoCashuHandler(
   redeem: (token: string, paymentHash: string) => Promise<number>,
@@ -233,7 +250,9 @@ export function createHonoCashuHandler(
         const pendingClaim = storage.tryAcquireRecoveryLease(paymentHash, REDEEM_LEASE_MS)
         if (pendingClaim) {
           try {
-            const credited = await redeem(pendingClaim.token, paymentHash)
+            const credited = await withLeaseKeepAlive(storage, paymentHash, () =>
+              redeem(pendingClaim.token, paymentHash),
+            )
             const newlySettled = storage.settleWithCredit(paymentHash, credited)
             const invoice = storage.getInvoice(paymentHash)
             return c.json({ credited: newlySettled ? credited : 0, macaroon: invoice?.macaroon })
@@ -249,7 +268,9 @@ export function createHonoCashuHandler(
 
       // We hold the exclusive claim — call the external mint
       try {
-        const credited = await redeem(token, paymentHash)
+        const credited = await withLeaseKeepAlive(storage, paymentHash, () =>
+          redeem(token, paymentHash),
+        )
         const newlySettled = storage.settleWithCredit(paymentHash, credited)
         const invoice = storage.getInvoice(paymentHash)
         return c.json({ credited: newlySettled ? credited : 0, macaroon: invoice?.macaroon })

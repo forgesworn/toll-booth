@@ -44,6 +44,11 @@ export interface StorageBackend {
    * Returns the claim if the lease was acquired, undefined otherwise.
    */
   tryAcquireRecoveryLease(paymentHash: string, leaseMs: number): PendingClaim | undefined
+  /**
+   * Extend an active lease on a pending claim.
+   * Returns true if extended, false if missing/settled/expired.
+   */
+  extendRecoveryLease(paymentHash: string, leaseMs: number): boolean
   storeInvoice(paymentHash: string, bolt11: string, amountSats: number, macaroon: string): void
   getInvoice(paymentHash: string): StoredInvoice | undefined
   close(): void

@@ -111,6 +111,34 @@ describe('sqliteStorage', () => {
     expect(storage.claimForRedeem('hash1', 'cashuA...')).toBe(false)
   })
 
+  it('tryAcquireRecoveryLease does not acquire while lease is active', () => {
+    storage = sqliteStorage()
+    expect(storage.claimForRedeem('hash1', 'tokenA', 30_000)).toBe(true)
+    expect(storage.tryAcquireRecoveryLease('hash1', 30_000)).toBeUndefined()
+  })
+
+  it('tryAcquireRecoveryLease acquires when lease is expired', () => {
+    storage = sqliteStorage()
+    expect(storage.claimForRedeem('hash1', 'tokenA', -1)).toBe(true)
+
+    const claim = storage.tryAcquireRecoveryLease('hash1', 30_000)
+    expect(claim).toBeDefined()
+    expect(claim!.paymentHash).toBe('hash1')
+    expect(claim!.token).toBe('tokenA')
+  })
+
+  it('extendRecoveryLease extends while lease is active', () => {
+    storage = sqliteStorage()
+    expect(storage.claimForRedeem('hash1', 'tokenA', 30_000)).toBe(true)
+    expect(storage.extendRecoveryLease('hash1', 30_000)).toBe(true)
+  })
+
+  it('extendRecoveryLease returns false when lease is expired', () => {
+    storage = sqliteStorage()
+    expect(storage.claimForRedeem('hash1', 'tokenA', -1)).toBe(true)
+    expect(storage.extendRecoveryLease('hash1', 30_000)).toBe(false)
+  })
+
   it('pendingClaims returns unsettled claims', () => {
     storage = sqliteStorage()
     storage.claimForRedeem('hash1', 'tokenA')

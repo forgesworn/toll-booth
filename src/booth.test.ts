@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto'
 import { Hono } from 'hono'
 import { Booth } from './booth.js'
 import { memoryStorage } from './storage/memory.js'
+import { sqliteStorage } from './storage/sqlite.js'
 import type { LightningBackend, CreditTier } from './types.js'
 
 const ROOT_KEY = 'a'.repeat(64)
@@ -326,8 +327,9 @@ describe('Booth', () => {
       const redeemCashu = vi.fn().mockResolvedValue(500)
       const storage = memoryStorage()
 
-      // Simulate a crash: claim was written but never settled
-      storage.claimForRedeem('abc123', 'cashuA...')
+      // Simulate a crash: claim was written but never settled.
+      // Use an expired lease so manual recovery can reacquire immediately.
+      storage.claimForRedeem('abc123', 'cashuA...', -1)
       storage.storeInvoice('abc123', 'lnbc...', 1000, 'mac1')
 
       const booth = new Booth({
@@ -354,7 +356,8 @@ describe('Booth', () => {
       const storage = memoryStorage()
 
       // Simulate a crash: claim was written but never settled
-      storage.claimForRedeem('abc123', 'cashuA...')
+      // with an expired lease so recovery can attempt redeem.
+      storage.claimForRedeem('abc123', 'cashuA...', -1)
 
       const booth = new Booth({
         adapter: 'hono',
@@ -376,12 +379,78 @@ describe('Booth', () => {
       booth.close()
     })
 
+    it('recoverPendingClaims skips claims with active lease', async () => {
+      const redeemCashu = vi.fn().mockResolvedValue(500)
+      const storage = memoryStorage()
+
+      // Lease is active; another request/process should still own this claim.
+      storage.claimForRedeem('abc123', 'cashuA...', 30_000)
+
+      const booth = new Booth({
+        adapter: 'hono',
+        backend: { createInvoice: vi.fn(), checkInvoice: vi.fn() },
+        pricing: {},
+        upstream: 'http://localhost',
+        rootKey: ROOT_KEY,
+        storage,
+      })
+
+      const recovered = await booth.recoverPendingClaims(redeemCashu)
+      expect(recovered).toBe(0)
+      expect(redeemCashu).not.toHaveBeenCalled()
+      expect(storage.isSettled('abc123')).toBe(false)
+      expect(storage.pendingClaims()).toHaveLength(1)
+
+      booth.close()
+    })
+
+    it('recoverPendingClaims keeps lease alive during long-running redeem', async () => {
+      vi.useFakeTimers()
+      try {
+        const storage = memoryStorage()
+        storage.claimForRedeem('abc123', 'cashuA...', -1)
+
+        let resolveRedeem: ((credited: number) => void) | undefined
+        const redeemCashu = vi.fn().mockImplementation(
+          () => new Promise<number>((resolve) => { resolveRedeem = resolve }),
+        )
+
+        const booth = new Booth({
+          adapter: 'hono',
+          backend: { createInvoice: vi.fn(), checkInvoice: vi.fn() },
+          pricing: {},
+          upstream: 'http://localhost',
+          rootKey: ROOT_KEY,
+          storage,
+        })
+
+        const recoveryPromise = booth.recoverPendingClaims(redeemCashu)
+        await Promise.resolve()
+        expect(redeemCashu).toHaveBeenCalledTimes(1)
+
+        // Lease renewal should keep this claim locked during long in-flight redeem.
+        vi.advanceTimersByTime(31_000)
+        expect(storage.tryAcquireRecoveryLease('abc123', 30_000)).toBeUndefined()
+
+        resolveRedeem?.(500)
+        const recovered = await recoveryPromise
+        expect(recovered).toBe(1)
+        expect(storage.isSettled('abc123')).toBe(true)
+        expect(storage.balance('abc123')).toBe(500)
+
+        booth.close()
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
     it('auto-recovers pending claims when redeemCashu is provided', async () => {
       const redeemCashu = vi.fn().mockResolvedValue(500)
       const storage = memoryStorage()
 
-      // Simulate a crash: claim was written but never settled
-      storage.claimForRedeem('abc123', 'cashuA...')
+      // Simulate a crash: claim was written but never settled.
+      // Use an expired lease so startup auto-recovery can acquire it.
+      storage.claimForRedeem('abc123', 'cashuA...', -1)
 
       const booth = new Booth({
         adapter: 'hono',
@@ -402,6 +471,34 @@ describe('Booth', () => {
       expect(storage.pendingClaims()).toHaveLength(0)
 
       booth.close()
+    })
+
+    it('startup auto-recovery skips active lease in shared sqlite storage', async () => {
+      const dbPath = `/tmp/toll-booth-${Date.now()}-${Math.random().toString(16).slice(2)}.db`
+      const writer = sqliteStorage({ path: dbPath })
+      writer.storeInvoice('abc123', 'lnbc...', 1000, 'mac1')
+      expect(writer.claimForRedeem('abc123', 'cashuA...', 30_000)).toBe(true)
+
+      const redeemCashu = vi.fn().mockResolvedValue(500)
+      const booth = new Booth({
+        adapter: 'hono',
+        backend: { createInvoice: vi.fn(), checkInvoice: vi.fn() },
+        pricing: {},
+        upstream: 'http://localhost',
+        rootKey: ROOT_KEY,
+        storage: sqliteStorage({ path: dbPath }),
+        redeemCashu,
+      })
+
+      // Auto-recovery runs asynchronously — give it a tick
+      await new Promise((r) => setTimeout(r, 10))
+
+      expect(redeemCashu).not.toHaveBeenCalled()
+      expect(writer.isSettled('abc123')).toBe(false)
+      expect(writer.pendingClaims()).toHaveLength(1)
+
+      booth.close()
+      writer.close()
     })
 
     it('rejects unknown paymentHash that has no stored invoice', async () => {
@@ -560,6 +657,53 @@ describe('Booth', () => {
 
         // Only one additional redeem call (2 total: initial fail + recovery)
         expect(redeemCashu).toHaveBeenCalledTimes(2)
+
+        booth.close()
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('long-running in-flight redeem keeps lease, retry stays pending', async () => {
+      vi.useFakeTimers()
+      try {
+        let resolveRedeem: ((credited: number) => void) | undefined
+        const redeemCashu = vi.fn().mockImplementation(
+          () => new Promise<number>((resolve) => { resolveRedeem = resolve }),
+        )
+        const { app, booth, paymentHash } = setup({ redeemCashu })
+
+        // Store the invoice
+        await app.request('/route', { method: 'POST' })
+
+        const opts = {
+          method: 'POST' as const,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: 'cashuA...', paymentHash }),
+        }
+
+        // First request acquires claim and starts a long-running redeem.
+        const firstPromise = app.request('/cashu-redeem', opts)
+        // Let the handler advance to the redeem call under fake timers.
+        for (let i = 0; i < 5 && redeemCashu.mock.calls.length === 0; i++) {
+          await vi.advanceTimersByTimeAsync(0)
+        }
+        expect(redeemCashu).toHaveBeenCalledTimes(1)
+
+        // Move past the base lease duration; keepalive should have renewed it.
+        vi.advanceTimersByTime(31_000)
+
+        const second = await app.request('/cashu-redeem', opts)
+        expect(second.status).toBe(202)
+        const secondBody = await second.json()
+        expect(secondBody.state).toBe('pending')
+        expect(redeemCashu).toHaveBeenCalledTimes(1)
+
+        resolveRedeem?.(500)
+        const first = await firstPromise
+        expect(first.status).toBe(200)
+        const firstBody = await first.json()
+        expect(firstBody.credited).toBe(500)
 
         booth.close()
       } finally {

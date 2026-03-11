@@ -76,6 +76,15 @@ export function memoryStorage(): StorageBackend {
       return { paymentHash, token: claim.token, claimedAt: claim.claimedAt }
     },
 
+    extendRecoveryLease(paymentHash: string, leaseMs: number): boolean {
+      if (settled.has(paymentHash)) return false
+      const claim = claims.get(paymentHash)
+      if (!claim) return false
+      if (Date.now() >= claim.leaseExpiresAt) return false
+      claim.leaseExpiresAt = Date.now() + leaseMs
+      return true
+    },
+
     storeInvoice(paymentHash: string, bolt11: string, amountSats: number, macaroon: string): void {
       if (invoices.has(paymentHash)) return
       invoices.set(paymentHash, {

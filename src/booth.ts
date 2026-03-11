@@ -9,7 +9,14 @@ import { sqliteStorage } from './storage/sqlite.js'
 import { StatsCollector } from './stats.js'
 import { randomBytes } from 'node:crypto'
 
-import { createHonoMiddleware, createHonoInvoiceStatusHandler, createHonoCreateInvoiceHandler, createHonoNwcHandler, createHonoCashuHandler } from './adapters/hono.js'
+import {
+  createHonoMiddleware,
+  createHonoInvoiceStatusHandler,
+  createHonoCreateInvoiceHandler,
+  createHonoNwcHandler,
+  createHonoCashuHandler,
+  REDEEM_LEASE_MS,
+} from './adapters/hono.js'
 import { createExpressMiddleware, createExpressInvoiceStatusHandler, createExpressCreateInvoiceHandler } from './adapters/express.js'
 import { createWebStandardMiddleware, createWebStandardInvoiceStatusHandler, createWebStandardCreateInvoiceHandler } from './adapters/web-standard.js'
 
@@ -161,6 +168,7 @@ export class Booth {
    * Recover Cashu redemptions that were claimed but never settled (crash recovery).
    * Automatically called on startup when Cashu is enabled. Can also be called
    * manually. For each pending claim, retries the redeem call:
+   * - If recovery lease is acquired: attempts redeem
    * - On success: settles with the credited amount
    * - On failure: leaves the claim pending for the next recovery attempt
    *
@@ -171,14 +179,27 @@ export class Booth {
   ): Promise<number> {
     const claims = this.storage.pendingClaims()
     let recovered = 0
+    const renewIntervalMs = Math.max(1_000, Math.floor(REDEEM_LEASE_MS / 2))
     for (const claim of claims) {
+      // Respect active leases so startup recovery does not race in-flight requests
+      // (or another process already handling this claim).
+      const leasedClaim = this.storage.tryAcquireRecoveryLease(claim.paymentHash, REDEEM_LEASE_MS)
+      if (!leasedClaim) continue
+
+      const timer = setInterval(() => {
+        this.storage.extendRecoveryLease(leasedClaim.paymentHash, REDEEM_LEASE_MS)
+      }, renewIntervalMs)
+
       try {
-        const credited = await redeemFn(claim.token, claim.paymentHash)
-        this.storage.settleWithCredit(claim.paymentHash, credited)
-        recovered++
+        const credited = await redeemFn(leasedClaim.token, leasedClaim.paymentHash)
+        if (this.storage.settleWithCredit(leasedClaim.paymentHash, credited)) {
+          recovered++
+        }
       } catch {
         // Transient failure (network, mint outage) — leave claim pending
         // for the next recovery attempt. Do NOT settle with 0.
+      } finally {
+        clearInterval(timer)
       }
     }
     return recovered
