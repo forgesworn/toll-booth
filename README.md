@@ -40,10 +40,10 @@ toll-booth exists for the cases where Aperture doesn't fit:
 |---|---|---|
 | **Language** | Go binary | TypeScript middleware |
 | **Deployment** | Standalone reverse proxy | Embeds in your existing app |
-| **Lightning node** | Requires LND | Phoenixd (lighter), LND coming soon |
+| **Lightning node** | Requires LND | Phoenixd, LND, or CLN |
 | **Serverless** | No — long-running process | Yes — runs on Cloudflare Workers, Deno, Bun |
 | **Configuration** | YAML file | Programmatic (code) |
-| **Maturity** | Production (powers Lightning Loop) | Alpha |
+| **Maturity** | Production (powers Lightning Loop) | Stable |
 
 **Use Aperture** if you run LND and want a proven, standalone proxy with TLS, Tor, Prometheus, and dynamic pricing.
 
@@ -76,8 +76,8 @@ Each IP address gets a configurable number of free requests per day — no signu
 | Backend    | Status      |
 |------------|-------------|
 | Phoenixd   | Implemented |
-| LND        | Coming soon |
-| Alby       | Coming soon |
+| LND        | Implemented |
+| CLN        | Implemented |
 
 ## Reference deployment
 
