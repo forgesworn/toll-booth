@@ -1,6 +1,6 @@
 {
   "name": "@thecryptodonkey/toll-booth",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "type": "module",
   "description": "Any API becomes a Lightning toll booth in one line. L402 middleware for Express, Deno, Bun, and Workers.",
   "license": "MIT",
