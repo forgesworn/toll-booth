@@ -6,6 +6,10 @@ toll-booth embeds in your existing Node.js application as middleware (not a sepa
 
 The closest alternative is Aperture (Lightning Labs), a Go reverse proxy that requires LND. toll-booth is TypeScript middleware that works with any Lightning backend, runs serverless, and supports Cashu ecash payments.
 
+Compared to x402 (Coinbase's on-chain stablecoin payment protocol), toll-booth settles in milliseconds over Lightning instead of waiting for block confirmations, charges fractions-of-a-sat routing fees instead of gas, and works with any Lightning wallet - no Coinbase dependency. As USDT-over-Lightning bridges go live, toll-booth APIs automatically accept stablecoins with zero code changes.
+
+Try it instantly: `npx @thecryptodonkey/toll-booth demo`
+
 ## Getting Started
 
 ```bash

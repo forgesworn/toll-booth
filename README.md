@@ -9,6 +9,14 @@
 
 [Live demo](https://jokes.trotters.dev/api/joke) - pay 10 sats, get a joke. No account. No sign-up.
 
+### Try it now
+
+```bash
+npx @thecryptodonkey/toll-booth demo
+```
+
+Spins up a fully working L402-gated joke API on localhost. Mock Lightning backend, in-memory storage, zero configuration. Scan the QR code from your terminal when the free tier runs out.
+
 ---
 
 ## Minimal example
@@ -212,6 +220,27 @@ Each backend implements the `LightningBackend` interface (`createInvoice` + `che
 | **Lightning node** | Requires LND | Phoenixd, LND, CLN, LNbits, or none (Cashu-only) |
 | **Serverless** | No - long-running process | Yes - Web Standard adapter runs on Cloudflare Workers, Deno, Bun |
 | **Configuration** | YAML file | Programmatic (code) |
+
+---
+
+## Why not x402?
+
+[x402](https://x402.org) is Coinbase's HTTP 402 payment protocol for on-chain stablecoins. It validates the same idea - machines paying for APIs - but makes different trade-offs.
+
+| | x402 | toll-booth |
+|---|---|---|
+| **Settlement** | On-chain (Base, Ethereum) | Lightning Network - sub-second, final |
+| **Settlement time** | Block confirmations (seconds to minutes) | Milliseconds |
+| **Transaction fees** | Gas fees (variable) | Routing fees (fractions of a sat) |
+| **Currency** | USDC on Base | Bitcoin (sats), with stablecoin compatibility via USDT-over-LN bridges |
+| **Infrastructure** | Requires Coinbase Commerce or on-chain wallet | Any of 5 Lightning backends, Cashu ecash, or NWC - self-hosted or hosted |
+| **Vendor lock-in** | Coinbase ecosystem | None - open protocol, open source, any Lightning wallet |
+| **Serverless** | Yes | Yes - Web Standard adapter for Workers, Deno, Bun |
+| **Offline/edge** | No - requires chain access | Yes - Cashu-only mode needs no node at all |
+
+x402 is doing valuable work normalising HTTP 402 as a payment primitive. If your clients already hold USDC on Base, it's a reasonable choice. If you want sub-second settlement, self-sovereign infrastructure, and a protocol that works with any Lightning wallet on earth, toll-booth is the answer.
+
+**Stablecoin compatibility:** toll-booth doesn't care how an invoice gets paid. As USDT-over-Lightning bridges (UTEXO and others) go live, your gated APIs automatically accept stablecoins with zero code changes. The best of both worlds: stablecoin UX on Bitcoin rails.
 
 ---
 
