@@ -1,9 +1,12 @@
 /**
- * Self-contained toll-booth demo server.
+ * Development demo server (requires tsx and Express).
  *
- * Runs a tiny upstream joke API on :4444 and a toll-booth gateway on :3000
- * with a mock Lightning backend that auto-settles invoices after ~1 second.
- * No real Lightning infrastructure required.
+ * For the production demo, use: npx @thecryptodonkey/toll-booth demo
+ * The npx version uses the web-standard adapter with zero extra deps.
+ *
+ * This version runs a tiny upstream joke API on :4444 and a toll-booth
+ * gateway on :3000 with a mock Lightning backend that auto-settles
+ * invoices after ~1 second. No real Lightning infrastructure required.
  *
  * Usage:  npx tsx demo/demo.ts
  */
@@ -128,10 +131,11 @@ async function main() {
     storage,
   }))
 
-  // L402-gated proxy
+  // L402-gated proxy (trustProxy suppresses warning for localhost demo)
   app.use(createExpressMiddleware({
     engine,
     upstream: 'http://localhost:4444',
+    trustProxy: true,
   }))
 
   app.listen(3000, () => {

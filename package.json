@@ -15,6 +15,9 @@
     "url": "git+https://github.com/TheCryptoDonkey/toll-booth.git"
   },
   "homepage": "https://github.com/TheCryptoDonkey/toll-booth#readme",
+  "bin": {
+    "toll-booth": "dist/cli.js"
+  },
   "exports": {
     ".": {
       "import": "./dist/index.js",
