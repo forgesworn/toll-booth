@@ -284,13 +284,21 @@ Deploy toll-booth as a sidecar (Docker Compose, Kubernetes) or as a standalone g
 
 ## Example deployments
 
-### sats-for-laughs
+### sats-for-laughs - build your own paid API
 
-[`examples/sats-for-laughs/`](examples/sats-for-laughs/) - a joke API gated by Lightning payments. Pay 10 sats, get a joke about bitcoin, lightning, nostr, or freedom tech. The live demo linked at the top of this README runs this example.
+[`examples/sats-for-laughs/`](examples/sats-for-laughs/) is the fastest path from "I have an API" to "my API earns sats". It's the same code that runs the [live demo](https://jokes.trotters.dev/api/joke). Clone it, change three env vars, deploy.
 
-### valhalla-proxy
+```bash
+cd examples/sats-for-laughs
+cp .env.example .env          # add your Phoenixd credentials
+docker compose up -d          # or: MOCK=true npm start
+```
 
-[`examples/valhalla-proxy/`](examples/valhalla-proxy/) - a complete Docker Compose setup gating the [Valhalla](https://github.com/valhalla/valhalla) routing engine (a C++ service) behind Lightning payments. Reference deployment for production use.
+Includes mock mode for local development (auto-settles invoices, no Lightning node needed), Docker Compose with Phoenixd, and a pre-generated pool of 100+ jokes across six topics.
+
+### valhalla-proxy - production reference
+
+[`examples/valhalla-proxy/`](examples/valhalla-proxy/) gates the [Valhalla](https://github.com/valhalla/valhalla) routing engine (a C++ service) behind Lightning payments. Full Docker Compose setup demonstrating toll-booth as a sidecar proxy in front of non-JavaScript infrastructure.
 
 ---
 
