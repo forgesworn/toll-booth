@@ -247,21 +247,42 @@ export function createExpressInvoiceStatusHandler(
 
 // -- Create invoice handler ---------------------------------------------------
 
+export interface CreateInvoiceHandlerConfig {
+  deps: CreateInvoiceDeps
+  trustProxy?: boolean
+}
+
 /**
  * Returns an Express `RequestHandler` that creates a new Lightning invoice.
  *
  * Assumes `express.json()` middleware is already mounted. Delegates to the
  * core `handleCreateInvoice` and returns the result.
+ *
+ * Accepts either a bare `CreateInvoiceDeps` object (backwards-compatible) or
+ * a `CreateInvoiceHandlerConfig` for IP-aware rate limiting.
  */
 export function createExpressCreateInvoiceHandler(
-  deps: CreateInvoiceDeps,
+  depsOrConfig: CreateInvoiceDeps | CreateInvoiceHandlerConfig,
 ): RequestHandler {
+  const config = 'deps' in depsOrConfig ? depsOrConfig : { deps: depsOrConfig }
+  const deps = config.deps
+
   return async (req: Request, res: Response, _next: NextFunction) => {
     const body = req.body ?? {}
-    const result = await handleCreateInvoice(deps, body)
+    const ip = config.trustProxy
+      ? (typeof req.headers['x-forwarded-for'] === 'string'
+          ? req.headers['x-forwarded-for'].split(',')[0]?.trim()
+          : undefined) ??
+        (typeof req.headers['x-real-ip'] === 'string'
+          ? req.headers['x-real-ip'].trim()
+          : undefined) ??
+        req.socket.remoteAddress ?? '127.0.0.1'
+      : req.socket.remoteAddress ?? '127.0.0.1'
+
+    const result = await handleCreateInvoice(deps, { ...body, clientIp: ip })
 
     if (!result.success) {
-      jsonWithSensitiveHeaders(res, { error: result.error, tiers: result.tiers }, 400)
+      jsonWithSensitiveHeaders(res, { error: result.error, tiers: result.tiers }, result.status ?? 400)
       return
     }
 

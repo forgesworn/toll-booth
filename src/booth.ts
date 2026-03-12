@@ -152,7 +152,10 @@ export class Booth {
       case 'express':
         this.middleware = createExpressMiddleware(adapterConfig)
         this.invoiceStatusHandler = createExpressInvoiceStatusHandler(invoiceStatusDeps)
-        this.createInvoiceHandler = createExpressCreateInvoiceHandler(createInvoiceDeps)
+        this.createInvoiceHandler = createExpressCreateInvoiceHandler({
+          deps: createInvoiceDeps,
+          trustProxy: config.trustProxy,
+        })
         if (nwcPayDeps) this.nwcPayHandler = createExpressNwcHandler(nwcPayDeps)
         if (cashuRedeemDeps) {
           this.redeemCashu = config.redeemCashu
@@ -163,7 +166,11 @@ export class Booth {
       case 'web-standard':
         this.middleware = createWebStandardMiddleware(adapterConfig)
         this.invoiceStatusHandler = createWebStandardInvoiceStatusHandler(invoiceStatusDeps)
-        this.createInvoiceHandler = createWebStandardCreateInvoiceHandler(createInvoiceDeps)
+        this.createInvoiceHandler = createWebStandardCreateInvoiceHandler({
+          deps: createInvoiceDeps,
+          trustProxy: config.trustProxy,
+          getClientIp: config.getClientIp,
+        })
         if (nwcPayDeps) this.nwcPayHandler = createWebStandardNwcHandler(nwcPayDeps)
         if (cashuRedeemDeps) {
           this.redeemCashu = config.redeemCashu

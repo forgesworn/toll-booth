@@ -255,15 +255,27 @@ export function createWebStandardInvoiceStatusHandler(
 
 // -- Create invoice handler ---------------------------------------------------
 
+export interface WebStandardCreateInvoiceConfig {
+  deps: CreateInvoiceDeps
+  trustProxy?: boolean
+  getClientIp?: (req: Request) => string
+}
+
 /**
  * Returns a `WebStandardHandler` that creates a new Lightning invoice.
  *
  * Parses the JSON body for an optional `amountSats` field, delegates
  * to the core `handleCreateInvoice`, and returns the result.
+ *
+ * Accepts either a bare `CreateInvoiceDeps` object (backwards-compatible) or
+ * a `WebStandardCreateInvoiceConfig` for IP-aware rate limiting.
  */
 export function createWebStandardCreateInvoiceHandler(
-  deps: CreateInvoiceDeps,
+  depsOrConfig: CreateInvoiceDeps | WebStandardCreateInvoiceConfig,
 ): WebStandardHandler {
+  const config = 'deps' in depsOrConfig ? depsOrConfig : { deps: depsOrConfig }
+  const deps = config.deps
+
   return async (req: Request): Promise<Response> => {
     const parsed = await safeParseJson<CreateInvoiceRequest>(req)
     if (!parsed.ok) {
@@ -273,12 +285,18 @@ export function createWebStandardCreateInvoiceHandler(
       )
     }
 
-    const result = await handleCreateInvoice(deps, parsed.value)
+    const ip = config.getClientIp
+      ? config.getClientIp(req)
+      : config.trustProxy
+        ? req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? req.headers.get('x-real-ip') ?? 'unknown'
+        : 'unknown'
+
+    const result = await handleCreateInvoice(deps, { ...parsed.value, clientIp: ip })
 
     if (!result.success) {
       return Response.json(
         { error: result.error, tiers: result.tiers },
-        { status: 400, headers: applyNoStoreHeaders(new Headers()) },
+        { status: result.status ?? 400, headers: applyNoStoreHeaders(new Headers()) },
       )
     }
 
