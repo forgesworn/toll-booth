@@ -130,6 +130,13 @@ describe('caveat tampering prevention', () => {
     expect(result.valid).toBe(true)
     expect(result.customCaveats).toEqual({ admin: 'true' })
   })
+
+  it('rejects macaroon with appended duplicate custom caveat', () => {
+    const mac = mintMacaroon(rootKey, paymentHash, 1000, ['model = llama3'])
+    const tampered = appendCaveat(mac, 'model = gpt4')
+    const result = verifyMacaroon(rootKey, tampered)
+    expect(result.valid).toBe(false)
+  })
 })
 
 describe('verifyMacaroon with VerifyContext', () => {

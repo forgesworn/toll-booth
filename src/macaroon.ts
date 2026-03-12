@@ -77,10 +77,8 @@ export function verifyMacaroon(rootKey: string, macaroonBase64: string, context?
       const eqIdx = condition.indexOf(' = ')
       if (eqIdx === -1) return 'malformed caveat'
       const key = condition.slice(0, eqIdx)
-      if (KNOWN_CAVEATS.has(key)) {
-        seen.set(key, (seen.get(key) ?? 0) + 1)
-        if (seen.get(key)! > 1) return 'duplicate caveat'
-      }
+      seen.set(key, (seen.get(key) ?? 0) + 1)
+      if (seen.get(key)! > 1) return 'duplicate caveat'
       return null
     }, [])
 
