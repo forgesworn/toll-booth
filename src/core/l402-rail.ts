@@ -28,7 +28,7 @@ export function createL402Rail(config: L402RailConfig): PaymentRail {
       return /^L402\s/i.test(auth)
     },
 
-    async challenge(route: string, price: PriceInfo): Promise<ChallengeFragment> {
+    async challenge(route: string, _price: PriceInfo): Promise<ChallengeFragment> {
       const amount = defaultAmount
       let bolt11 = ''
       let paymentHash: string
@@ -90,17 +90,14 @@ export function createL402Rail(config: L402RailConfig): PaymentRail {
         timingSafeEqual(Buffer.from(preimage), Buffer.from(settlementSecret))
 
       if (!isLightning && !isCashu) {
-        if (!storage.isSettled(paymentHash)) {
-          return { authenticated: false, paymentId: paymentHash, mode: 'credit', currency: 'sat' }
-        }
+        return { authenticated: false, paymentId: paymentHash, mode: 'credit', currency: 'sat' }
       }
 
-      // First-time settlement — credits the balance
+      // First-time settlement — credits the balance.
+      // Only reachable with a valid proof (Lightning preimage or Cashu secret).
+      // If settleWithCredit loses a race, another request already settled — continue.
       if (!storage.isSettled(paymentHash)) {
-        const settled = storage.settleWithCredit(paymentHash, creditBalance, preimage)
-        if (!settled && !isLightning) {
-          return { authenticated: false, paymentId: paymentHash, mode: 'credit', currency: 'sat' }
-        }
+        storage.settleWithCredit(paymentHash, creditBalance, preimage)
       }
 
       // Return current balance — engine will debit and check sufficiency

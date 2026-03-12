@@ -23,6 +23,16 @@ describe('L402Rail', () => {
       expect(rail.detect(req)).toBe(true)
     })
 
+    it('returns true case-insensitively', () => {
+      const rail = createL402Rail({
+        rootKey: ROOT_KEY,
+        storage: mockStorage(),
+        defaultAmount: 1000,
+      })
+      const req = makeRequest({ authorization: 'l402 abc:def' })
+      expect(rail.detect(req)).toBe(true)
+    })
+
     it('returns false for missing Authorization header', () => {
       const rail = createL402Rail({
         rootKey: ROOT_KEY,
@@ -44,15 +54,26 @@ describe('L402Rail', () => {
     })
   })
 
+  describe('canChallenge', () => {
+    it('returns true when price has sats', () => {
+      const rail = createL402Rail({ rootKey: ROOT_KEY, storage: mockStorage(), defaultAmount: 1000 })
+      expect(rail.canChallenge!({ sats: 100 })).toBe(true)
+    })
+
+    it('returns false when price has only usd', () => {
+      const rail = createL402Rail({ rootKey: ROOT_KEY, storage: mockStorage(), defaultAmount: 1000 })
+      expect(rail.canChallenge!({ usd: 100 })).toBe(false)
+    })
+  })
+
   describe('verify', () => {
-    it('verifies valid L402 credential', () => {
+    it('verifies valid L402 credential and returns creditBalance', () => {
       const { preimage, paymentHash } = makePreimageAndHash()
       const macaroon = mintMacaroon(ROOT_KEY, paymentHash, 1000)
       const storage = mockStorage()
       storage.isSettled.mockReturnValue(false)
       storage.settleWithCredit.mockReturnValue(true)
-      storage.debit.mockReturnValue({ success: true, remaining: 900 })
-      storage.balance.mockReturnValue(900)
+      storage.balance.mockReturnValue(1000)
 
       const rail = createL402Rail({
         rootKey: ROOT_KEY,
@@ -67,13 +88,28 @@ describe('L402Rail', () => {
       expect(result.paymentId).toBe(paymentHash)
       expect(result.mode).toBe('credit')
       expect(result.currency).toBe('sat')
+      expect(result.creditBalance).toBe(1000)
     })
 
-    it('rejects invalid preimage', () => {
-      const { paymentHash } = makePreimageAndHash()
+    it('never calls storage.debit', () => {
+      const { preimage, paymentHash } = makePreimageAndHash()
       const macaroon = mintMacaroon(ROOT_KEY, paymentHash, 1000)
       const storage = mockStorage()
       storage.isSettled.mockReturnValue(false)
+      storage.settleWithCredit.mockReturnValue(true)
+      storage.balance.mockReturnValue(1000)
+
+      const rail = createL402Rail({ rootKey: ROOT_KEY, storage, defaultAmount: 1000 })
+      rail.verify(makeRequest({ authorization: `L402 ${macaroon}:${preimage}` }))
+
+      expect(storage.debit).not.toHaveBeenCalled()
+    })
+
+    it('rejects invalid preimage even if payment is settled', () => {
+      const { paymentHash } = makePreimageAndHash()
+      const macaroon = mintMacaroon(ROOT_KEY, paymentHash, 1000)
+      const storage = mockStorage()
+      storage.isSettled.mockReturnValue(true) // already settled
 
       const rail = createL402Rail({
         rootKey: ROOT_KEY,
@@ -86,6 +122,30 @@ describe('L402Rail', () => {
       const result = rail.verify(req)
 
       expect(result.authenticated).toBe(false)
+    })
+
+    it('rejects malformed token without colon', () => {
+      const rail = createL402Rail({ rootKey: ROOT_KEY, storage: mockStorage(), defaultAmount: 1000 })
+      const req = makeRequest({ authorization: 'L402 nocolonhere' })
+      const result = rail.verify(req)
+      expect(result.authenticated).toBe(false)
+    })
+
+    it('authenticates with Cashu settlement secret', () => {
+      const { paymentHash } = makePreimageAndHash()
+      const macaroon = mintMacaroon(ROOT_KEY, paymentHash, 1000)
+      const secret = randomBytes(32).toString('hex')
+      const storage = mockStorage()
+      storage.getSettlementSecret.mockReturnValue(secret)
+      storage.isSettled.mockReturnValue(true) // Cashu settles before L402 auth
+      storage.balance.mockReturnValue(500)
+
+      const rail = createL402Rail({ rootKey: ROOT_KEY, storage, defaultAmount: 1000 })
+      const req = makeRequest({ authorization: `L402 ${macaroon}:${secret}` })
+      const result = rail.verify(req)
+
+      expect(result.authenticated).toBe(true)
+      expect(result.creditBalance).toBe(500)
     })
   })
 
@@ -113,6 +173,22 @@ describe('L402Rail', () => {
       expect(l402.invoice).toBe('lnbc1000...')
       expect(l402.macaroon).toBeDefined()
       expect(l402.amount_sats).toBe(1000)
+    })
+
+    it('generates synthetic hash without backend (Cashu-only mode)', async () => {
+      const rail = createL402Rail({
+        rootKey: ROOT_KEY,
+        storage: mockStorage(),
+        defaultAmount: 500,
+      })
+
+      const result = await rail.challenge('/api/test', { sats: 500 })
+      expect(result.headers['WWW-Authenticate']).toMatch(/^L402 /)
+      const l402 = result.body.l402 as Record<string, unknown>
+      expect(l402.invoice).toBe('')
+      expect(l402.macaroon).toBeDefined()
+      expect(l402.payment_hash).toMatch(/^[0-9a-f]{64}$/)
+      expect(l402.amount_sats).toBe(500)
     })
   })
 })
