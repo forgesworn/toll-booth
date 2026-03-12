@@ -244,3 +244,86 @@ describe('Hono payment routes', () => {
     expect(body).toHaveProperty('error')
   })
 })
+
+describe('Hono adapter integration', () => {
+  it('full L402 flow: create invoice -> settle -> authenticated request', async () => {
+    const { engine, storage, rootKey } = createTestEngine()
+    const tollBooth = createHonoTollBooth({ engine })
+    const app = new Hono<TollBoothEnv>()
+
+    const paymentApp = tollBooth.createPaymentApp({
+      storage,
+      rootKey,
+      tiers: [],
+      defaultAmount: 1000,
+    })
+    app.route('/', paymentApp)
+    app.use('/api/*', tollBooth.authMiddleware)
+    app.get('/api/test', (c) => {
+      return c.json({
+        paymentHash: c.get('tollBoothPaymentHash'),
+        creditBalance: c.get('tollBoothCreditBalance'),
+      })
+    })
+
+    // Step 1: Request without auth -> 402
+    const unauthRes = await app.request('/api/test')
+    expect(unauthRes.status).toBe(402)
+    const challenge = await unauthRes.json() as Record<string, unknown>
+    expect(challenge).toHaveProperty('payment_hash')
+    expect(challenge).toHaveProperty('macaroon')
+
+    // Step 2: Create invoice via payment route
+    const createRes = await app.request('/create-invoice', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    })
+    expect(createRes.status).toBe(200)
+    const invoice = await createRes.json() as Record<string, unknown>
+    const paymentHash = invoice.payment_hash as string
+
+    // Step 3: Settle payment directly in storage (simulate Lightning payment)
+    const preimage = randomBytes(32).toString('hex')
+    storage.settleWithCredit(paymentHash, 1000, preimage)
+
+    // Step 4: Get the macaroon from challenge (or use the one from create-invoice)
+    const macaroon = invoice.macaroon as string
+
+    // Step 5: Authenticated request
+    const authRes = await app.request('/api/test', {
+      headers: { Authorization: `L402 ${macaroon}:${preimage}` },
+    })
+    expect(authRes.status).toBe(200)
+    const body = await authRes.json() as Record<string, unknown>
+    expect(body.paymentHash).toBe(paymentHash)
+    expect(typeof body.creditBalance).toBe('number')
+  })
+
+  it('reconcile adjusts balance after authenticated request', async () => {
+    const { engine, storage, rootKey } = createTestEngine()
+    const { preimage, paymentHash, macaroon } = makeCredential(rootKey)
+    storage.settleWithCredit(paymentHash, 1000, preimage)
+
+    const tollBooth = createHonoTollBooth({ engine })
+    const app = new Hono<TollBoothEnv>()
+    app.use('/api/*', tollBooth.authMiddleware)
+    app.get('/api/test', (c) => {
+      // Simulate upstream returning actual cost of 5 (estimated was 10)
+      const ph = c.get('tollBoothPaymentHash')
+      if (ph) {
+        const result = tollBooth.engine.reconcile(ph, 5)
+        return c.json({ adjusted: result.adjusted, newBalance: result.newBalance })
+      }
+      return c.json({ adjusted: false })
+    })
+
+    const res = await app.request('/api/test', {
+      headers: { Authorization: `L402 ${macaroon}:${preimage}` },
+    })
+    expect(res.status).toBe(200)
+    const body = await res.json() as Record<string, unknown>
+    expect(body.adjusted).toBe(true)
+    expect(body.newBalance).toBe(995) // 1000 - 10 (estimated) + 5 (refund)
+  })
+})
