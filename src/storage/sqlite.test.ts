@@ -183,6 +183,46 @@ describe('sqliteStorage', () => {
     expect(storage.pendingClaims()).toHaveLength(0)
   })
 
+  describe('adjustCredits', () => {
+    it('refunds credits (positive delta)', () => {
+      storage = sqliteStorage()
+      storage.credit('hash1', 100)
+      const newBalance = storage.adjustCredits('hash1', 50)
+      expect(newBalance).toBe(150)
+      expect(storage.balance('hash1')).toBe(150)
+    })
+
+    it('deducts additional credits (negative delta)', () => {
+      storage = sqliteStorage()
+      storage.credit('hash1', 100)
+      const newBalance = storage.adjustCredits('hash1', -30)
+      expect(newBalance).toBe(70)
+      expect(storage.balance('hash1')).toBe(70)
+    })
+
+    it('clamps balance to zero on over-deduction', () => {
+      storage = sqliteStorage()
+      storage.credit('hash1', 50)
+      const newBalance = storage.adjustCredits('hash1', -100)
+      expect(newBalance).toBe(0)
+      expect(storage.balance('hash1')).toBe(0)
+    })
+
+    it('works on non-existent payment hash (creates entry)', () => {
+      storage = sqliteStorage()
+      const newBalance = storage.adjustCredits('hash1', 100)
+      expect(newBalance).toBe(100)
+      expect(storage.balance('hash1')).toBe(100)
+    })
+
+    it('zero delta is a no-op', () => {
+      storage = sqliteStorage()
+      storage.credit('hash1', 100)
+      const newBalance = storage.adjustCredits('hash1', 0)
+      expect(newBalance).toBe(100)
+    })
+  })
+
   it('prunes invoices older than maxAgeMs', () => {
     storage = sqliteStorage()
     storage.storeInvoice('h1', 'bolt11', 100, 'mac', 'tok1')

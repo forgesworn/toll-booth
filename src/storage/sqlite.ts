@@ -210,6 +210,23 @@ export function sqliteStorage(config?: SqliteStorageConfig): StorageBackend {
     }
   })
 
+  const stmtAdjustCredits = db.prepare(`
+    UPDATE credits SET balance = MAX(0, balance + ?), updated_at = datetime('now')
+    WHERE payment_hash = ?
+  `)
+
+  const txnAdjustCredits = db.transaction((paymentHash: string, delta: number): number => {
+    const row = stmtBalance.get(paymentHash) as { balance: number } | undefined
+    if (!row) {
+      const newBalance = Math.max(0, delta)
+      stmtCredit.run(paymentHash, newBalance)
+      return newBalance
+    }
+    stmtAdjustCredits.run(delta, paymentHash)
+    const updated = stmtBalance.get(paymentHash) as { balance: number }
+    return updated.balance
+  })
+
   const txnDebit = db.transaction((paymentHash: string, amount: number): DebitResult => {
     const row = stmtBalance.get(paymentHash) as { balance: number } | undefined
     const current = row?.balance ?? 0
@@ -230,6 +247,10 @@ export function sqliteStorage(config?: SqliteStorageConfig): StorageBackend {
 
     debit(paymentHash: string, amount: number): DebitResult {
       return txnDebit(paymentHash, amount)
+    },
+
+    adjustCredits(paymentHash: string, delta: number): number {
+      return txnAdjustCredits(paymentHash, delta)
     },
 
     balance(paymentHash: string): number {
