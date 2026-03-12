@@ -1,8 +1,7 @@
 # toll-booth L402 demo
-# Records a terminal GIF showing the complete L402 payment flow.
+# Each scene clears the screen for maximum legibility at small sizes.
 #
-# Prerequisites:  npm install (in toll-booth root)
-# Run:            cd toll-booth && vhs demo/demo.tape
+# Run:  cd toll-booth && vhs demo/demo.tape
 
 Output "demo/toll-booth-demo.gif"
 
@@ -11,81 +10,102 @@ Require curl
 Require jq
 
 Set Shell "bash"
-Set FontSize 14
+Set FontSize 16
 Set Width 1200
 Set Height 600
 Set Theme "Catppuccin Mocha"
-Set TypingSpeed 30ms
-Set Padding 20
+Set TypingSpeed 40ms
+Set Padding 24
 Set PlaybackSpeed 1
 
-# Boot the demo server before recording starts
+# Hidden: set up PATH and cd
 Hide
 Type `export PATH="/Users/darren/.nvm/versions/node/v22.17.0/bin:$PATH"`
 Enter
-Type "cd /Users/darren/WebstormProjects/toll-booth && npx tsx demo/demo.ts > /dev/null 2>&1 &"
+Type "cd /Users/darren/WebstormProjects/toll-booth && clear"
 Enter
-Type "sleep 3 && clear"
-Enter
-Sleep 4s
+Sleep 1s
 Show
 
-Sleep 300ms
-
-# Step 1: free-tier request succeeds
-Type "# 1. Free-tier request (no auth needed)"
+# ── Scene 1: Boot the server (real, visible banner) ──────────────────────────
+Type "npx tsx demo/demo.ts &"
 Enter
-Sleep 400ms
+Sleep 4s
+
+# ── Scene 2: Free request ────────────────────────────────────────────────────
+Hide
+Type "clear"
+Enter
+Sleep 300ms
+Show
+
 Type "curl -s localhost:3000/api/joke | jq ."
 Enter
-Sleep 1.5s
-
-# Step 2: second request hits 402
-Type "# 2. Free tier exhausted — 402 Payment Required"
-Enter
-Sleep 400ms
-Type `curl -s -o /dev/null -w 'HTTP %{http_code}\n' localhost:3000/api/joke`
-Enter
-Sleep 1.5s
-
-# Step 3: create an invoice and save to file
-Type "# 3. Create a Lightning invoice (10 sats)"
-Enter
-Sleep 400ms
-Type "curl -s -X POST localhost:3000/create-invoice > /tmp/inv.json"
-Enter
-Sleep 500ms
-Type `jq '{amount_sats, payment_hash}' /tmp/inv.json`
-Enter
 Sleep 2s
 
-# Step 4: wait for auto-settle, check status via payment_url
-Type "# 4. Invoice auto-settles — check payment status"
+Hide
+Type "echo ''"
 Enter
-Sleep 400ms
-Type "sleep 2"
-Enter
-Sleep 2.5s
-Type "STATUS_URL=$(jq -r .payment_url /tmp/inv.json)"
-Enter
-Type `curl -s "localhost:3000$STATUS_URL" | jq '{paid, preimage: (.preimage // .token_suffix)}'`
-Enter
-Sleep 2s
-
-# Step 5: authenticated request with L402 token
-Type "# 5. Authenticated request with L402 token"
-Enter
-Sleep 400ms
-Type "MAC=$(jq -r .macaroon /tmp/inv.json)"
-Enter
-Type `PRE=$(curl -s "localhost:3000$STATUS_URL" | jq -r '(.preimage // .token_suffix)')`
-Enter
-Sleep 500ms
-Type `curl -s -H "Authorization: L402 $MAC:$PRE" localhost:3000/api/joke | jq .`
+Show
+Type "echo '# Free tier - 1 request per day, no payment needed'"
 Enter
 Sleep 3s
 
-# Shut down
+# ── Scene 3: 402 Payment Required ────────────────────────────────────────────
+Hide
+Type "clear"
+Enter
+Sleep 300ms
+Show
+
+Type `curl -s -w '\nHTTP %{http_code}\n' -o /dev/null localhost:3000/api/joke`
+Enter
+Sleep 1.5s
+
+Hide
+Type "echo ''"
+Enter
+Show
+Type "echo '# Free tier exhausted - 402 Payment Required'"
+Enter
+Sleep 3s
+
+# ── Scene 4: Paid request ────────────────────────────────────────────────────
+
+# Hidden: create invoice, wait for auto-settle, extract credentials via files
+Hide
+Type "curl -s -X POST localhost:3000/create-invoice > /tmp/inv.json"
+Enter
+Type "sleep 2"
+Enter
+Sleep 3s
+Type `MAC=$(jq -r .macaroon /tmp/inv.json)`
+Enter
+Type `PURL=$(jq -r .payment_url /tmp/inv.json)`
+Enter
+Type `curl -s "localhost:3000$PURL" > /tmp/status.json`
+Enter
+Sleep 500ms
+Type `PRE=$(jq -r .preimage /tmp/status.json)`
+Enter
+Type "clear"
+Enter
+Sleep 300ms
+Show
+
+Type `curl -s -H "Authorization: L402 $MAC:$PRE" localhost:3000/api/joke | jq .`
+Enter
+Sleep 2s
+
+Hide
+Type "echo ''"
+Enter
+Show
+Type "echo '# Paid with Lightning - 10 sats per joke'"
+Enter
+Sleep 4s
+
+# Clean up
 Hide
 Type "kill %1 2>/dev/null"
 Enter

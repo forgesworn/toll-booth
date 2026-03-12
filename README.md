@@ -5,6 +5,8 @@
 
 **Any API becomes a Lightning toll booth in one line.**
 
+![toll-booth demo](demo/toll-booth-demo.gif)
+
 [Live demo](<!-- DEMO_URL -->) - pay 10 sats, get a joke. No account. No sign-up.
 
 ---
