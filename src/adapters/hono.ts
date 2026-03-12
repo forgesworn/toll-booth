@@ -3,6 +3,7 @@ import { Hono } from 'hono'
 import type { Context, MiddlewareHandler } from 'hono'
 import type { TollBoothEngine } from '../core/toll-booth.js'
 import type { TollBoothRequest, CreateInvoiceRequest, NwcPayRequest, CashuRedeemRequest } from '../core/types.js'
+import { PAYMENT_HASH_RE } from '../core/types.js'
 import type { LightningBackend, CreditTier } from '../types.js'
 import type { StorageBackend } from '../storage/interface.js'
 import { handleCreateInvoice } from '../core/create-invoice.js'
@@ -13,6 +14,29 @@ import { handleNwcPay } from '../core/nwc-pay.js'
 import type { NwcPayDeps } from '../core/nwc-pay.js'
 import { handleCashuRedeem } from '../core/cashu-redeem.js'
 import type { CashuRedeemDeps } from '../core/cashu-redeem.js'
+import { applyNoStoreHeaders, appendVary } from './proxy-headers.js'
+
+const MAX_BODY_BYTES = 65_536
+
+/**
+ * Parses request body as JSON with a size limit.
+ * Returns undefined on oversized, empty, or malformed bodies.
+ */
+async function safeParseJson<T>(c: Context, maxBytes = MAX_BODY_BYTES): Promise<T | undefined> {
+  const contentLength = c.req.header('content-length')
+  if (contentLength !== undefined) {
+    const len = parseInt(contentLength, 10)
+    if (Number.isFinite(len) && len > maxBytes) return undefined
+  }
+  try {
+    const text = await c.req.text()
+    if (new TextEncoder().encode(text).byteLength > maxBytes) return undefined
+    if (!text.trim()) return {} as T
+    return JSON.parse(text) as T
+  } catch {
+    return undefined
+  }
+}
 
 /**
  * Hono context variables set by the toll-booth auth middleware.
@@ -91,6 +115,9 @@ export function createHonoTollBooth(config: HonoTollBoothConfig): HonoTollBooth 
     const result = await engine.handle(tollReq)
 
     if (result.action === 'challenge') {
+      c.header('Cache-Control', 'no-store')
+      c.header('Pragma', 'no-cache')
+      c.header('X-Content-Type-Options', 'nosniff')
       return c.json(result.body, result.status as 402, result.headers)
     }
 
@@ -126,6 +153,12 @@ export function createHonoTollBooth(config: HonoTollBoothConfig): HonoTollBooth 
       cashuEnabled: paymentConfig.cashuRedeem !== undefined,
     }
 
+    const noStore = (c: Context) => {
+      c.header('Cache-Control', 'no-store')
+      c.header('Pragma', 'no-cache')
+      c.header('X-Content-Type-Options', 'nosniff')
+    }
+
     // POST /create-invoice
     app.post('/create-invoice', async (c) => {
       const ip = paymentConfig.getClientIp?.(c)
@@ -133,18 +166,15 @@ export function createHonoTollBooth(config: HonoTollBoothConfig): HonoTollBooth 
         ?? c.req.header('x-forwarded-for')?.split(',')[0]?.trim()
         ?? '0.0.0.0'
 
-      let body: CreateInvoiceRequest = {}
-      try {
-        const text = await c.req.text()
-        if (text.trim()) {
-          body = JSON.parse(text) as CreateInvoiceRequest
-        }
-      } catch {
+      const body = await safeParseJson<CreateInvoiceRequest>(c)
+      if (body === undefined) {
+        noStore(c)
         return c.json({ error: 'Invalid JSON body' }, 400)
       }
 
       const result = await handleCreateInvoice(createInvoiceDeps, { ...body, clientIp: ip })
 
+      noStore(c)
       if (!result.success) {
         return c.json({ error: result.error, tiers: result.tiers }, (result.status ?? 400) as 400)
       }
@@ -164,6 +194,9 @@ export function createHonoTollBooth(config: HonoTollBoothConfig): HonoTollBooth 
     // GET /invoice-status/:paymentHash
     app.get('/invoice-status/:paymentHash', async (c) => {
       const paymentHash = c.req.param('paymentHash')
+      if (!PAYMENT_HASH_RE.test(paymentHash)) {
+        return c.json({ error: 'Invalid payment hash' }, 400)
+      }
       const token = c.req.query('token')
       const statusToken = token && token.length <= 128 ? token : undefined
       const accept = c.req.header('accept') ?? ''
@@ -171,16 +204,19 @@ export function createHonoTollBooth(config: HonoTollBoothConfig): HonoTollBooth 
       try {
         if (accept.includes('text/html')) {
           const { html, status } = await renderInvoiceStatusHtml(invoiceStatusDeps, paymentHash, statusToken)
-          return new Response(html, {
-            status,
-            headers: { 'Content-Type': 'text/html; charset=utf-8' },
-          })
+          const headers = appendVary(applyNoStoreHeaders(new Headers()), 'Accept')
+          headers.set('Content-Type', 'text/html; charset=utf-8')
+          return new Response(html, { status, headers })
         }
 
         const result = await handleInvoiceStatus(invoiceStatusDeps, paymentHash, statusToken)
         if (!result.found) {
           return c.json({ error: 'Invoice not found' }, 404)
         }
+        c.header('Cache-Control', 'no-store')
+        c.header('Pragma', 'no-cache')
+        c.header('X-Content-Type-Options', 'nosniff')
+        c.header('Vary', 'Accept')
         return c.json({ paid: result.paid, preimage: result.preimage, token_suffix: result.tokenSuffix })
       } catch {
         return c.json({ error: 'Failed to check invoice status' }, 502)
@@ -195,17 +231,14 @@ export function createHonoTollBooth(config: HonoTollBoothConfig): HonoTollBooth 
       }
 
       app.post('/nwc-pay', async (c) => {
-        let body: NwcPayRequest = {} as NwcPayRequest
-        try {
-          const text = await c.req.text()
-          if (text.trim()) {
-            body = JSON.parse(text) as NwcPayRequest
-          }
-        } catch {
+        const body = await safeParseJson<NwcPayRequest>(c)
+        if (body === undefined) {
+          noStore(c)
           return c.json({ error: 'Invalid JSON body' }, 400)
         }
 
         const result = await handleNwcPay(nwcDeps, body)
+        noStore(c)
         if (result.success) {
           return c.json({ preimage: result.preimage })
         }
@@ -221,17 +254,14 @@ export function createHonoTollBooth(config: HonoTollBoothConfig): HonoTollBooth 
       }
 
       app.post('/cashu-redeem', async (c) => {
-        let body: CashuRedeemRequest = {} as CashuRedeemRequest
-        try {
-          const text = await c.req.text()
-          if (text.trim()) {
-            body = JSON.parse(text) as CashuRedeemRequest
-          }
-        } catch {
+        const body = await safeParseJson<CashuRedeemRequest>(c)
+        if (body === undefined) {
+          noStore(c)
           return c.json({ error: 'Invalid JSON body' }, 400)
         }
 
         const result = await handleCashuRedeem(cashuDeps, body)
+        noStore(c)
         if (result.success) {
           return c.json({ credited: result.credited, token_suffix: result.tokenSuffix })
         }

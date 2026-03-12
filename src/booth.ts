@@ -24,9 +24,8 @@ import {
   createWebStandardNwcHandler,
   createWebStandardCashuHandler,
 } from './adapters/web-standard.js'
-import { createHonoTollBooth } from './adapters/hono.js'
 
-export type AdapterType = 'express' | 'web-standard' | 'hono'
+export type AdapterType = 'express' | 'web-standard'
 
 export interface BoothOptions extends BoothConfig {
   adapter: AdapterType
@@ -50,11 +49,10 @@ export interface BoothOptions extends BoothConfig {
  */
 export class Booth {
   readonly middleware: unknown
-  readonly invoiceStatusHandler?: unknown
-  readonly createInvoiceHandler?: unknown
+  readonly invoiceStatusHandler: unknown
+  readonly createInvoiceHandler: unknown
   readonly nwcPayHandler?: unknown
   readonly cashuRedeemHandler?: unknown
-  readonly paymentApp?: unknown
 
   /** Aggregate usage statistics. Resets on restart. */
   readonly stats: StatsCollector
@@ -179,30 +177,6 @@ export class Booth {
           this.cashuRedeemHandler = createWebStandardCashuHandler(cashuRedeemDeps)
         }
         break
-
-      case 'hono': {
-        const honoTollBooth = createHonoTollBooth({
-          engine: this.engine,
-          getClientIp: config.getClientIp
-            ? (c) => config.getClientIp!((c as any).req.raw)
-            : undefined,
-        })
-        this.middleware = honoTollBooth.authMiddleware
-        this.paymentApp = honoTollBooth.createPaymentApp({
-          storage: this.storage,
-          rootKey: this.rootKey,
-          tiers: config.creditTiers ?? [],
-          defaultAmount,
-          backend: config.backend,
-          maxPendingPerIp: config.invoiceRateLimit?.maxPendingPerIp,
-          nwcPay: config.nwcPayInvoice,
-          cashuRedeem: config.redeemCashu,
-        })
-        if (cashuRedeemDeps) {
-          this.redeemCashu = config.redeemCashu
-        }
-        break
-      }
     }
 
     // Invoice expiry pruning
