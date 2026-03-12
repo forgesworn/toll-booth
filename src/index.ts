@@ -30,6 +30,8 @@ export { createExpressMiddleware, createExpressInvoiceStatusHandler, createExpre
 export type { ExpressMiddlewareConfig } from './adapters/express.js'
 export { createWebStandardMiddleware, createWebStandardInvoiceStatusHandler, createWebStandardCreateInvoiceHandler, createWebStandardNwcHandler, createWebStandardCashuHandler } from './adapters/web-standard.js'
 export type { WebStandardHandler, WebStandardMiddlewareConfig } from './adapters/web-standard.js'
+// Hono adapter types (implementation at @thecryptodonkey/toll-booth/hono)
+export type { HonoTollBoothConfig, HonoTollBooth, PaymentAppConfig, TollBoothEnv } from './adapters/hono.js'
 
 // Utilities
 export { mintMacaroon, verifyMacaroon, parseCaveats } from './macaroon.js'
