@@ -2,7 +2,11 @@
 
 A joke API gated by Lightning payments, powered by [toll-booth](https://github.com/TheCryptoDonkey/toll-booth).
 
-Pay 21 sats, get a joke. No account. No sign-up. This is the same code that runs the [live demo](https://jokes.trotters.dev/api/joke).
+Pay 21 sats, get a joke. No account. No sign-up. This is the same code that runs the [live demo](https://jokes.trotters.dev/).
+
+**Web UI:** Visit `http://localhost:3000/` in a browser for the human-friendly experience - get a joke, hit the paywall, scan the QR code or pay with a browser wallet extension.
+
+**API:** `curl http://localhost:3000/api/joke` for programmatic access.
 
 ## Three steps to a paid API
 
