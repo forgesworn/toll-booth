@@ -1,6 +1,7 @@
 // src/demo.ts
 import { createServer } from 'node:http'
 import { randomBytes, createHash } from 'node:crypto'
+import QRCode from 'qrcode'
 import { memoryStorage } from './storage/memory.js'
 import { createTollBooth } from './core/toll-booth.js'
 import {
@@ -192,6 +193,20 @@ export async function startDemo(): Promise<void> {
             response = await invoiceStatusHandler(webReq)
           } else {
             response = await middleware(webReq)
+
+            // Print QR code to terminal on 402 so devs can scan with a wallet
+            if (response.status === 402) {
+              const cloned = response.clone()
+              const body = await cloned.json() as { invoice?: string; payment_url?: string }
+              if (body.invoice) {
+                const qr = await QRCode.toString(body.invoice.toUpperCase(), { type: 'terminal', small: true })
+                console.log('')
+                console.log(`  ${BOLD}Scan to pay:${RESET}`)
+                console.log(qr)
+                console.log(`  ${DIM}Or open: http://localhost:${port}${body.payment_url}${RESET}`)
+                console.log('')
+              }
+            }
           }
 
           await sendWebResponse(response, nodeRes)
