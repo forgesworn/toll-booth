@@ -34,10 +34,7 @@
     "url": "git+https://github.com/TheCryptoDonkey/toll-booth.git"
   },
   "homepage": "https://github.com/TheCryptoDonkey/toll-booth#readme",
-  "funding": {
-    "type": "github",
-    "url": "https://github.com/sponsors/TheCryptoDonkey"
-  },
+  "funding": "https://strike.me/thedonkey",
   "bin": {
     "toll-booth": "dist/cli.js"
   },
