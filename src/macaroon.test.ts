@@ -130,6 +130,7 @@ describe('caveat tampering prevention', () => {
     expect(result.valid).toBe(true)
     expect(result.customCaveats).toEqual({ admin: 'true' })
   })
+})
 
 describe('verifyMacaroon with VerifyContext', () => {
   const rootKey = 'a'.repeat(64)
@@ -187,12 +188,37 @@ describe('verifyMacaroon with VerifyContext', () => {
     expect(before.valid).toBe(true)
     expect(after.valid).toBe(false)
   })
-})
 
   it('uses identifier as authoritative payment hash, not caveat value', () => {
     const mac = mintMacaroon(rootKey, paymentHash, 1000)
     const result = verifyMacaroon(rootKey, mac)
     expect(result.valid).toBe(true)
     expect(result.paymentHash).toBe(paymentHash) // From identifier, not caveat
+  })
+})
+
+describe('custom caveat extraction', () => {
+  const rootKey = 'a'.repeat(64)
+  const paymentHash = 'b'.repeat(64)
+
+  it('extracts custom caveats into customCaveats', () => {
+    const mac = mintMacaroon(rootKey, paymentHash, 1000, ['sender = example.com', 'plan = premium'])
+    const result = verifyMacaroon(rootKey, mac, { path: '/', ip: '1.2.3.4' })
+    expect(result.valid).toBe(true)
+    expect(result.customCaveats).toEqual({ sender: 'example.com', plan: 'premium' })
+  })
+
+  it('returns undefined customCaveats when none present', () => {
+    const mac = mintMacaroon(rootKey, paymentHash, 1000)
+    const result = verifyMacaroon(rootKey, mac, { path: '/', ip: '1.2.3.4' })
+    expect(result.customCaveats).toBeUndefined()
+  })
+
+  it('does not include built-in caveats in customCaveats', () => {
+    const mac = mintMacaroon(rootKey, paymentHash, 1000, ['route = /api/*', 'model = llama3'])
+    const result = verifyMacaroon(rootKey, mac, { path: '/api/chat', ip: '1.2.3.4' })
+    expect(result.valid).toBe(true)
+    expect(result.customCaveats).toEqual({ model: 'llama3' })
+    expect(result.customCaveats).not.toHaveProperty('route')
   })
 })
