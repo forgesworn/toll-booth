@@ -7,7 +7,7 @@
 
 ![toll-booth demo](demo/toll-booth-demo.gif)
 
-[Live demo](<!-- DEMO_URL -->) - pay 10 sats, get a joke. No account. No sign-up.
+[Live demo](https://jokes.trotters.dev/api/joke) - pay 10 sats, get a joke. No account. No sign-up.
 
 ---
 
@@ -72,13 +72,13 @@ An agent using Claude, GPT, or any MCP-capable model can call your API, receive 
 
 ```bash
 # Get a free joke (1 free per day per IP)
-curl https://DEMO_URL/api/joke
+curl https://jokes.trotters.dev/api/joke
 
 # Free tier exhausted - request a Lightning invoice for 10 sats
-curl -X POST https://DEMO_URL/create-invoice
+curl -X POST https://jokes.trotters.dev/create-invoice
 
 # Pay the invoice with any Lightning wallet, then authenticate
-curl -H "Authorization: L402 <macaroon>:<preimage>" https://DEMO_URL/api/joke
+curl -H "Authorization: L402 <macaroon>:<preimage>" https://jokes.trotters.dev/api/joke
 ```
 
 ---
