@@ -120,7 +120,7 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
       const statusToken = randomBytes(32).toString('hex')
 
       // Store invoice for payment page (bolt11 is empty in Cashu-only mode)
-      config.storage.storeInvoice(paymentHash, bolt11 ?? '', defaultAmount, macaroon, statusToken)
+      config.storage.storeInvoice(paymentHash, bolt11 ?? '', defaultAmount, macaroon, statusToken, req.ip)
 
       config.onChallenge?.({
         timestamp: new Date().toISOString(),
