@@ -1,7 +1,7 @@
 import { newMacaroon, importMacaroon } from 'macaroon'
 
 const LOCATION = 'toll-booth'
-const KNOWN_CAVEATS = new Set(['payment_hash', 'credit_balance'])
+const KNOWN_CAVEATS = new Set(['payment_hash', 'credit_balance', 'route', 'expires', 'ip'])
 
 /**
  * Mints a new macaroon encoding a payment hash and credit balance.
@@ -33,6 +33,18 @@ export function mintMacaroon(rootKey: string, paymentHash: string, creditBalance
 }
 
 /**
+ * Context provided to verifyMacaroon for built-in caveat checks.
+ */
+export interface VerifyContext {
+  /** The request path, checked against any `route` caveat. */
+  path: string
+  /** The client IP address, checked against any `ip` caveat. */
+  ip: string
+  /** Override the current time for `expires` caveat checks (useful in tests). */
+  now?: Date
+}
+
+/**
  * Result of macaroon verification.
  */
 export interface VerifyResult {
@@ -42,6 +54,8 @@ export interface VerifyResult {
   paymentHash?: string
   /** The credit balance in satoshis extracted from the macaroon, if valid. */
   creditBalance?: number
+  /** Any non-built-in caveats present on the macaroon. */
+  customCaveats?: Record<string, string>
 }
 
 /**
@@ -49,9 +63,10 @@ export interface VerifyResult {
  *
  * @param rootKey - Hex-encoded 32-byte root key used to mint the macaroon.
  * @param macaroonBase64 - Base64-encoded binary macaroon.
+ * @param context - Optional context for built-in caveat verification (route, expires, ip).
  * @returns A VerifyResult indicating validity and parsed caveat values.
  */
-export function verifyMacaroon(rootKey: string, macaroonBase64: string): VerifyResult {
+export function verifyMacaroon(rootKey: string, macaroonBase64: string, context?: VerifyContext): VerifyResult {
   try {
     const keyBytes = hexToBytes(rootKey)
     const m = importMacaroon(base64ToUint8(macaroonBase64))
@@ -62,9 +77,10 @@ export function verifyMacaroon(rootKey: string, macaroonBase64: string): VerifyR
       const eqIdx = condition.indexOf(' = ')
       if (eqIdx === -1) return 'malformed caveat'
       const key = condition.slice(0, eqIdx)
-      if (!KNOWN_CAVEATS.has(key)) return 'unknown caveat'
-      seen.set(key, (seen.get(key) ?? 0) + 1)
-      if (seen.get(key)! > 1) return 'duplicate caveat'
+      if (KNOWN_CAVEATS.has(key)) {
+        seen.set(key, (seen.get(key) ?? 0) + 1)
+        if (seen.get(key)! > 1) return 'duplicate caveat'
+      }
       return null
     }, [])
 
@@ -80,16 +96,47 @@ export function verifyMacaroon(rootKey: string, macaroonBase64: string): VerifyR
       return { valid: false }
     }
 
+    if (context) {
+      if (caveats.route && !matchRoute(caveats.route, context.path)) {
+        return { valid: false }
+      }
+      if (caveats.expires) {
+        const now = context.now ?? new Date()
+        if (new Date(caveats.expires) <= now) {
+          return { valid: false }
+        }
+      }
+      if (caveats.ip && caveats.ip !== context.ip) {
+        return { valid: false }
+      }
+    }
+
+    const customCaveats: Record<string, string> = {}
+    for (const [key, value] of Object.entries(caveats)) {
+      if (!KNOWN_CAVEATS.has(key)) {
+        customCaveats[key] = value
+      }
+    }
+
     return {
       valid: true,
       paymentHash: identifier,
       creditBalance: caveats.credit_balance !== undefined
         ? parseInt(caveats.credit_balance, 10)
         : undefined,
+      customCaveats: Object.keys(customCaveats).length > 0 ? customCaveats : undefined,
     }
   } catch {
     return { valid: false }
   }
+}
+
+function matchRoute(pattern: string, path: string): boolean {
+  if (pattern.endsWith('/*')) {
+    const prefix = pattern.slice(0, -2)
+    return path === prefix || path.startsWith(prefix + '/')
+  }
+  return pattern === path
 }
 
 /**

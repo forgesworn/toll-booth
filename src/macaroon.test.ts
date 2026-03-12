@@ -123,12 +123,71 @@ describe('caveat tampering prevention', () => {
     expect(result.valid).toBe(false)
   })
 
-  it('rejects macaroon with appended unknown caveat', () => {
+  it('allows macaroon with appended custom caveat (attenuation)', () => {
     const mac = mintMacaroon(rootKey, paymentHash, 1000)
-    const tampered = appendCaveat(mac, 'admin = true')
-    const result = verifyMacaroon(rootKey, tampered)
+    const attenuated = appendCaveat(mac, 'admin = true')
+    const result = verifyMacaroon(rootKey, attenuated)
+    expect(result.valid).toBe(true)
+    expect(result.customCaveats).toEqual({ admin: 'true' })
+  })
+
+describe('verifyMacaroon with VerifyContext', () => {
+  const rootKey = 'a'.repeat(64)
+  const paymentHash = 'b'.repeat(64)
+
+  it('verifies route caveat (exact match)', () => {
+    const mac = mintMacaroon(rootKey, paymentHash, 1000, ['route = /send'])
+    const result = verifyMacaroon(rootKey, mac, { path: '/send', ip: '1.2.3.4' })
+    expect(result.valid).toBe(true)
+  })
+
+  it('rejects route caveat mismatch', () => {
+    const mac = mintMacaroon(rootKey, paymentHash, 1000, ['route = /send'])
+    const result = verifyMacaroon(rootKey, mac, { path: '/other', ip: '1.2.3.4' })
     expect(result.valid).toBe(false)
   })
+
+  it('verifies route caveat with trailing wildcard', () => {
+    const mac = mintMacaroon(rootKey, paymentHash, 1000, ['route = /api/*'])
+    expect(verifyMacaroon(rootKey, mac, { path: '/api/send', ip: '1.2.3.4' }).valid).toBe(true)
+    expect(verifyMacaroon(rootKey, mac, { path: '/api/status', ip: '1.2.3.4' }).valid).toBe(true)
+    expect(verifyMacaroon(rootKey, mac, { path: '/other', ip: '1.2.3.4' }).valid).toBe(false)
+  })
+
+  it('verifies expires caveat (not expired)', () => {
+    const future = new Date(Date.now() + 86_400_000).toISOString()
+    const mac = mintMacaroon(rootKey, paymentHash, 1000, [`expires = ${future}`])
+    const result = verifyMacaroon(rootKey, mac, { path: '/', ip: '1.2.3.4' })
+    expect(result.valid).toBe(true)
+  })
+
+  it('rejects expired macaroon', () => {
+    const past = new Date(Date.now() - 1000).toISOString()
+    const mac = mintMacaroon(rootKey, paymentHash, 1000, [`expires = ${past}`])
+    const result = verifyMacaroon(rootKey, mac, { path: '/', ip: '1.2.3.4' })
+    expect(result.valid).toBe(false)
+  })
+
+  it('verifies ip caveat', () => {
+    const mac = mintMacaroon(rootKey, paymentHash, 1000, ['ip = 1.2.3.4'])
+    expect(verifyMacaroon(rootKey, mac, { path: '/', ip: '1.2.3.4' }).valid).toBe(true)
+    expect(verifyMacaroon(rootKey, mac, { path: '/', ip: '5.6.7.8' }).valid).toBe(false)
+  })
+
+  it('skips built-in verification when context omitted (backwards compatible)', () => {
+    const mac = mintMacaroon(rootKey, paymentHash, 1000, ['route = /send'])
+    const result = verifyMacaroon(rootKey, mac)
+    expect(result.valid).toBe(true)
+  })
+
+  it('uses injectable now for expires testing', () => {
+    const mac = mintMacaroon(rootKey, paymentHash, 1000, ['expires = 2026-06-01T00:00:00Z'])
+    const before = verifyMacaroon(rootKey, mac, { path: '/', ip: '1.2.3.4', now: new Date('2026-05-01') })
+    const after = verifyMacaroon(rootKey, mac, { path: '/', ip: '1.2.3.4', now: new Date('2026-07-01') })
+    expect(before.valid).toBe(true)
+    expect(after.valid).toBe(false)
+  })
+})
 
   it('uses identifier as authoritative payment hash, not caveat value', () => {
     const mac = mintMacaroon(rootKey, paymentHash, 1000)
