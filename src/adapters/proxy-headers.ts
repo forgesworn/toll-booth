@@ -39,6 +39,7 @@ export function stripProxyResponseHeaders(source: HeaderSource): Headers {
 export function applyNoStoreHeaders(headers: Headers): Headers {
   headers.set('Cache-Control', 'no-store')
   headers.set('Pragma', 'no-cache')
+  headers.set('X-Content-Type-Options', 'nosniff')
   return headers
 }
 

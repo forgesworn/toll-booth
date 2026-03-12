@@ -22,6 +22,11 @@ export async function handleNwcPay(
       return { success: false, error: 'Invalid request: nwcUri, bolt11, paymentHash and statusToken required', status: 400 }
     }
 
+    // Validate NWC URI scheme to prevent SSRF via arbitrary WebSocket connections
+    if (!nwcUri.startsWith('nostr+walletconnect://')) {
+      return { success: false, error: 'nwcUri must use the nostr+walletconnect:// scheme', status: 400 }
+    }
+
     const invoice = deps.storage.getInvoiceForStatus(paymentHash, statusToken)
     if (!invoice || invoice.bolt11 !== bolt11) {
       return { success: false, error: 'Unknown invoice or invoice mismatch', status: 400 }

@@ -1,4 +1,5 @@
 import type { LightningBackend, Invoice, InvoiceStatus } from '../types.js'
+import { PAYMENT_HASH_RE } from '../core/types.js'
 
 export interface ClnConfig {
   /** CLN REST API URL (e.g. https://localhost:3010). */
@@ -52,6 +53,7 @@ export function clnBackend(config: ClnConfig): LightningBackend {
     },
 
     async checkInvoice(paymentHash: string): Promise<InvoiceStatus> {
+      if (!PAYMENT_HASH_RE.test(paymentHash)) throw new Error('Invalid payment hash')
       const res = await fetch(
         `${baseUrl}/v1/listinvoices?payment_hash=${paymentHash}`,
         { headers, signal: AbortSignal.timeout(timeoutMs) },

@@ -142,6 +142,10 @@ describe('clnBackend', () => {
 
       await expect(backend.checkInvoice('a'.repeat(64))).rejects.toThrow(/500/)
     })
+
+    it('rejects invalid payment hash', async () => {
+      await expect(backend.checkInvoice('not-a-hash')).rejects.toThrow(/Invalid payment hash/)
+    })
   })
 
   describe('url normalisation', () => {

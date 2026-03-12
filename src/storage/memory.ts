@@ -1,4 +1,5 @@
 // src/storage/memory.ts
+import { timingSafeEqual } from 'node:crypto'
 import type { StorageBackend, DebitResult, StoredInvoice, PendingClaim } from './interface.js'
 
 const DEFAULT_LEASE_MS = 30_000
@@ -136,7 +137,11 @@ export function memoryStorage(): StorageBackend {
 
     getInvoiceForStatus(paymentHash: string, statusToken: string): StoredInvoice | undefined {
       const invoice = invoices.get(paymentHash)
-      if (!invoice || invoice.statusToken !== statusToken) return undefined
+      if (!invoice) return undefined
+      // Timing-safe comparison to prevent token enumeration via timing side-channel
+      const storedBuf = Buffer.from(invoice.statusToken)
+      const providedBuf = Buffer.from(statusToken)
+      if (storedBuf.length !== providedBuf.length || !timingSafeEqual(storedBuf, providedBuf)) return undefined
       return toStoredInvoice(invoice)
     },
 

@@ -101,6 +101,35 @@ describe('handleNwcPay', () => {
     if (!result.success) expect(result.status).toBe(400)
   })
 
+  it('rejects nwcUri without nostr+walletconnect:// scheme', async () => {
+    const deps = createDeps()
+    const hash = 'a'.repeat(64)
+    deps.storage.storeInvoice(hash, 'lnbc_stored', 1000, 'mac', 'tok123')
+    const result = await handleNwcPay(deps, {
+      nwcUri: 'wss://evil-internal-service.local',
+      bolt11: 'lnbc_stored',
+      paymentHash: hash,
+      statusToken: 'tok123',
+    })
+    expect(result.success).toBe(false)
+    if (!result.success) expect(result.status).toBe(400)
+    if (!result.success) expect(result.error).toMatch(/nostr\+walletconnect/)
+  })
+
+  it('rejects http:// nwcUri (SSRF prevention)', async () => {
+    const deps = createDeps()
+    const hash = 'a'.repeat(64)
+    deps.storage.storeInvoice(hash, 'lnbc_stored', 1000, 'mac', 'tok123')
+    const result = await handleNwcPay(deps, {
+      nwcUri: 'http://169.254.169.254/latest/meta-data/',
+      bolt11: 'lnbc_stored',
+      paymentHash: hash,
+      statusToken: 'tok123',
+    })
+    expect(result.success).toBe(false)
+    if (!result.success) expect(result.status).toBe(400)
+  })
+
   it('returns 500 when nwcPay throws', async () => {
     const deps = createDeps({
       nwcPay: vi.fn().mockRejectedValue(new Error('wallet offline')),

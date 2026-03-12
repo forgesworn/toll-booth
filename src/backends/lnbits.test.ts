@@ -6,6 +6,9 @@ vi.stubGlobal('fetch', mockFetch)
 
 beforeEach(() => mockFetch.mockReset())
 
+// Valid 32-byte hex payment hash for tests
+const VALID_HASH = 'a'.repeat(64)
+
 describe('lnbitsBackend', () => {
   const backend = lnbitsBackend({
     url: 'https://legend.lnbits.com',
@@ -17,7 +20,7 @@ describe('lnbitsBackend', () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          payment_hash: 'abc123',
+          payment_hash: VALID_HASH,
           payment_request: 'lnbc1500n1pw5kjhm...',
         }),
       })
@@ -38,14 +41,14 @@ describe('lnbitsBackend', () => {
       expect(body.memo).toBe('test memo')
 
       expect(invoice.bolt11).toBe('lnbc1500n1pw5kjhm...')
-      expect(invoice.paymentHash).toBe('abc123')
+      expect(invoice.paymentHash).toBe(VALID_HASH)
     })
 
     it('uses default memo when none provided', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          payment_hash: 'abc123',
+          payment_hash: VALID_HASH,
           payment_request: 'lnbc1500n1pw5kjhm...',
         }),
       })
@@ -88,19 +91,19 @@ describe('lnbitsBackend', () => {
         ok: true,
         json: async () => ({
           paid: true,
-          preimage: 'def456',
+          preimage: 'b'.repeat(64),
         }),
       })
 
-      const status = await backend.checkInvoice('abc123')
+      const status = await backend.checkInvoice(VALID_HASH)
 
       expect(mockFetch).toHaveBeenCalledOnce()
       const [url, opts] = mockFetch.mock.calls[0]
-      expect(url).toBe('https://legend.lnbits.com/api/v1/payments/abc123')
+      expect(url).toBe(`https://legend.lnbits.com/api/v1/payments/${VALID_HASH}`)
       expect(opts.headers['X-Api-Key']).toBe('test-api-key')
       expect(opts.signal).toBeInstanceOf(AbortSignal)
       expect(status.paid).toBe(true)
-      expect(status.preimage).toBe('def456')
+      expect(status.preimage).toBe('b'.repeat(64))
     })
 
     it('returns paid=false when pending', async () => {
@@ -109,7 +112,7 @@ describe('lnbitsBackend', () => {
         json: async () => ({ paid: false }),
       })
 
-      const status = await backend.checkInvoice('abc123')
+      const status = await backend.checkInvoice(VALID_HASH)
       expect(status.paid).toBe(false)
       expect(status.preimage).toBeUndefined()
     })
@@ -117,7 +120,7 @@ describe('lnbitsBackend', () => {
     it('returns paid=false on 404 (not found)', async () => {
       mockFetch.mockResolvedValueOnce({ ok: false, status: 404 })
 
-      const status = await backend.checkInvoice('abc123')
+      const status = await backend.checkInvoice(VALID_HASH)
       expect(status.paid).toBe(false)
     })
 
@@ -128,7 +131,7 @@ describe('lnbitsBackend', () => {
         text: async () => 'Unauthorised',
       })
 
-      await expect(backend.checkInvoice('abc123')).rejects.toThrow(/401/)
+      await expect(backend.checkInvoice(VALID_HASH)).rejects.toThrow(/401/)
     })
 
     it('throws on 500 (server error)', async () => {
@@ -138,7 +141,11 @@ describe('lnbitsBackend', () => {
         text: async () => 'Internal error',
       })
 
-      await expect(backend.checkInvoice('abc123')).rejects.toThrow(/500/)
+      await expect(backend.checkInvoice(VALID_HASH)).rejects.toThrow(/500/)
+    })
+
+    it('rejects invalid payment hash', async () => {
+      await expect(backend.checkInvoice('not-a-hash')).rejects.toThrow(/Invalid payment hash/)
     })
   })
 })

@@ -1,4 +1,5 @@
 import type { LightningBackend, Invoice, InvoiceStatus } from '../types.js'
+import { PAYMENT_HASH_RE } from '../core/types.js'
 
 export interface LNbitsConfig {
   /** LNbits instance URL (e.g. https://legend.lnbits.com) */
@@ -52,6 +53,7 @@ export function lnbitsBackend(config: LNbitsConfig): LightningBackend {
     },
 
     async checkInvoice(paymentHash: string): Promise<InvoiceStatus> {
+      if (!PAYMENT_HASH_RE.test(paymentHash)) throw new Error('Invalid payment hash')
       const res = await fetch(`${baseUrl}/api/v1/payments/${paymentHash}`, {
         headers: { 'X-Api-Key': config.apiKey },
         signal: AbortSignal.timeout(timeoutMs),

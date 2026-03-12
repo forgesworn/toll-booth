@@ -17,7 +17,7 @@ describe('phoenixdBackend', () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          paymentHash: 'abc123',
+          paymentHash: 'a'.repeat(64),
           serialized: 'lnbc1500n1pw5kjhm...',
         }),
       })
@@ -33,7 +33,7 @@ describe('phoenixdBackend', () => {
       expect(opts.body.toString()).toContain('amountSat=100')
       expect(opts.body.toString()).toContain('description=test+memo')
       expect(invoice.bolt11).toBe('lnbc1500n1pw5kjhm...')
-      expect(invoice.paymentHash).toBe('abc123')
+      expect(invoice.paymentHash).toBe('a'.repeat(64))
     })
 
     it('throws on HTTP error', async () => {
@@ -57,11 +57,11 @@ describe('phoenixdBackend', () => {
         }),
       })
 
-      const status = await backend.checkInvoice('abc123')
+      const status = await backend.checkInvoice('a'.repeat(64))
 
       expect(mockFetch).toHaveBeenCalledOnce()
       const [url, opts] = mockFetch.mock.calls[0]
-      expect(url).toBe('http://localhost:9740/payments/incoming/abc123')
+      expect(url).toBe(`http://localhost:9740/payments/incoming/${'a'.repeat(64)}`)
       expect(opts.signal).toBeInstanceOf(AbortSignal)
       expect(status.paid).toBe(true)
       expect(status.preimage).toBe('def456')
@@ -73,7 +73,7 @@ describe('phoenixdBackend', () => {
         json: async () => ({ isPaid: false }),
       })
 
-      const status = await backend.checkInvoice('abc123')
+      const status = await backend.checkInvoice('a'.repeat(64))
       expect(status.paid).toBe(false)
       expect(status.preimage).toBeUndefined()
     })
@@ -81,7 +81,7 @@ describe('phoenixdBackend', () => {
     it('returns paid=false on 404 (not found)', async () => {
       mockFetch.mockResolvedValueOnce({ ok: false, status: 404 })
 
-      const status = await backend.checkInvoice('abc123')
+      const status = await backend.checkInvoice('a'.repeat(64))
       expect(status.paid).toBe(false)
     })
 
@@ -92,7 +92,7 @@ describe('phoenixdBackend', () => {
         text: async () => 'Unauthorized',
       })
 
-      await expect(backend.checkInvoice('abc123')).rejects.toThrow(/401/)
+      await expect(backend.checkInvoice('a'.repeat(64))).rejects.toThrow(/401/)
     })
 
     it('throws on 500 (server error)', async () => {
@@ -102,7 +102,11 @@ describe('phoenixdBackend', () => {
         text: async () => 'Internal error',
       })
 
-      await expect(backend.checkInvoice('abc123')).rejects.toThrow(/500/)
+      await expect(backend.checkInvoice('a'.repeat(64))).rejects.toThrow(/500/)
+    })
+
+    it('rejects invalid payment hash', async () => {
+      await expect(backend.checkInvoice('not-a-hash')).rejects.toThrow(/Invalid payment hash/)
     })
   })
 })

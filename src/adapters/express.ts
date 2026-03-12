@@ -32,6 +32,12 @@ export interface ExpressMiddlewareConfig {
   responseHeaders?: Record<string, string>
   /** Timeout in milliseconds for upstream proxy requests (default: 30000). */
   upstreamTimeout?: number
+  /**
+   * Custom callback to extract client IP from the request.
+   * Use this for platform-specific IP resolution.
+   * Takes precedence over trustProxy when provided.
+   */
+  getClientIp?: (req: Request) => string
 }
 
 function setSensitiveHeaders(res: Response, headers?: Headers): void {
@@ -102,16 +108,18 @@ export function createExpressMiddleware(
   const upstreamTimeout = config.upstreamTimeout ?? 30_000
 
   return async (req: Request, res: Response, _next: NextFunction) => {
-    const ip = config.trustProxy
-      ? (typeof req.headers['x-forwarded-for'] === 'string'
-          ? req.headers['x-forwarded-for'].split(',')[0]?.trim()
-          : undefined) ??
-        (typeof req.headers['x-real-ip'] === 'string'
-          ? req.headers['x-real-ip'].trim()
-          : undefined) ??
-        req.socket.remoteAddress ??
-        '127.0.0.1'
-      : req.socket.remoteAddress ?? '127.0.0.1'
+    const ip = config.getClientIp
+      ? config.getClientIp(req)
+      : config.trustProxy
+        ? (typeof req.headers['x-forwarded-for'] === 'string'
+            ? req.headers['x-forwarded-for'].split(',')[0]?.trim()
+            : undefined) ??
+          (typeof req.headers['x-real-ip'] === 'string'
+            ? req.headers['x-real-ip'].trim()
+            : undefined) ??
+          req.socket.remoteAddress ??
+          '127.0.0.1'
+        : req.socket.remoteAddress ?? '127.0.0.1'
 
     const headers: Record<string, string | undefined> = {}
     for (const [key, value] of Object.entries(req.headers)) {
@@ -200,8 +208,18 @@ export function createExpressMiddleware(
         challengeHeaders.set(key, value)
       }
       jsonWithSensitiveHeaders(res, result.body, 402, challengeHeaders)
-    } catch {
-      res.status(502).json({ error: 'Upstream routing engine unavailable' })
+    } catch (err) {
+      // Distinguish upstream network errors from programming errors
+      if (err instanceof TypeError && (err.message.includes('fetch') || err.message.includes('network'))) {
+        res.status(502).json({ error: 'Upstream unavailable' })
+      } else if (err instanceof DOMException && err.name === 'TimeoutError') {
+        res.status(504).json({ error: 'Upstream timeout' })
+      } else if (err instanceof DOMException && err.name === 'AbortError') {
+        res.status(504).json({ error: 'Upstream request aborted' })
+      } else {
+        console.error('[toll-booth] Unexpected error in middleware:', err instanceof Error ? err.message : err)
+        res.status(502).json({ error: 'Upstream unavailable' })
+      }
     }
   }
 }

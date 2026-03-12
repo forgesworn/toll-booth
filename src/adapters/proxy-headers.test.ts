@@ -47,12 +47,13 @@ describe('proxy header helpers', () => {
     expect(headers.get('x-test')).toBe('ok')
   })
 
-  it('applies no-store and merges vary values without duplication', () => {
+  it('applies no-store, nosniff, and merges vary values without duplication', () => {
     const headers = appendVary(applyNoStoreHeaders(new Headers({ Vary: 'Accept-Encoding' })), 'Accept')
     appendVary(headers, 'Accept')
 
     expect(headers.get('cache-control')).toBe('no-store')
     expect(headers.get('pragma')).toBe('no-cache')
+    expect(headers.get('x-content-type-options')).toBe('nosniff')
     expect(headers.get('vary')).toBe('Accept-Encoding, Accept')
   })
 })
