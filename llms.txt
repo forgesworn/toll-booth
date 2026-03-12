@@ -1,6 +1,6 @@
 # toll-booth
 
-> APIs gate access through accounts, API keys, and credit cards — mechanisms that assume a human on the other end. Machines and AI agents can't sign up for accounts. toll-booth is L402 payment middleware that lets any HTTP API accept instant payments — Lightning, Cashu ecash, or Nostr Wallet Connect — with no accounts, no API keys, and no PII exchanged.
+> toll-booth lets AI agents discover, pay for, and consume any HTTP API using Lightning, Cashu, or NWC - no accounts, no API keys, no human in the loop. It's L402 payment middleware that embeds in your Node.js app as middleware, supporting Express 5, Deno, Bun, and Cloudflare Workers.
 
 toll-booth embeds in your existing Node.js application as middleware (not a separate proxy). It supports Express 5, Deno, Bun, and Cloudflare Workers. Five Lightning backends are supported (Phoenixd, LND, Core Lightning, LNbits, Alby), or you can run in Cashu-only mode with no Lightning node at all — ideal for serverless and edge deployments.
 

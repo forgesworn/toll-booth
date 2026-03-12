@@ -1,0 +1,499 @@
+# toll-booth — Complete API Reference
+
+> toll-booth lets AI agents discover, pay for, and consume any HTTP API using Lightning, Cashu, or NWC - no accounts, no API keys, no human in the loop. It's L402 payment middleware that embeds in your Node.js app as middleware, supporting Express 5, Deno, Bun, and Cloudflare Workers.
+
+## Installation
+
+```bash
+npm install @thecryptodonkey/toll-booth
+```
+
+## Subpath Exports
+
+| Import path | Contents |
+|-------------|----------|
+| `@thecryptodonkey/toll-booth` | `Booth`, `createTollBooth`, core handlers, storage factories, adapters, macaroon utilities, types |
+| `@thecryptodonkey/toll-booth/backends/phoenixd` | `phoenixdBackend` |
+| `@thecryptodonkey/toll-booth/backends/lnd` | `lndBackend` |
+| `@thecryptodonkey/toll-booth/backends/cln` | `clnBackend` |
+| `@thecryptodonkey/toll-booth/backends/lnbits` | `lnbitsBackend` |
+| `@thecryptodonkey/toll-booth/backends/alby` | `albyBackend` |
+| `@thecryptodonkey/toll-booth/storage/sqlite` | `sqliteStorage` |
+| `@thecryptodonkey/toll-booth/storage/memory` | `memoryStorage` |
+| `@thecryptodonkey/toll-booth/adapters/express` | Express adapter factories |
+| `@thecryptodonkey/toll-booth/adapters/web-standard` | Web Standard adapter factories |
+
+Prefer subpath imports for tree-shaking in bundled environments.
+
+## Booth Class
+
+The `Booth` class is the main entry point. It wires together the engine, storage, and adapter from a single config object.
+
+```typescript
+import { Booth } from '@thecryptodonkey/toll-booth'
+import { phoenixdBackend } from '@thecryptodonkey/toll-booth/backends/phoenixd'
+
+const booth = new Booth({
+  adapter: 'express',
+  backend: phoenixdBackend({
+    url: 'http://localhost:9740',
+    password: process.env.PHOENIXD_PASSWORD!,
+  }),
+  pricing: { '/api': 10 },
+  upstream: 'http://localhost:8080',
+})
+
+// Wire into Express:
+app.get('/invoice-status/:paymentHash', booth.invoiceStatusHandler as any)
+app.post('/create-invoice', booth.createInvoiceHandler as any)
+app.use('/', booth.middleware as any)
+```
+
+### BoothOptions
+
+`BoothOptions` extends `BoothConfig` with two additional fields:
+
+```typescript
+interface BoothOptions extends BoothConfig {
+  /** Select the framework adapter. */
+  adapter: 'express' | 'web-standard'
+  /**
+   * Custom storage backend. Provide this OR dbPath, not both.
+   * Defaults to SQLite at ./toll-booth.db.
+   */
+  storage?: StorageBackend
+}
+```
+
+### BoothConfig
+
+```typescript
+interface BoothConfig {
+  /**
+   * Lightning backend for invoice creation and status checks.
+   * Optional when using Cashu-only mode (redeemCashu provided without backend).
+   */
+  backend?: LightningBackend
+
+  /** Pricing table: route pattern -> satoshi cost per request. */
+  pricing: PricingTable
+
+  /** Upstream URL to proxy authorised requests to. */
+  upstream: string
+
+  /** Per-IP daily free-request allowance before payment is required. */
+  freeTier?: { requestsPerDay: number }
+
+  /**
+   * Default invoice amount in satoshis.
+   * Controls credits minted per invoice and the cost for unpriced routes
+   * when strictPricing is enabled. Default: 1000.
+   */
+  defaultInvoiceAmount?: number
+
+  /**
+   * When true, unpriced routes are challenged with a 402 instead of
+   * being proxied for free. Prevents accidental billing gaps.
+   */
+  strictPricing?: boolean
+
+  /**
+   * Macaroon signing key as a 64-character hex string (32 bytes).
+   * If omitted, a random key is generated at startup. Not safe for
+   * production: tokens are invalidated on restart.
+   */
+  rootKey?: string
+
+  /** Path to the SQLite database file. Default: ./toll-booth.db */
+  dbPath?: string
+
+  /**
+   * Trust X-Forwarded-For / X-Real-IP headers for client IP.
+   * Only enable if a trusted proxy overwrites these headers.
+   */
+  trustProxy?: boolean
+
+  /**
+   * Custom callback to resolve client IP (e.g. for Deno, Bun, Workers
+   * where the framework does not expose a standard IP field).
+   */
+  getClientIp?: (request: unknown) => string
+
+  /** Extra response headers to include on every response. */
+  responseHeaders?: Record<string, string>
+
+  /** Credit tiers for volume discounts. Used by the payment page and /create-invoice. */
+  creditTiers?: CreditTier[]
+
+  /**
+   * NWC callback: pay a Lightning invoice via Nostr Wallet Connect.
+   * Accepts NWC URI + bolt11, returns the payment preimage.
+   * When provided, the payment page shows an NWC option.
+   */
+  nwcPayInvoice?: (nwcUri: string, bolt11: string) => Promise<string>
+
+  /**
+   * Cashu callback: redeem a Cashu ecash token as payment.
+   * Returns the credited amount in satoshis.
+   * When provided, the payment page shows a Cashu option and the
+   * /cashu-redeem endpoint is registered.
+   */
+  redeemCashu?: (token: string, paymentHash: string) => Promise<number>
+
+  /** Timeout in ms for upstream proxy requests. Default: 30000. */
+  upstreamTimeout?: number
+
+  /**
+   * Maximum age of stored invoices in ms. Older invoices are pruned hourly.
+   * Set to 0 to disable pruning. Default: 86400000 (24 hours).
+   */
+  invoiceMaxAgeMs?: number
+
+  /** Event hook: called after each successful payment. */
+  onPayment?: (event: PaymentEvent) => void
+
+  /** Event hook: called after each proxied request. */
+  onRequest?: (event: RequestEvent) => void
+
+  /** Event hook: called after each 402 challenge issued. */
+  onChallenge?: (event: ChallengeEvent) => void
+}
+```
+
+### Booth Instance API
+
+```typescript
+class Booth {
+  /** Main request handler: checks auth, proxies upstream. */
+  readonly middleware: unknown
+
+  /** GET /invoice-status/:paymentHash */
+  readonly invoiceStatusHandler: unknown
+
+  /** POST /create-invoice */
+  readonly createInvoiceHandler: unknown
+
+  /** POST /nwc-pay (only present when nwcPayInvoice is configured) */
+  readonly nwcPayHandler?: unknown
+
+  /** POST /cashu-redeem (only present when redeemCashu is configured) */
+  readonly cashuRedeemHandler?: unknown
+
+  /** Aggregate usage statistics. Resets on restart. */
+  readonly stats: StatsCollector
+
+  /** Reset free-tier counters for all IPs. */
+  resetFreeTier(): void
+
+  /**
+   * Recover Cashu redemptions that were claimed but never settled (crash recovery).
+   * Called automatically on startup. Returns number of recovered claims.
+   */
+  recoverPendingClaims(
+    redeemFn: (token: string, paymentHash: string) => Promise<number>
+  ): Promise<number>
+
+  /** Clean up timers and database connections. */
+  close(): void
+}
+```
+
+## Types
+
+```typescript
+interface LightningBackend {
+  createInvoice(amountSats: number, memo?: string): Promise<Invoice>
+  checkInvoice(paymentHash: string): Promise<InvoiceStatus>
+}
+
+interface Invoice {
+  bolt11: string
+  paymentHash: string
+}
+
+interface InvoiceStatus {
+  paid: boolean
+  preimage?: string
+}
+
+type PricingTable = Record<string, number>
+
+interface CreditTier {
+  amountSats: number   // what the user pays
+  creditSats: number   // credits received (exceeds amountSats for volume discounts)
+  label: string
+}
+
+interface PaymentEvent {
+  timestamp: string
+  paymentHash: string
+  amountSats: number
+}
+
+interface RequestEvent {
+  timestamp: string
+  endpoint: string
+  satsDeducted: number
+  remainingBalance: number
+  latencyMs: number
+  authenticated: boolean
+  clientIp: string
+}
+
+interface ChallengeEvent {
+  timestamp: string
+  endpoint: string
+  amountSats: number
+  clientIp: string
+}
+
+type EventHandler = {
+  onPayment?: (event: PaymentEvent) => void
+  onRequest?: (event: RequestEvent) => void
+  onChallenge?: (event: ChallengeEvent) => void
+}
+```
+
+## Lightning Backends
+
+### Phoenixd
+
+```typescript
+import { phoenixdBackend } from '@thecryptodonkey/toll-booth/backends/phoenixd'
+
+interface PhoenixdConfig {
+  url: string       // e.g. "http://localhost:9740"
+  password: string  // Phoenixd auth password
+  timeout?: number  // request timeout ms (default: 30000)
+}
+
+phoenixdBackend(config: PhoenixdConfig): LightningBackend
+```
+
+### LND
+
+```typescript
+import { lndBackend } from '@thecryptodonkey/toll-booth/backends/lnd'
+
+interface LndConfig {
+  url: string           // e.g. "https://localhost:8080"
+  macaroon?: string     // admin macaroon as hex string
+  macaroonPath?: string // path to admin.macaroon file (alternative to hex)
+  timeout?: number      // request timeout ms (default: 30000)
+}
+
+lndBackend(config: LndConfig): LightningBackend
+```
+
+Either `macaroon` or `macaroonPath` must be provided.
+
+### Core Lightning (CLN)
+
+```typescript
+import { clnBackend } from '@thecryptodonkey/toll-booth/backends/cln'
+
+interface ClnConfig {
+  url: string    // e.g. "https://localhost:3010"
+  rune: string   // rune token for authentication
+  timeout?: number
+}
+
+clnBackend(config: ClnConfig): LightningBackend
+```
+
+### LNbits
+
+```typescript
+import { lnbitsBackend } from '@thecryptodonkey/toll-booth/backends/lnbits'
+
+interface LNbitsConfig {
+  url: string     // e.g. "https://legend.lnbits.com"
+  apiKey: string  // invoice/read API key from the LNbits wallet
+  timeout?: number
+}
+
+lnbitsBackend(config: LNbitsConfig): LightningBackend
+```
+
+Works with self-hosted or hosted LNbits instances.
+
+### Alby / NWC
+
+```typescript
+import { albyBackend } from '@thecryptodonkey/toll-booth/backends/alby'
+
+interface AlbyConfig {
+  nwcUrl: string              // nostr+walletconnect://pubkey?relay=wss://...&secret=...
+  timeout?: number
+  allowInsecureRelay?: boolean // must be true; see note below
+}
+
+albyBackend(config: AlbyConfig): LightningBackend
+```
+
+The Alby backend uses an unauthenticated JSON relay transport. It must be explicitly opted into with `allowInsecureRelay: true`; suitable only for local testing or a fully trusted relay.
+
+## Storage Backend
+
+`StorageBackend` is an interface you can implement for custom persistence.
+
+```typescript
+interface StorageBackend {
+  credit(paymentHash: string, amount: number): void
+  debit(paymentHash: string, amount: number): DebitResult
+  balance(paymentHash: string): number
+  settle(paymentHash: string): boolean
+  isSettled(paymentHash: string): boolean
+  settleWithCredit(paymentHash: string, amount: number, settlementSecret?: string): boolean
+  getSettlementSecret(paymentHash: string): string | undefined
+  claimForRedeem(paymentHash: string, token: string, leaseMs?: number): boolean
+  pendingClaims(): PendingClaim[]
+  tryAcquireRecoveryLease(paymentHash: string, leaseMs: number): PendingClaim | undefined
+  extendRecoveryLease(paymentHash: string, leaseMs: number): boolean
+  storeInvoice(paymentHash: string, bolt11: string, amountSats: number, macaroon: string, statusToken: string): void
+  getInvoice(paymentHash: string): StoredInvoice | undefined
+  getInvoiceForStatus(paymentHash: string, statusToken: string): StoredInvoice | undefined
+  pruneExpiredInvoices(maxAgeMs: number): number
+  pruneStaleRecords(maxAgeMs: number): number
+  close(): void
+}
+
+interface DebitResult {
+  success: boolean
+  remaining: number
+}
+
+interface StoredInvoice {
+  paymentHash: string
+  bolt11: string
+  amountSats: number
+  macaroon: string
+  createdAt: string
+}
+
+interface PendingClaim {
+  paymentHash: string
+  token: string
+  claimedAt: string
+}
+```
+
+Built-in implementations:
+
+```typescript
+import { sqliteStorage } from '@thecryptodonkey/toll-booth/storage/sqlite'
+import { memoryStorage } from '@thecryptodonkey/toll-booth/storage/memory'
+
+sqliteStorage({ path: './toll-booth.db' }): StorageBackend
+memoryStorage(): StorageBackend
+```
+
+SQLite uses WAL mode with three tables: `credits`, `invoices`, `cashu_claims`.
+`memoryStorage` is suitable for testing and ephemeral deployments.
+
+## Usage Examples
+
+### Express (Lightning)
+
+```typescript
+import express from 'express'
+import { Booth } from '@thecryptodonkey/toll-booth'
+import { phoenixdBackend } from '@thecryptodonkey/toll-booth/backends/phoenixd'
+
+const app = express()
+app.use(express.json())
+
+const booth = new Booth({
+  adapter: 'express',
+  backend: phoenixdBackend({
+    url: process.env.PHOENIXD_URL!,
+    password: process.env.PHOENIXD_PASSWORD!,
+  }),
+  pricing: { '/api': 10 },
+  upstream: 'http://localhost:8080',
+  freeTier: { requestsPerDay: 5 },
+  creditTiers: [
+    { amountSats: 1000, creditSats: 1000, label: 'Standard' },
+    { amountSats: 5000, creditSats: 5500, label: 'Pro (10% bonus)' },
+    { amountSats: 10000, creditSats: 12000, label: 'Enterprise (20% bonus)' },
+  ],
+})
+
+app.get('/invoice-status/:paymentHash', booth.invoiceStatusHandler as any)
+app.post('/create-invoice', booth.createInvoiceHandler as any)
+app.use('/', booth.middleware as any)
+
+app.listen(3000)
+```
+
+### Web Standard (Deno, Bun, Cloudflare Workers) - Cashu-only
+
+No Lightning node required. Suitable for serverless and edge deployments.
+
+```typescript
+import { Booth } from '@thecryptodonkey/toll-booth'
+
+const booth = new Booth({
+  adapter: 'web-standard',
+  redeemCashu: async (token, paymentHash) => {
+    // Verify and redeem the ecash token with your Cashu mint.
+    // Return the credited amount in satoshis.
+    return amountRedeemed
+  },
+  pricing: { '/api': 5 },
+  upstream: 'http://localhost:8080',
+})
+
+// Bun example:
+Bun.serve({
+  port: 3000,
+  async fetch(req) {
+    const url = new URL(req.url)
+    if (url.pathname === '/cashu-redeem') {
+      return (booth.cashuRedeemHandler as any)(req)
+    }
+    if (url.pathname.startsWith('/invoice-status/')) {
+      return (booth.invoiceStatusHandler as any)(req)
+    }
+    if (url.pathname === '/create-invoice') {
+      return (booth.createInvoiceHandler as any)(req)
+    }
+    return (booth.middleware as any)(req)
+  },
+})
+```
+
+### Custom LightningBackend
+
+```typescript
+import type { LightningBackend } from '@thecryptodonkey/toll-booth'
+
+const myBackend: LightningBackend = {
+  async createInvoice(amountSats, memo) {
+    // Call your Lightning node API.
+    return { bolt11: '...', paymentHash: '...' }
+  },
+  async checkInvoice(paymentHash) {
+    // Check payment status.
+    return { paid: true, preimage: '...' }
+  },
+}
+```
+
+## Payment Flow
+
+1. Client requests a priced endpoint without credentials.
+2. Free tier checked per IP per day; if allowance remains the request is proxied.
+3. Free tier exhausted: HTTP 402 response with BOLT-11 invoice and a macaroon.
+4. Client pays via Lightning wallet, NWC, or Cashu ecash token.
+5. Client sends `Authorization: L402 <macaroon>:<preimage>` on subsequent requests.
+6. Macaroon verified against root key; preimage validated against payment hash.
+7. Credits deducted per request from the payment-hash balance.
+8. Credits exhausted: new 402 issued with a fresh invoice.
+
+## Links
+
+- Repository: https://github.com/TheCryptoDonkey/toll-booth
+- npm: https://www.npmjs.com/package/@thecryptodonkey/toll-booth
+- Reference deployment: examples/valhalla-proxy/ (Docker Compose, Express + Phoenixd)
+- Licence: MIT
