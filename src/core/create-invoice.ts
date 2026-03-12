@@ -36,7 +36,7 @@ export async function handleCreateInvoice(
 
     const requestedAmount = request.amountSats ?? deps.defaultAmount
 
-    if (!Number.isInteger(requestedAmount) || requestedAmount < 1) {
+    if (!Number.isSafeInteger(requestedAmount) || requestedAmount < 1 || requestedAmount > 2_100_000_000_000_000) {
       return { success: false, error: 'amountSats must be a positive integer' }
     }
 

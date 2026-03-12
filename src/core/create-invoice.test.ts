@@ -52,6 +52,13 @@ describe('handleCreateInvoice', () => {
     expect(result.error).toBe('amountSats must be a positive integer')
   })
 
+  it('rejects amountSats exceeding 21M BTC in sats', async () => {
+    const deps = makeDeps()
+    const result = await handleCreateInvoice(deps, { amountSats: 2_100_000_000_000_001 })
+    expect(result.success).toBe(false)
+    expect(result.error).toBe('amountSats must be a positive integer')
+  })
+
   it('rejects negative amountSats', async () => {
     const deps = makeDeps()
     const result = await handleCreateInvoice(deps, { amountSats: -5 })
