@@ -69,6 +69,9 @@ const port = parseInt(process.env.PORT ?? '3000', 10)
 const app = express()
 app.use(express.json())
 
+// Serve web frontend (before toll-booth middleware so / is not gated)
+app.use(express.static(resolve(__dirname, 'public')))
+
 const mockStorage = MOCK ? memoryStorage() : undefined
 const backend = MOCK
   ? createMockBackend(mockStorage!)
