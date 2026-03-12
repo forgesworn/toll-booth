@@ -144,8 +144,8 @@ export async function startDemo(): Promise<void> {
     storage,
     rootKey,
     upstream: upstreamUrl,
-    pricing: { '/api/joke': 10 },
-    defaultInvoiceAmount: 10,
+    pricing: { '/api/joke': 21 },
+    defaultInvoiceAmount: 21,
     freeTier: { requestsPerDay: 3 },
     onRequest: (event) => {
       if (event.authenticated) {
@@ -173,7 +173,7 @@ export async function startDemo(): Promise<void> {
     storage,
     rootKey,
     tiers: [],
-    defaultAmount: 10,
+    defaultAmount: 21,
   })
 
   const invoiceStatusHandler = createWebStandardInvoiceStatusHandler({
@@ -237,7 +237,7 @@ export async function startDemo(): Promise<void> {
     console.log('')
     console.log(`  ${BOLD}Pricing${RESET}`)
     console.log(`  ${DIM}Route${RESET}            ${DIM}Cost${RESET}         ${DIM}Free tier${RESET}`)
-    console.log(`  /api/joke          10 sats      3 reqs/day`)
+    console.log(`  /api/joke          21 sats      3 reqs/day`)
     console.log('')
     console.log(`  ${BOLD}Try it:${RESET}`)
     console.log(`  ${DIM}$${RESET} curl http://localhost:${port}/api/joke`)

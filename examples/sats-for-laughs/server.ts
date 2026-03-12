@@ -81,10 +81,10 @@ const booth = new Booth({
   adapter: 'express',
   backend,
   ...(mockStorage ? { storage: mockStorage } : {}),
-  pricing: { '/api/joke': 10 },
+  pricing: { '/api/joke': 21 },
   upstream: `http://localhost:${UPSTREAM_PORT}`,
   freeTier: { requestsPerDay: 1 },
-  defaultInvoiceAmount: 10,
+  defaultInvoiceAmount: 21,
   rootKey: process.env.ROOT_KEY || randomBytes(32).toString('hex'),
   trustProxy: true,
   onRequest: (event) => {
@@ -107,7 +107,7 @@ app.listen(port, () => {
   console.log(`sats-for-laughs listening on :${port}`)
   console.log(`  topics: ${topics.join(', ')}`)
   console.log(`  jokes loaded: ${jokes.length}`)
-  console.log(`  pricing: 10 sats/joke (1 free/day)`)
+  console.log(`  pricing: 21 sats/joke (1 free/day)`)
 })
 
 function shutdown() {

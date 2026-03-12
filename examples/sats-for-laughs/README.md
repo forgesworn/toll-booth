@@ -2,7 +2,7 @@
 
 A joke API gated by Lightning payments, powered by [toll-booth](https://github.com/TheCryptoDonkey/toll-booth).
 
-Pay 10 sats, get a joke. No account. No sign-up. This is the same code that runs the [live demo](https://jokes.trotters.dev/api/joke).
+Pay 21 sats, get a joke. No account. No sign-up. This is the same code that runs the [live demo](https://jokes.trotters.dev/api/joke).
 
 ## Three steps to a paid API
 
@@ -32,7 +32,7 @@ Replace the joke endpoint with your own API. The key lines in `server.ts`:
 const booth = new Booth({
   adapter: 'express',
   backend: phoenixdBackend({ url: '...', password: '...' }),
-  pricing: { '/api/joke': 10 },           // your routes and prices
+  pricing: { '/api/joke': 21 },           // your routes and prices
   upstream: `http://localhost:${UPSTREAM_PORT}`,  // your API
   freeTier: { requestsPerDay: 1 },
 })
@@ -44,7 +44,7 @@ Change `pricing` to your routes, point `upstream` at your service, deploy.
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/joke` | GET | Random joke (1 free/day, then 10 sats) |
+| `/api/joke` | GET | Random joke (1 free/day, then 21 sats) |
 | `/api/joke?topic=nostr` | GET | Joke on a specific topic |
 | `/create-invoice` | POST | Get a Lightning invoice |
 | `/invoice-status/:paymentHash` | GET | Check payment status (JSON or HTML payment page) |
