@@ -11,7 +11,7 @@ const KNOWN_CAVEATS = new Set(['payment_hash', 'credit_balance'])
  * @param creditBalanceSats - The credit balance in satoshis.
  * @returns Base64-encoded binary macaroon.
  */
-export function mintMacaroon(rootKey: string, paymentHash: string, creditBalanceSats: number): string {
+export function mintMacaroon(rootKey: string, paymentHash: string, creditBalanceSats: number, caveats?: string[]): string {
   const keyBytes = hexToBytes(rootKey)
   const m = newMacaroon({
     identifier: paymentHash,
@@ -21,6 +21,14 @@ export function mintMacaroon(rootKey: string, paymentHash: string, creditBalance
   })
   m.addFirstPartyCaveat(`payment_hash = ${paymentHash}`)
   m.addFirstPartyCaveat(`credit_balance = ${creditBalanceSats}`)
+  if (caveats) {
+    for (const caveat of caveats) {
+      if (!caveat.includes(' = ')) {
+        throw new Error(`Invalid caveat format (must contain " = "): ${caveat}`)
+      }
+      m.addFirstPartyCaveat(caveat)
+    }
+  }
   return uint8ToBase64(m.exportBinary())
 }
 

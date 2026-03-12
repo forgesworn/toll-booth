@@ -72,6 +72,39 @@ describe('parseCaveats', () => {
   })
 })
 
+describe('mintMacaroon with caveats', () => {
+  const rootKey = 'a'.repeat(64)
+  const paymentHash = 'b'.repeat(64)
+
+  it('mints with additional caveats', () => {
+    const mac = mintMacaroon(rootKey, paymentHash, 1000, ['route = /send', 'sender = example.com'])
+    const caveats = parseCaveats(mac)
+    expect(caveats.route).toBe('/send')
+    expect(caveats.sender).toBe('example.com')
+    expect(caveats.payment_hash).toBe(paymentHash)
+    expect(caveats.credit_balance).toBe('1000')
+  })
+
+  it('mints normally when caveats omitted', () => {
+    const mac = mintMacaroon(rootKey, paymentHash, 1000)
+    const caveats = parseCaveats(mac)
+    expect(caveats.payment_hash).toBe(paymentHash)
+    expect(caveats.credit_balance).toBe('1000')
+    expect(Object.keys(caveats)).toHaveLength(2)
+  })
+
+  it('mints normally with empty caveats array', () => {
+    const mac = mintMacaroon(rootKey, paymentHash, 1000, [])
+    const caveats = parseCaveats(mac)
+    expect(Object.keys(caveats)).toHaveLength(2)
+  })
+
+  it('rejects caveats without = separator', () => {
+    expect(() => mintMacaroon(rootKey, paymentHash, 1000, ['invalid']))
+      .toThrow()
+  })
+})
+
 describe('caveat tampering prevention', () => {
   const rootKey = 'a'.repeat(64)
   const paymentHash = 'b'.repeat(64)
