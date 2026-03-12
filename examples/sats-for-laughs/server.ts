@@ -83,7 +83,7 @@ const backend = MOCK
 const booth = new Booth({
   adapter: 'express',
   backend,
-  ...(mockStorage ? { storage: mockStorage } : {}),
+  ...(mockStorage ? { storage: mockStorage } : { dbPath: process.env.TOLL_BOOTH_DB_PATH ?? '/data/toll-booth.db' }),
   pricing: { '/api/joke': 21 },
   upstream: `http://localhost:${UPSTREAM_PORT}`,
   freeTier: { requestsPerDay: 1 },
