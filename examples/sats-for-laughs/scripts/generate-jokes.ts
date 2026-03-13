@@ -44,11 +44,13 @@ async function generateBatch(topic: string, count: number): Promise<Joke[]> {
 
   try {
     const parsed = JSON.parse(content) as { jokes: { setup: string; punchline: string }[] }
-    return parsed.jokes.map((j) => ({
-      setup: j.setup,
-      punchline: j.punchline,
-      topic: topic.toLowerCase().replace(/\s*\(hns\)/i, ''),
-    }))
+    return parsed.jokes
+      .filter((j) => j.setup && j.punchline)
+      .map((j) => ({
+        setup: j.setup,
+        punchline: j.punchline,
+        topic: topic.toLowerCase().replace(/\s*\(hns\)/i, ''),
+      }))
   } catch {
     console.error(`  Failed to parse response for ${topic}`)
     return []

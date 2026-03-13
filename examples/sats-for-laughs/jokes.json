@@ -5593,5 +5593,505 @@
     "setup": "When can you ask two Handshake domains about secrets?",
     "punchline": "When they're in their 'key' moment!",
     "topic": "handshake"
+  },
+  {
+    "setup": "My Lightning channel partner ghosted me.",
+    "punchline": "Now all my liquidity is on the wrong side and I can't even route my feelings.",
+    "topic": "lightning"
+  },
+  {
+    "setup": "What's the difference between a Lightning invoice and a parking ticket?",
+    "punchline": "The parking ticket doesn't expire in 60 seconds while you're still fumbling for your wallet.",
+    "topic": "lightning"
+  },
+  {
+    "setup": "I tried to explain onion routing to my mum.",
+    "punchline": "She said, 'So it makes you cry and nobody knows where it's going? Sounds like your father's driving.'",
+    "topic": "lightning"
+  },
+  {
+    "setup": "My therapist says I have trust issues.",
+    "punchline": "I said, 'That's rich coming from someone who doesn't even run a watchtower.'",
+    "topic": "lightning"
+  },
+  {
+    "setup": "Lightning node operators are just introverts with extra steps.",
+    "punchline": "They sit alone in a room, mass as many connections as possible, and charge a fee if anyone actually tries to interact with them.",
+    "topic": "lightning"
+  },
+  {
+    "setup": "I opened a channel with 10 million sats of capacity.",
+    "punchline": "My wife opened a channel to Amazon. Guess whose closed first.",
+    "topic": "lightning"
+  },
+  {
+    "setup": "BOLT-11 invoices are like my ex's text messages.",
+    "punchline": "Impossibly long, full of encoded demands, and they expire if you don't respond fast enough.",
+    "topic": "lightning"
+  },
+  {
+    "setup": "My Lightning node found a route through 14 hops.",
+    "punchline": "Still fewer intermediaries than sending a bank wire on a Friday afternoon.",
+    "topic": "lightning"
+  },
+  {
+    "setup": "What do Lightning fees and my contributions at work have in common?",
+    "punchline": "They're both so small that nobody notices them, yet the whole system collapses without them.",
+    "topic": "lightning"
+  },
+  {
+    "setup": "I told my node to rebalance its channels automatically.",
+    "punchline": "It spent 3,000 sats in fees to move 2,000 sats. It's learning from my financial habits perfectly.",
+    "topic": "lightning"
+  },
+  {
+    "setup": "Running a routing node is like hosting a dinner party.",
+    "punchline": "You provide all the liquidity, everyone else has a great time, and you're left with a 0.01% tip and dirty dishes.",
+    "topic": "lightning"
+  },
+  {
+    "setup": "My payment got split into 7 parts via MPP.",
+    "punchline": "Even my sats are commitment-phobic; they won't travel together.",
+    "topic": "lightning"
+  },
+  {
+    "setup": "A watchtower operator walks into a pub.",
+    "punchline": "The bartender says, 'You look knackered.' He replies, 'I've been staring at other people's relationships 24/7 waiting for someone to cheat.'",
+    "topic": "lightning"
+  },
+  {
+    "setup": "I finally achieved perfect inbound liquidity on all my channels.",
+    "punchline": "Then someone paid me 50 sats for a joke and the whole thing collapsed. Worth it though.",
+    "topic": "lightning"
+  },
+  {
+    "setup": "Lightning Network routing is just satnav for money.",
+    "punchline": "And just like satnav, it'll confidently send you through a dodgy neighbourhood because it's 2 millisats cheaper.",
+    "topic": "lightning"
+  },
+  {
+    "setup": "My mate asked why I run a Lightning node at a loss.",
+    "punchline": "I said it's the same reason people buy gym memberships; it's about the idea of being productive, not actually doing it.",
+    "topic": "lightning"
+  },
+  {
+    "setup": "What's a payment hash's love language?",
+    "punchline": "Preimage reveal. It won't commit to anything until you prove you can deliver.",
+    "topic": "lightning"
+  },
+  {
+    "setup": "I explained channel capacity to my nan.",
+    "punchline": "She said, 'So it's like a bath; water can only flow one way at a time and if you force it, everything overflows?' Nan gets it.",
+    "topic": "lightning"
+  },
+  {
+    "setup": "Lightning is instant and nearly free.",
+    "punchline": "So naturally, I spent six hours and 12,000 sats trying to open a balanced channel to prove it.",
+    "topic": "lightning"
+  },
+  {
+    "setup": "My node has 47 channels and routes about 3 payments a week.",
+    "punchline": "It's basically the LinkedIn of financial infrastructure. Loads of connections, zero activity.",
+    "topic": "lightning"
+  },
+  {
+    "setup": "Force-closing a channel is the Lightning equivalent of flipping the table during a board game.",
+    "punchline": "Technically allowed by the rules, but everyone has to wait two weeks before they'll play with you again.",
+    "topic": "lightning"
+  },
+  {
+    "setup": "They say Lightning solves the scaling problem.",
+    "punchline": "It does. Now instead of one problem, you have channels, liquidity, routing, backups, and watchtowers. Beautifully scaled.",
+    "topic": "lightning"
+  },
+  {
+    "setup": "I tried to pay a 1-sat invoice and the routing fee was 3 sats.",
+    "punchline": "That's a 300% surcharge. Even Ticketmaster would blush.",
+    "topic": "lightning"
+  },
+  {
+    "setup": "Why do Lightning developers make terrible comedians?",
+    "punchline": "All their best material is wrapped in multiple layers of encryption and nobody can see the payload until the very end.",
+    "topic": "lightning"
+  },
+  {
+    "setup": "My Lightning wallet says 'payment failed: no route found'.",
+    "punchline": "Weird. My money has no trouble finding a route when it's leaving my bank account for rent.",
+    "topic": "lightning"
+  },
+  {
+    "setup": "I asked a node operator how business was going.",
+    "punchline": "He said, 'I've mass 50 BTC in channels, earned 12,000 sats in fees this month, and my electricity bill is 40 quid. Living the dream.'",
+    "topic": "lightning"
+  },
+  {
+    "setup": "Submarine swaps sound exciting until you realise what they actually are.",
+    "punchline": "It's just moving your own money from one pocket to another and paying someone to watch.",
+    "topic": "lightning"
+  },
+  {
+    "setup": "I told my wife I'd put our savings into cold storage.",
+    "punchline": "She bought a freezer. I bought a Ledger. We're both disappointed in each other.",
+    "topic": "bitcoin"
+  },
+  {
+    "setup": "What's the difference between a Bitcoin miner and a toddler?",
+    "punchline": "The toddler eventually stops throwing a tantrum when it doesn't get what it wants from the pool.",
+    "topic": "bitcoin"
+  },
+  {
+    "setup": "My therapist asked me to describe my relationship with Bitcoin in one word.",
+    "punchline": "\"Unconfirmed.\"",
+    "topic": "bitcoin"
+  },
+  {
+    "setup": "I wrote my seed phrase on a piece of paper and hid it somewhere safe.",
+    "punchline": "Somewhere so safe, even I can't find it. So technically it's the most secure wallet in existence.",
+    "topic": "bitcoin"
+  },
+  {
+    "setup": "Bitcoin's difficulty adjustment is a lot like my fitness routine.",
+    "punchline": "Every two weeks it looks at my performance and makes everything harder for no apparent reward.",
+    "topic": "bitcoin"
+  },
+  {
+    "setup": "My mate says he's running a full node from his flat in Croydon.",
+    "punchline": "Validates every transaction on the network but still can't validate his own life choices.",
+    "topic": "bitcoin"
+  },
+  {
+    "setup": "The halving is basically Bitcoin's way of saying:",
+    "punchline": "\"You lot had it too easy. From now on, half the reward, double the arguments on Twitter.\"",
+    "topic": "bitcoin"
+  },
+  {
+    "setup": "I tried to explain UTXOs to my dad.",
+    "punchline": "He said, \"So it's like having fifty different pockets and none of them have the right change?\" Honestly, that's the best explanation I've ever heard.",
+    "topic": "bitcoin"
+  },
+  {
+    "setup": "Satoshi Nakamoto's real identity is the greatest mystery of the 21st century.",
+    "punchline": "Invented a trustless system and then asked 8 billion people to trust him by disappearing. Absolute legend.",
+    "topic": "bitcoin"
+  },
+  {
+    "setup": "There will only ever be 21 million Bitcoin.",
+    "punchline": "Which means there are already more people who've explained this fact to me at dinner parties than there are Bitcoin.",
+    "topic": "bitcoin"
+  },
+  {
+    "setup": "My transaction has been stuck in the mempool for six hours.",
+    "punchline": "At this point it's not a mempool, it's a memory foam mattress. Nothing's getting out.",
+    "topic": "bitcoin"
+  },
+  {
+    "setup": "People say proof of work is wasteful.",
+    "punchline": "Have they seen my browser history of altcoin research? Now THAT'S wasted energy.",
+    "topic": "bitcoin"
+  },
+  {
+    "setup": "I asked a Bitcoiner what six block confirmations feels like.",
+    "punchline": "He said, \"You know when you send a text and they read it, then the three dots appear six separate times before they finally reply? Like that, but with money.\"",
+    "topic": "bitcoin"
+  },
+  {
+    "setup": "Bitcoin transaction fees during a bull run are like airport coffee.",
+    "punchline": "You know it's extortionate, you know you're being robbed, and you're going to pay it anyway because you've got no choice.",
+    "topic": "bitcoin"
+  },
+  {
+    "setup": "My gran asked me what Bitcoin mining is.",
+    "punchline": "I said it's like a worldwide maths competition where the prize is digital gold and the electricity bill is very real. She said, \"So it's like your university degree then.\"",
+    "topic": "bitcoin"
+  },
+  {
+    "setup": "A Bitcoiner, a gold bug, and a property investor walk into a bar.",
+    "punchline": "The gold bug pays cash, the property investor says he's asset-rich but liquidity-poor, and the Bitcoiner tries to pay in sats but the transaction's still pending so he just lectures everyone about sound money until someone else covers his tab.",
+    "topic": "bitcoin"
+  },
+  {
+    "setup": "I keep my Bitcoin in cold storage and my emotions in colder storage.",
+    "punchline": "One has a recovery phrase. The other requires a therapist who accepts Lightning payments.",
+    "topic": "bitcoin"
+  },
+  {
+    "setup": "People who bought Bitcoin in 2012 and held are called visionaries.",
+    "punchline": "People who bought Bitcoin in 2012 and sold at $100 are called my brother-in-law, and we don't bring it up at Christmas.",
+    "topic": "bitcoin"
+  },
+  {
+    "setup": "The mempool is just Bitcoin's waiting room.",
+    "punchline": "Low fee? Take a number. High fee? Right this way, sir. It's basically the NHS versus private healthcare but for money.",
+    "topic": "bitcoin"
+  },
+  {
+    "setup": "I told my boss I needed a raise because of inflation.",
+    "punchline": "He said, \"We don't have inflation here.\" I said, \"That's funny, neither does Bitcoin, and yet here we both are, pretending everything's fine.\"",
+    "topic": "bitcoin"
+  },
+  {
+    "setup": "What do Bitcoin and my love life have in common?",
+    "punchline": "Everyone keeps telling me to hold, but all I experience is volatility and long periods of nothing happening.",
+    "topic": "bitcoin"
+  },
+  {
+    "setup": "My hardware wallet has a PIN, a passphrase, and requires physical confirmation of every transaction.",
+    "punchline": "Meanwhile, my bank lets me move ten grand with a thumbprint and vibes.",
+    "topic": "bitcoin"
+  },
+  {
+    "setup": "Explaining the Lightning Network to someone is easy.",
+    "punchline": "You just open a channel, explain payment channels, routing, liquidity, watchtowers, and by the time you're done, the on-chain transaction would have confirmed anyway.",
+    "topic": "bitcoin"
+  },
+  {
+    "setup": "A block is mined every ten minutes on average.",
+    "punchline": "\"On average\" is doing an enormous amount of heavy lifting in that sentence. Like saying I go to the gym on average.",
+    "topic": "bitcoin"
+  },
+  {
+    "setup": "The best time to buy Bitcoin was ten years ago. The second best time is now.",
+    "punchline": "The worst time is right after you just told everyone at the pub it's definitely going to crash.",
+    "topic": "bitcoin"
+  },
+  {
+    "setup": "I accidentally sent Bitcoin to the wrong address.",
+    "punchline": "On the bright side, I've now made an anonymous donation to someone who will spend the rest of their life wondering why a stranger sent them forty quid in magic internet money.",
+    "topic": "bitcoin"
+  },
+  {
+    "setup": "I told my friend I was running my own email server.",
+    "punchline": "He said 'That's cool.' I said 'No, that's three days of my life I'm never getting back.'",
+    "topic": "freedom tech"
+  },
+  {
+    "setup": "What's the difference between a cypherpunk and a conspiracy theorist?",
+    "punchline": "About six months.",
+    "topic": "freedom tech"
+  },
+  {
+    "setup": "My wife asked why I keep muttering 'don't trust, verify' in my sleep.",
+    "punchline": "I told her I'd need to see the evidence before I could confirm that.",
+    "topic": "freedom tech"
+  },
+  {
+    "setup": "I encrypted a love letter to my partner with PGP.",
+    "punchline": "She said it was the most romantic thing no one had ever been able to read.",
+    "topic": "freedom tech"
+  },
+  {
+    "setup": "Self-hosting is just the grown-up version of 'I'll do it myself.'",
+    "punchline": "Except instead of tying your shoes, you're debugging NGINX configs at 2am while crying.",
+    "topic": "freedom tech"
+  },
+  {
+    "setup": "A cypherpunk walks into a bar. The bartender asks for his name.",
+    "punchline": "He says 'That's on a need-to-know basis, and you don't need to know. I'll have a beer. Here's cash.'",
+    "topic": "freedom tech"
+  },
+  {
+    "setup": "My Tor connection is a lot like my dating life.",
+    "punchline": "Three hops and I still end up somewhere I didn't intend.",
+    "topic": "freedom tech"
+  },
+  {
+    "setup": "I asked a privacy advocate what they got for Christmas.",
+    "punchline": "They said they couldn't tell me, but the metadata suggests it was from Amazon, weighed 2kg, and arrived on the 23rd.",
+    "topic": "freedom tech"
+  },
+  {
+    "setup": "What do open-source developers and magicians have in common?",
+    "punchline": "They both show you exactly how the trick works and you still can't do it yourself.",
+    "topic": "freedom tech"
+  },
+  {
+    "setup": "My VPN provider promises 'zero logs.'",
+    "punchline": "Which is also the number of times I've been able to verify that.",
+    "topic": "freedom tech"
+  },
+  {
+    "setup": "I decentralised my marriage.",
+    "punchline": "Now every major decision requires consensus from at least three of five trusted nodes. We've never been happier. Or made a decision.",
+    "topic": "freedom tech"
+  },
+  {
+    "setup": "The government says if you've nothing to hide, you've nothing to fear.",
+    "punchline": "And yet they classified 50 million documents last year. Must be terrified.",
+    "topic": "freedom tech"
+  },
+  {
+    "setup": "My friend said sovereign computing means never having to say you're sorry.",
+    "punchline": "That's not true. I apologise to my home server every single morning.",
+    "topic": "freedom tech"
+  },
+  {
+    "setup": "I tried to explain end-to-end encryption to my mum.",
+    "punchline": "She said 'So it's like whispering?' I said 'Yes, if whispering involved prime numbers the size of Wales.'",
+    "topic": "freedom tech"
+  },
+  {
+    "setup": "How many cypherpunks does it take to change a lightbulb?",
+    "punchline": "None. They'd rather sit in the dark than let the power company know which room they're in.",
+    "topic": "freedom tech"
+  },
+  {
+    "setup": "Self-custody is great. I'm my own bank now.",
+    "punchline": "Unfortunately, my bank has terrible opening hours, no customer support, and the manager keeps losing the passwords.",
+    "topic": "freedom tech"
+  },
+  {
+    "setup": "A surveillance state and a helicopter parent have a lot in common.",
+    "punchline": "They both read all your messages and insist it's for your own safety.",
+    "topic": "freedom tech"
+  },
+  {
+    "setup": "I told my friend I only use censorship-resistant platforms.",
+    "punchline": "He said 'That's brilliant, how do I find you?' I said 'Exactly.'",
+    "topic": "freedom tech"
+  },
+  {
+    "setup": "People say open-source software is free as in freedom, not free as in beer.",
+    "punchline": "But after 14 hours configuring it, you'll definitely need the beer as well.",
+    "topic": "freedom tech"
+  },
+  {
+    "setup": "My password manager holds 487 unique, high-entropy passwords.",
+    "punchline": "And they're all protected by one password I also use for my luggage.",
+    "topic": "freedom tech"
+  },
+  {
+    "setup": "My Meshtastic node has been running on solar for six months straight.",
+    "punchline": "It's the most committed relationship I've ever had; it never loses power and it always stays connected.",
+    "topic": "meshtastic"
+  },
+  {
+    "setup": "I told my wife I needed another LoRa radio for the house.",
+    "punchline": "She said we already have communication problems without adding more nodes to the mesh.",
+    "topic": "meshtastic"
+  },
+  {
+    "setup": "What's the difference between a Meshtastic user and a doomsday prepper?",
+    "punchline": "The Meshtastic user already has comms sorted and just needs to work on the tinned beans.",
+    "topic": "meshtastic"
+  },
+  {
+    "setup": "My message took 7 hops to reach my mate across town.",
+    "punchline": "Still faster than him replying to a WhatsApp.",
+    "topic": "meshtastic"
+  },
+  {
+    "setup": "I put a Meshtastic node on my roof, one in the shed, and one on the dog.",
+    "punchline": "The dog has the best SNR in the neighbourhood. He's a very good node boy.",
+    "topic": "meshtastic"
+  },
+  {
+    "setup": "A Meshtastic firmware update bricked my node last night.",
+    "punchline": "On the bright side, it's now the perfect paperweight for my off-grid survival plans.",
+    "topic": "meshtastic"
+  },
+  {
+    "setup": "I tried explaining Meshtastic to my parents. 'So it's like texting but without the internet, phone signal, or any infrastructure whatsoever.'",
+    "punchline": "My dad said, 'So it's like talking to your mother - the message goes out but you never know if it arrived.'",
+    "topic": "meshtastic"
+  },
+  {
+    "setup": "My range test hit 84 kilometres yesterday.",
+    "punchline": "The message just said 'test'. Eighty-four kilometres of radio engineering to transmit the least interesting word in the English language.",
+    "topic": "meshtastic"
+  },
+  {
+    "setup": "I've got 14 solar-powered Meshtastic nodes deployed across the countryside.",
+    "punchline": "My electricity bill is zero. My LoRa radio bill, however, suggests I may need an intervention.",
+    "topic": "meshtastic"
+  },
+  {
+    "setup": "The serial chat on my Meshtastic node keeps showing messages from someone called 'NODE_0xDEAD'.",
+    "punchline": "Either someone's got a dark sense of humour or my mesh network has ghosts. Either way, the SNR is immaculate.",
+    "topic": "meshtastic"
+  },
+  {
+    "setup": "My neighbour asked why I have antennas on every surface of my house.",
+    "punchline": "I said it's a mesh network. He said it looks like my house is trying to leave the planet. Fair point, the gain on that rooftop Yagi is absurd.",
+    "topic": "meshtastic"
+  },
+  {
+    "setup": "Meshtastic users don't have a fear of missing out.",
+    "punchline": "We have a fear of missing packets. Completely different anxiety, much worse treatment options.",
+    "topic": "meshtastic"
+  },
+  {
+    "setup": "I accidentally posted my nsec instead of my npub.",
+    "punchline": "Within thirty seconds I'd zapped myself 50,000 sats, mass-followed every Bitcoin influencer, and changed my display name to 'PWNED_LOL'. Honestly, the new followers were the worst part.",
+    "topic": "nostr"
+  },
+  {
+    "setup": "Nostr stands for 'Notes and Other Stuff Transmitted by Relays'.",
+    "punchline": "The 'other stuff' is mostly people arguing about which client is best. It's like Linux distro wars but everyone's paying each other sats to fight.",
+    "topic": "nostr"
+  },
+  {
+    "setup": "My mate submitted a NIP proposal for a new event kind to standardise how people complain about NIP proposals.",
+    "punchline": "It was rejected. Three people forked it. Two of those forks are now in production on clients nobody uses.",
+    "topic": "nostr"
+  },
+  {
+    "setup": "I run my own Nostr relay. It's very exclusive.",
+    "punchline": "The only users are me, three bots, and someone who accidentally connected while trying to set up their own relay. We're a tight-knit community.",
+    "topic": "nostr"
+  },
+  {
+    "setup": "What's the Nostr user's love language?",
+    "punchline": "Zaps. Nothing says 'I appreciate you' like mass-broadcasting a cryptographically signed Lightning payment to every relay on the planet.",
+    "topic": "nostr"
+  },
+  {
+    "setup": "I tried to explain Nostr key management to my nan.",
+    "punchline": "She said, 'So if I lose this one string of letters, I lose my entire identity forever with no recovery?' I said yes. She said that's just like her Tesco Clubcard situation.",
+    "topic": "nostr"
+  },
+  {
+    "setup": "There are now 47 Nostr clients to choose from.",
+    "punchline": "Each one renders the same note in a slightly different shade of purple and crashes on a completely unique set of event kinds.",
+    "topic": "nostr"
+  },
+  {
+    "setup": "A centralised social network bans you. A decentralised social network can't ban you.",
+    "punchline": "Instead, fifty relay operators individually decide they don't like you. Much more personal.",
+    "topic": "nostr"
+  },
+  {
+    "setup": "I set up a Nostr bot that auto-zaps anyone who posts something genuinely original.",
+    "punchline": "It's been running for three months. My Lightning wallet balance is completely untouched.",
+    "topic": "nostr"
+  },
+  {
+    "setup": "My therapist asked me to describe my relationship with social media.",
+    "punchline": "I said I maintain three npubs, subscribe to 200 relays, wrote two NIPs, and argue about protocol design at 2am. She said, 'So you left Twitter.' I said, 'I evolved.'",
+    "topic": "nostr"
+  },
+  {
+    "setup": "I bought a Handshake TLD at auction for 500 HNS.",
+    "punchline": "Now I own the entire '.cheese' namespace on a blockchain. ICANN could never. My mum says I should have spent the money on actual cheese.",
+    "topic": "handshake"
+  },
+  {
+    "setup": "ICANN charges hundreds of thousands to apply for a new TLD. Handshake lets you auction one for pocket change.",
+    "punchline": "The catch is that only seven people can resolve it, and three of them are the same person on different browsers.",
+    "topic": "handshake"
+  },
+  {
+    "setup": "I told a DNS engineer I was decentralising the root zone with blockchain technology.",
+    "punchline": "He stared at me for a full ten seconds, whispered 'but why', and then just walked into the sea.",
+    "topic": "handshake"
+  },
+  {
+    "setup": "Handshake name resolution is trustless, censorship-resistant, and fully decentralised.",
+    "punchline": "It's also fully optional, which is a polite way of saying almost no browser supports it natively. But apart from that - flawless.",
+    "topic": "handshake"
+  },
+  {
+    "setup": "I won a Handshake auction for the TLD '.bitcoin' in 2021.",
+    "punchline": "I've spent five years waiting for someone to want a domain on it. In the meantime, the name renewal fees have cost me more than the auction. This is what early adoption feels like.",
+    "topic": "handshake"
   }
 ]
