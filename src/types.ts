@@ -49,6 +49,7 @@ export interface LightningBackend {
 }
 
 import type { Currency, PricingEntry } from './core/payment-rail.js'
+import type { X402RailConfig } from './core/x402-types.js'
 
 /**
  * Pricing table mapping route patterns to amounts.
@@ -170,6 +171,9 @@ export interface BoothConfig {
    * When provided, the payment page shows a Cashu option.
    */
   redeemCashu?: (token: string, paymentHash: string) => Promise<number>
+
+  /** x402 stablecoin payment rail configuration. */
+  x402?: X402RailConfig
 
   /**
    * Timeout in milliseconds for upstream proxy requests.

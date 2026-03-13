@@ -11,6 +11,7 @@ export function createX402Rail(config: X402RailConfig): PaymentRail {
     facilitator,
     creditMode = true,
     facilitatorUrl,
+    storage,
   } = config
 
   return {
@@ -59,11 +60,20 @@ export function createX402Rail(config: X402RailConfig): PaymentRail {
           return { authenticated: false, paymentId: result.txHash || '', mode: 'per-request', currency: 'usd' }
         }
 
+        // Credit mode: persist balance to storage (mirrors L402 rail's settleWithCredit)
+        if (creditMode && storage && !storage.isSettled(result.txHash)) {
+          storage.settleWithCredit(result.txHash, result.amount, undefined, 'usd')
+        }
+
+        const creditBalance = creditMode && storage
+          ? storage.balance(result.txHash, 'usd')
+          : (creditMode ? result.amount : undefined)
+
         return {
           authenticated: true,
           paymentId: result.txHash,
           mode: creditMode ? 'credit' : 'per-request',
-          creditBalance: creditMode ? result.amount : undefined,
+          creditBalance,
           currency: 'usd',
         }
       } catch {

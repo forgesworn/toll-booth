@@ -24,6 +24,8 @@ export interface X402RailConfig {
   facilitator: X402Facilitator
   creditMode?: boolean  // default: true
   facilitatorUrl?: string
+  /** Storage backend — required for credit mode to persist balances. Injected by Booth. */
+  storage?: import('../storage/interface.js').StorageBackend
 }
 
 /** Default USDC contract addresses by network */

@@ -19,7 +19,8 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
   const freeTier = config.freeTier ? new FreeTier(config.freeTier.requestsPerDay) : null
   const storage = config.storage
 
-  // Auto-create L402Rail when rails not explicitly provided (backward compat)
+  // Booth always provides explicit rails. This fallback exists for direct
+  // createTollBooth() users who don't pass rails (backward compat).
   const rails = config.rails ?? [
     createL402Rail({
       rootKey: config.rootKey,
@@ -48,10 +49,10 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
         return { action: 'pass', upstream, headers: {} }
       }
 
-      // Effective cost in sats: explicit pricing, or defaultInvoiceAmount when strictPricing
-      const cost = pricedEntry !== undefined
-        ? (typeof pricedEntry === 'number' ? pricedEntry : (pricedEntry.sats ?? defaultAmount))
-        : defaultAmount
+      // Pricing for this route, normalised to PriceInfo
+      const priceInfo = typeof pricedEntry === 'number'
+        ? { sats: pricedEntry }
+        : (pricedEntry ?? { sats: defaultAmount })
 
       // Try each rail
       for (const rail of rails) {
@@ -59,9 +60,22 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
           const result = await Promise.resolve(rail.verify(req))
 
           if (result.authenticated) {
+            // Pick cost in the rail's currency
+            const cost = result.currency === 'usd'
+              ? (priceInfo.usd ?? 0)
+              : (priceInfo.sats ?? defaultAmount)
+
+            // Per-request replay protection: reject if already settled
+            if (result.mode === 'per-request') {
+              if (storage.isSettled(result.paymentId)) {
+                break  // fall through to challenge
+              }
+              storage.settle(result.paymentId)
+            }
+
             // Engine handles debit for credit mode
             if (result.mode === 'credit' && result.paymentId && cost > 0) {
-              const debit = storage.debit(result.paymentId, cost)
+              const debit = storage.debit(result.paymentId, cost, result.currency)
               if (!debit.success) {
                 // Insufficient balance — fall through to challenge
                 break
@@ -69,7 +83,7 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
             }
 
             const remaining = result.mode === 'credit'
-              ? storage.balance(result.paymentId)
+              ? storage.balance(result.paymentId, result.currency)
               : undefined
 
             // Fire onPayment exactly once per paymentHash (first time seen)
@@ -79,6 +93,7 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
                 timestamp: new Date().toISOString(),
                 paymentHash: result.paymentId,
                 amountSats: creditedAmount,
+                currency: result.currency,
               })
             }
 
@@ -115,6 +130,7 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
               latencyMs: Date.now() - start,
               authenticated: true,
               clientIp: req.ip,
+              currency: result.currency,
             })
 
             return {
@@ -203,11 +219,12 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
       }
       const delta = entry.cost - actualCost
       if (delta === 0) {
-        return { adjusted: false, newBalance: storage.balance(paymentHash), delta: 0 }
+        return { adjusted: false, newBalance: storage.balance(paymentHash, entry.currency), delta: 0 }
       }
-      const newBalance = storage.adjustCredits(paymentHash, delta)
+      const newBalance = storage.adjustCredits(paymentHash, delta, entry.currency)
       if (delta < 0) {
-        console.warn(`[toll-booth] Reconciliation: additional charge of ${-delta} sats for ${paymentHash}, new balance ${newBalance}`)
+        const unit = entry.currency === 'usd' ? 'cents' : 'sats'
+        console.warn(`[toll-booth] Reconciliation: additional charge of ${-delta} ${unit} for ${paymentHash}, new balance ${newBalance}`)
       }
       estimatedCosts.delete(paymentHash)
       return { adjusted: true, newBalance, delta }

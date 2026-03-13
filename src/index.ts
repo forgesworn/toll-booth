@@ -38,6 +38,9 @@ export type { PaymentRail, PriceInfo, PricingEntry, ChallengeFragment, RailVerif
 export { normalisePricing, normalisePricingTable } from './core/payment-rail.js'
 export { createL402Rail } from './core/l402-rail.js'
 export type { L402RailConfig } from './core/l402-rail.js'
+export { createX402Rail } from './core/x402-rail.js'
+export type { X402RailConfig, X402Facilitator, X402Payment, X402VerifyResult } from './core/x402-types.js'
+export { DEFAULT_USDC_ASSETS } from './core/x402-types.js'
 
 // Utilities
 export { mintMacaroon, verifyMacaroon, parseCaveats } from './macaroon.js'

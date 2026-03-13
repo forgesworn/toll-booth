@@ -1,11 +1,14 @@
 // src/booth.ts
 import type { BoothConfig, EventHandler } from './types.js'
 import { normalisePricingTable } from './core/payment-rail.js'
+import type { PaymentRail } from './core/payment-rail.js'
 import type { StorageBackend } from './storage/interface.js'
 import type { TollBoothEngine } from './core/toll-booth.js'
 import type { CreateInvoiceDeps } from './core/create-invoice.js'
 import type { InvoiceStatusDeps } from './core/invoice-status.js'
 import { createTollBooth } from './core/toll-booth.js'
+import { createL402Rail } from './core/l402-rail.js'
+import { createX402Rail } from './core/x402-rail.js'
 import { sqliteStorage } from './storage/sqlite.js'
 import { StatsCollector } from './stats.js'
 import { randomBytes } from 'node:crypto'
@@ -65,8 +68,8 @@ export class Booth {
   private readonly pruneTimer?: ReturnType<typeof setInterval>
 
   constructor(config: BoothOptions & EventHandler) {
-    if (!config.backend && !config.redeemCashu) {
-      throw new Error('At least one payment method required: provide a Lightning backend, redeemCashu callback, or both')
+    if (!config.backend && !config.redeemCashu && !config.x402) {
+      throw new Error('At least one payment method required: provide a Lightning backend, redeemCashu callback, or x402 config')
     }
 
     let rootKeyInput: string
@@ -100,6 +103,17 @@ export class Booth {
 
     const normalisedPricing = normalisePricingTable(config.pricing)
 
+    // Build payment rails array
+    const rails: PaymentRail[] = []
+
+    if (config.backend || config.redeemCashu) {
+      rails.push(createL402Rail({ rootKey: this.rootKey, storage: this.storage, defaultAmount, backend: config.backend }))
+    }
+
+    if (config.x402) {
+      rails.push(createX402Rail({ ...config.x402, storage: this.storage }))
+    }
+
     this.engine = createTollBooth({
       backend: config.backend,
       storage: this.storage,
@@ -111,6 +125,7 @@ export class Booth {
       freeTier: config.freeTier,
       strictPricing: config.strictPricing,
       creditTiers: config.creditTiers,
+      rails,
       onPayment: (event) => {
         stats.recordPayment(event)
         userOnPayment?.(event)

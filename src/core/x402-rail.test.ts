@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { createX402Rail } from './x402-rail.js'
 import type { X402Facilitator } from './x402-types.js'
+import { memoryStorage } from '../storage/memory.js'
 
 function mockFacilitator(overrides?: Partial<{ valid: boolean; txHash: string; amount: number; sender: string }>): X402Facilitator {
   return {
@@ -81,13 +82,15 @@ describe('X402Rail', () => {
   })
 
   describe('verify', () => {
-    it('verifies valid x402 payment (credit mode)', async () => {
+    it('verifies valid x402 payment (credit mode) and persists credits', async () => {
+      const storage = memoryStorage()
       const facilitator = mockFacilitator()
       const rail = createX402Rail({
         receiverAddress: '0xreceiver',
         network: 'base',
         facilitator,
         creditMode: true,
+        storage,
       })
 
       const payload = JSON.stringify({
@@ -100,6 +103,27 @@ describe('X402Rail', () => {
       expect(result.mode).toBe('credit')
       expect(result.creditBalance).toBe(500)
       expect(result.currency).toBe('usd')
+
+      // Credits persisted to storage in USD
+      expect(storage.balance('0xabc123', 'usd')).toBe(500)
+      expect(storage.isSettled('0xabc123')).toBe(true)
+    })
+
+    it('credit mode without storage still returns creditBalance from facilitator', async () => {
+      const rail = createX402Rail({
+        receiverAddress: '0xreceiver',
+        network: 'base',
+        facilitator: mockFacilitator(),
+        creditMode: true,
+      })
+
+      const payload = JSON.stringify({
+        signature: 'sig', sender: '0xs', amount: 500, network: 'base', nonce: 'n1',
+      })
+      const result = await rail.verify(makeRequest({ 'x-payment': payload }))
+
+      expect(result.authenticated).toBe(true)
+      expect(result.creditBalance).toBe(500)
     })
 
     it('verifies valid x402 payment (per-request mode)', async () => {
