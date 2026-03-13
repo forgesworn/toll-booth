@@ -2,7 +2,7 @@
 import { randomBytes } from 'node:crypto'
 import { FreeTier } from '../free-tier.js'
 import { createL402Rail } from './l402-rail.js'
-import { normalisePricingTable } from './payment-rail.js'
+import { normalisePricing, normalisePricingTable } from './payment-rail.js'
 import type { Currency } from './payment-rail.js'
 import type { TollBoothRequest, TollBoothResult, TollBoothCoreConfig, ReconcileResult } from './types.js'
 
@@ -50,9 +50,9 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
       }
 
       // Pricing for this route, normalised to PriceInfo
-      const priceInfo = typeof pricedEntry === 'number'
-        ? { sats: pricedEntry }
-        : (pricedEntry ?? { sats: defaultAmount })
+      const priceInfo = pricedEntry !== undefined
+        ? normalisePricing(pricedEntry)
+        : { sats: defaultAmount }
 
       // Try each rail
       for (const rail of rails) {

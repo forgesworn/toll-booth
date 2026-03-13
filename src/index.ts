@@ -34,8 +34,8 @@ export type { WebStandardHandler, WebStandardMiddlewareConfig } from './adapters
 export type { HonoTollBoothConfig, HonoTollBooth, PaymentAppConfig, TollBoothEnv } from './adapters/hono.js'
 
 // Payment rails
-export type { PaymentRail, PriceInfo, PricingEntry, ChallengeFragment, RailVerifyResult, SettleResult, Currency } from './core/payment-rail.js'
-export { normalisePricing, normalisePricingTable } from './core/payment-rail.js'
+export type { PaymentRail, PriceInfo, PricingEntry, TieredPricing, ChallengeFragment, RailVerifyResult, SettleResult, Currency } from './core/payment-rail.js'
+export { normalisePricing, normalisePricingTable, isTieredPricing } from './core/payment-rail.js'
 export { createL402Rail } from './core/l402-rail.js'
 export type { L402RailConfig } from './core/l402-rail.js'
 export { createX402Rail } from './core/x402-rail.js'

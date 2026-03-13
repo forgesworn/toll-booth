@@ -7,14 +7,33 @@ export interface PriceInfo {
   usd?: number
 }
 
-/** Accepts both number (backward-compat sats) and PriceInfo */
-export type PricingEntry = number | PriceInfo
+/** A tier map: keys are tier names (must include 'default'), values are prices. */
+export type TieredPricing = Record<string, number | PriceInfo>
+
+/** Accepts number (backward-compat sats), PriceInfo, or a tiered pricing map. */
+export type PricingEntry = number | PriceInfo | TieredPricing
+
+/**
+ * Type guard distinguishing TieredPricing from number | PriceInfo.
+ *
+ * PriceInfo uses 'sats' and/or 'usd' keys but never 'default', so the
+ * presence of a 'default' key reliably identifies a tiered pricing map.
+ */
+export function isTieredPricing(entry: PricingEntry): entry is TieredPricing {
+  if (typeof entry === 'number') return false
+  return 'default' in entry
+}
 
 export type PricingTable = Record<string, PricingEntry>
 
 /** Normalise a PricingEntry to PriceInfo. Numbers become { sats: n }. */
 export function normalisePricing(entry: PricingEntry): PriceInfo {
-  return typeof entry === 'number' ? { sats: entry } : entry
+  if (typeof entry === 'number') return { sats: entry }
+  if (isTieredPricing(entry)) {
+    const defaultValue = entry.default
+    return typeof defaultValue === 'number' ? { sats: defaultValue } : defaultValue
+  }
+  return entry
 }
 
 /** Normalise an entire PricingTable. */

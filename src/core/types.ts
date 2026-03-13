@@ -12,10 +12,11 @@ export interface TollBoothRequest {
   headers: Record<string, string | undefined>
   ip: string
   body?: ReadableStream | null
+  tier?: string
 }
 
 export type TollBoothResult =
-  | { action: 'proxy'; upstream: string; headers: Record<string, string>; paymentHash?: string; estimatedCost?: number; creditBalance?: number; freeRemaining?: number }
+  | { action: 'proxy'; upstream: string; headers: Record<string, string>; paymentHash?: string; estimatedCost?: number; creditBalance?: number; freeRemaining?: number; tier?: string }
   | { action: 'challenge'; status: 401 | 402; headers: Record<string, string>; body: Record<string, unknown> }
   | { action: 'pass'; upstream: string; headers: Record<string, string> }
 

@@ -73,6 +73,8 @@ export interface CreditTier {
   creditSats: number
   /** Human-readable label for this tier. */
   label: string
+  /** Pricing tier this credit tier belongs to (e.g. 'default', 'premium'). */
+  tier?: string
   /** x402 tier amount in cents (USD). */
   amountUsd?: number
   /** x402 tier credit in cents (USD). */
@@ -219,6 +221,7 @@ export interface RequestEvent {
   authenticated: boolean
   clientIp: string
   currency?: Currency
+  tier?: string
 }
 
 /**
