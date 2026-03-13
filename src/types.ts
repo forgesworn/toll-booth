@@ -48,7 +48,7 @@ export interface LightningBackend {
   checkInvoice(paymentHash: string): Promise<InvoiceStatus>
 }
 
-import type { PricingEntry } from './core/payment-rail.js'
+import type { Currency, PricingEntry } from './core/payment-rail.js'
 
 /**
  * Pricing table mapping route patterns to amounts.
@@ -72,6 +72,10 @@ export interface CreditTier {
   creditSats: number
   /** Human-readable label for this tier. */
   label: string
+  /** x402 tier amount in cents (USD). */
+  amountUsd?: number
+  /** x402 tier credit in cents (USD). */
+  creditUsd?: number
 }
 
 /**
@@ -194,6 +198,8 @@ export interface PaymentEvent {
   timestamp: string
   paymentHash: string
   amountSats: number
+  currency?: Currency  // 'sat' | 'usd', defaults to 'sat'
+  rail?: string        // 'l402' | 'x402' | custom
 }
 
 /**
@@ -208,6 +214,7 @@ export interface RequestEvent {
   latencyMs: number
   authenticated: boolean
   clientIp: string
+  currency?: Currency
 }
 
 /**
