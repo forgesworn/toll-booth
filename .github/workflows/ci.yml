@@ -23,7 +23,7 @@ jobs:
 
       - run: npm ci
       - run: npm run typecheck
-      - run: npm test
+      - run: npx vitest run --pool=forks
 
   integration:
     if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
