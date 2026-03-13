@@ -1,10 +1,10 @@
 import { newMacaroon, importMacaroon } from 'macaroon'
 
 const LOCATION = 'toll-booth'
-const KNOWN_CAVEATS = new Set(['payment_hash', 'credit_balance', 'route', 'expires', 'ip'])
+const KNOWN_CAVEATS = new Set(['payment_hash', 'credit_balance', 'currency', 'route', 'expires', 'ip'])
 
 /** Caveat keys that encode monetary value and must not be set via the caveats parameter. */
-const RESERVED_CAVEAT_KEYS = new Set(['payment_hash', 'credit_balance'])
+const RESERVED_CAVEAT_KEYS = new Set(['payment_hash', 'credit_balance', 'currency'])
 
 /**
  * Mints a new macaroon encoding a payment hash and credit balance.
@@ -14,7 +14,7 @@ const RESERVED_CAVEAT_KEYS = new Set(['payment_hash', 'credit_balance'])
  * @param creditBalanceSats - The credit balance in satoshis.
  * @returns Base64-encoded binary macaroon.
  */
-export function mintMacaroon(rootKey: string, paymentHash: string, creditBalanceSats: number, caveats?: string[]): string {
+export function mintMacaroon(rootKey: string, paymentHash: string, creditBalanceSats: number, caveats?: string[], currency?: string): string {
   const keyBytes = hexToBytes(rootKey)
   const m = newMacaroon({
     identifier: paymentHash,
@@ -24,6 +24,7 @@ export function mintMacaroon(rootKey: string, paymentHash: string, creditBalance
   })
   m.addFirstPartyCaveat(`payment_hash = ${paymentHash}`)
   m.addFirstPartyCaveat(`credit_balance = ${creditBalanceSats}`)
+  m.addFirstPartyCaveat(`currency = ${currency ?? 'sat'}`)
   if (caveats) {
     for (const caveat of caveats) {
       if (!caveat.includes(' = ')) {
@@ -64,6 +65,8 @@ export interface VerifyResult {
   paymentHash?: string
   /** The credit balance in satoshis extracted from the macaroon, if valid. */
   creditBalance?: number
+  /** The currency the credit balance is denominated in ('sat' or 'usd'). */
+  currency?: string
   /** Any non-built-in caveats present on the macaroon. */
   customCaveats?: Record<string, string>
 }
@@ -135,10 +138,13 @@ export function verifyMacaroon(rootKey: string, macaroonBase64: string, context?
       creditBalance = parsed
     }
 
+    const currency = caveats.currency ?? 'sat'
+
     return {
       valid: true,
       paymentHash: identifier,
       creditBalance,
+      currency,
       customCaveats: Object.keys(customCaveats).length > 0 ? customCaveats : undefined,
     }
   } catch {

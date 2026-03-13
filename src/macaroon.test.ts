@@ -90,13 +90,13 @@ describe('mintMacaroon with caveats', () => {
     const caveats = parseCaveats(mac)
     expect(caveats.payment_hash).toBe(paymentHash)
     expect(caveats.credit_balance).toBe('1000')
-    expect(Object.keys(caveats)).toHaveLength(2)
+    expect(Object.keys(caveats)).toHaveLength(3)
   })
 
   it('mints normally with empty caveats array', () => {
     const mac = mintMacaroon(rootKey, paymentHash, 1000, [])
     const caveats = parseCaveats(mac)
-    expect(Object.keys(caveats)).toHaveLength(2)
+    expect(Object.keys(caveats)).toHaveLength(3)
   })
 
   it('rejects caveats without = separator', () => {
@@ -233,6 +233,33 @@ describe('custom caveat extraction', () => {
     expect(result.valid).toBe(true)
     expect(result.customCaveats).toEqual({ model: 'llama3' })
     expect(result.customCaveats).not.toHaveProperty('route')
+  })
+})
+
+describe('currency caveat', () => {
+  const ROOT_KEY = 'a'.repeat(64)
+  const HASH = 'b'.repeat(64)
+
+  it('mints macaroon with currency caveat', () => {
+    const mac = mintMacaroon(ROOT_KEY, HASH, 1000, undefined, 'usd')
+    const caveats = parseCaveats(mac)
+    expect(caveats.currency).toBe('usd')
+  })
+
+  it('defaults to sat when no currency specified', () => {
+    const mac = mintMacaroon(ROOT_KEY, HASH, 1000)
+    const caveats = parseCaveats(mac)
+    expect(caveats.currency).toBe('sat')
+  })
+
+  it('verifyMacaroon returns currency in result', () => {
+    const mac = mintMacaroon(ROOT_KEY, HASH, 1000, undefined, 'usd')
+    const result = verifyMacaroon(ROOT_KEY, mac)
+    expect(result.currency).toBe('usd')
+  })
+
+  it('currency is a reserved caveat key', () => {
+    expect(() => mintMacaroon(ROOT_KEY, HASH, 1000, ['currency = sat'])).toThrow()
   })
 })
 
