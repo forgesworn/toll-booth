@@ -16,7 +16,8 @@ interface Joke {
   topic: string
 }
 
-const jokes: Joke[] = JSON.parse(readFileSync(resolve(__dirname, 'jokes.json'), 'utf-8'))
+const jokes: Joke[] = (JSON.parse(readFileSync(resolve(__dirname, 'jokes.json'), 'utf-8')) as Joke[])
+  .filter((j) => j.setup && j.punchline)
 const topics = [...new Set(jokes.map((j) => j.topic))]
 
 function randomJoke(topic?: string): Joke {
