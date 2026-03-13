@@ -495,3 +495,202 @@ describe('Cashu-only mode (no Lightning backend)', () => {
     }
   })
 })
+
+describe('tiered pricing', () => {
+  const tieredPricing = {
+    '/route': {
+      default: 5,
+      standard: 21,
+      premium: 42,
+    },
+  }
+
+  it('resolves default tier when no tier specified', async () => {
+    const { preimage, paymentHash } = makePreimageAndHash()
+    const storage = memoryStorage()
+    const engine = createTollBooth(makeConfig({ storage, pricing: tieredPricing }))
+
+    const macaroon = mintMacaroon(ROOT_KEY, paymentHash, 1000)
+    const result = await engine.handle(makeRequest({
+      headers: { authorization: `L402 ${macaroon}:${preimage}` },
+    }))
+
+    expect(result.action).toBe('proxy')
+    if (result.action === 'proxy') {
+      // default tier = 5 sats, not 42 (premium)
+      expect(result.creditBalance).toBe(995)
+    }
+  })
+
+  it('resolves tier from req.tier field', async () => {
+    const { preimage, paymentHash } = makePreimageAndHash()
+    const storage = memoryStorage()
+    const engine = createTollBooth(makeConfig({ storage, pricing: tieredPricing }))
+
+    const macaroon = mintMacaroon(ROOT_KEY, paymentHash, 1000)
+    const result = await engine.handle(makeRequest({
+      headers: { authorization: `L402 ${macaroon}:${preimage}` },
+      tier: 'premium',
+    }))
+
+    expect(result.action).toBe('proxy')
+    if (result.action === 'proxy') {
+      // premium tier = 42 sats
+      expect(result.creditBalance).toBe(958)
+    }
+  })
+
+  it('returns challenge for unknown tier', async () => {
+    const { preimage, paymentHash } = makePreimageAndHash()
+    const storage = memoryStorage()
+    const engine = createTollBooth(makeConfig({ storage, pricing: tieredPricing }))
+
+    const macaroon = mintMacaroon(ROOT_KEY, paymentHash, 1000)
+    const result = await engine.handle(makeRequest({
+      headers: { authorization: `L402 ${macaroon}:${preimage}` },
+      tier: 'nonexistent',
+    }))
+
+    expect(result.action).toBe('challenge')
+  })
+
+  it('rejects tier names with invalid characters', async () => {
+    const { preimage, paymentHash } = makePreimageAndHash()
+    const storage = memoryStorage()
+    const engine = createTollBooth(makeConfig({ storage, pricing: tieredPricing }))
+
+    const macaroon = mintMacaroon(ROOT_KEY, paymentHash, 1000)
+
+    for (const badTier of ['UPPERCASE', 'has spaces', 'special!chars', '../traversal', 'a'.repeat(33)]) {
+      const result = await engine.handle(makeRequest({
+        headers: { authorization: `L402 ${macaroon}:${preimage}` },
+        tier: badTier,
+      }))
+      expect(result.action).toBe('challenge')
+    }
+  })
+
+  it('flat pricing still works unchanged (tier is undefined)', async () => {
+    const { preimage, paymentHash } = makePreimageAndHash()
+    const storage = memoryStorage()
+    const engine = createTollBooth(makeConfig({
+      storage,
+      pricing: { '/route': 10 },
+    }))
+
+    const macaroon = mintMacaroon(ROOT_KEY, paymentHash, 1000)
+    const result = await engine.handle(makeRequest({
+      headers: { authorization: `L402 ${macaroon}:${preimage}` },
+    }))
+
+    expect(result.action).toBe('proxy')
+    if (result.action === 'proxy') {
+      expect(result.creditBalance).toBe(990)
+      expect(result.tier).toBeUndefined()
+    }
+  })
+
+  it('dual-currency tiered pricing resolves correctly', async () => {
+    const { preimage, paymentHash } = makePreimageAndHash()
+    const storage = memoryStorage()
+    const engine = createTollBooth(makeConfig({
+      storage,
+      pricing: {
+        '/route': {
+          default: { sats: 5, usd: 1 },
+          premium: { sats: 42, usd: 8 },
+        },
+      },
+    }))
+
+    const macaroon = mintMacaroon(ROOT_KEY, paymentHash, 1000)
+    const result = await engine.handle(makeRequest({
+      headers: { authorization: `L402 ${macaroon}:${preimage}` },
+      tier: 'premium',
+    }))
+
+    expect(result.action).toBe('proxy')
+    if (result.action === 'proxy') {
+      // premium sats cost = 42
+      expect(result.creditBalance).toBe(958)
+      expect(result.tier).toBe('premium')
+    }
+  })
+
+  it('tier included in RequestEvent callback', async () => {
+    const { preimage, paymentHash } = makePreimageAndHash()
+    const storage = memoryStorage()
+    const onRequest = vi.fn()
+    const engine = createTollBooth(makeConfig({
+      storage,
+      pricing: tieredPricing,
+      onRequest,
+    }))
+
+    const macaroon = mintMacaroon(ROOT_KEY, paymentHash, 1000)
+    await engine.handle(makeRequest({
+      headers: { authorization: `L402 ${macaroon}:${preimage}` },
+      tier: 'standard',
+    }))
+
+    expect(onRequest).toHaveBeenCalledTimes(1)
+    expect(onRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ tier: 'standard' }),
+    )
+  })
+
+  it('X-Toll-Tier header in proxy result headers', async () => {
+    const { preimage, paymentHash } = makePreimageAndHash()
+    const storage = memoryStorage()
+    const engine = createTollBooth(makeConfig({ storage, pricing: tieredPricing }))
+
+    const macaroon = mintMacaroon(ROOT_KEY, paymentHash, 1000)
+    const result = await engine.handle(makeRequest({
+      headers: { authorization: `L402 ${macaroon}:${preimage}` },
+      tier: 'premium',
+    }))
+
+    expect(result.action).toBe('proxy')
+    if (result.action === 'proxy') {
+      expect(result.headers['X-Toll-Tier']).toBe('premium')
+    }
+  })
+})
+
+describe('config validation and challenge tiers map', () => {
+  it('throws if tiered route has no default key', () => {
+    expect(() => createTollBooth(makeConfig({
+      pricing: { '/route': { standard: 21, premium: 42 } as any },
+    }))).toThrow(/default/)
+  })
+
+  it('challenge includes tiers map for tiered routes', async () => {
+    const engine = createTollBooth(makeConfig({
+      pricing: {
+        '/route': { default: 5, standard: 21, premium: 42 },
+      },
+    }))
+
+    const result = await engine.handle(makeRequest())
+    expect(result.action).toBe('challenge')
+    if (result.action === 'challenge') {
+      expect(result.body.tiers).toEqual({
+        default: { sats: 5 },
+        standard: { sats: 21 },
+        premium: { sats: 42 },
+      })
+    }
+  })
+
+  it('challenge omits tiers map for flat-priced routes', async () => {
+    const engine = createTollBooth(makeConfig({
+      pricing: { '/route': 10 },
+    }))
+
+    const result = await engine.handle(makeRequest())
+    expect(result.action).toBe('challenge')
+    if (result.action === 'challenge') {
+      expect(result.body.tiers).toBeUndefined()
+    }
+  })
+})

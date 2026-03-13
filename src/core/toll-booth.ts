@@ -2,8 +2,8 @@
 import { randomBytes } from 'node:crypto'
 import { FreeTier } from '../free-tier.js'
 import { createL402Rail } from './l402-rail.js'
-import { normalisePricing, normalisePricingTable } from './payment-rail.js'
-import type { Currency } from './payment-rail.js'
+import { normalisePricing, normalisePricingTable, isTieredPricing } from './payment-rail.js'
+import type { Currency, PriceInfo, TieredPricing } from './payment-rail.js'
 import type { TollBoothRequest, TollBoothResult, TollBoothCoreConfig, ReconcileResult } from './types.js'
 
 export interface TollBoothEngine {
@@ -13,7 +13,34 @@ export interface TollBoothEngine {
   upstream: string
 }
 
+/** Valid tier name: lowercase alphanumeric, hyphens, underscores; 1-32 chars. */
+const TIER_NAME_RE = /^[a-z0-9_-]{1,32}$/
+
+/** Normalise a single tier value (number or PriceInfo) to PriceInfo. */
+function normaliseTierValue(value: number | PriceInfo): PriceInfo {
+  return typeof value === 'number' ? { sats: value } : value
+}
+
+/** Build a normalised tiers map from a TieredPricing entry. */
+function normaliseTiersMap(entry: TieredPricing): Record<string, PriceInfo> {
+  const result: Record<string, PriceInfo> = {}
+  for (const [key, value] of Object.entries(entry)) {
+    result[key] = normaliseTierValue(value)
+  }
+  return result
+}
+
 export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
+  // Validate tiered pricing entries: each must have a 'default' key
+  for (const [route, entry] of Object.entries(config.pricing ?? {})) {
+    if (typeof entry === 'object' && !('sats' in entry) && !('usd' in entry)) {
+      // Looks like a tier map; verify it has 'default'
+      if (!('default' in entry)) {
+        throw new Error(`Tiered pricing for "${route}" must include a "default" key.`)
+      }
+    }
+  }
+
   const defaultAmount = config.defaultInvoiceAmount ?? 1000
   const upstream = config.upstream.replace(/\/$/, '')
   const freeTier = config.freeTier ? new FreeTier(config.freeTier.requestsPerDay) : null
@@ -44,15 +71,83 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
       const path = req.path
       const pricedEntry = config.pricing[path]
 
+      // Inner helper: issue a multi-rail 402 challenge for this route
+      async function issueChallenge(): Promise<TollBoothResult> {
+        const challengeHeaders: Record<string, string> = {}
+        const challengeBody: Record<string, unknown> = {}
+
+        const normalisedPrice = normalisedPricing[req.path] ?? { sats: defaultAmount }
+
+        for (const rail of rails) {
+          if (rail.canChallenge && !rail.canChallenge(normalisedPrice)) continue
+          const fragment = await rail.challenge(req.path, normalisedPrice)
+          Object.assign(challengeHeaders, fragment.headers)
+          Object.assign(challengeBody, fragment.body)
+        }
+
+        challengeBody.message = 'Payment required.'
+
+        // Include normalised tiers map for tiered routes
+        if (pricedEntry !== undefined && isTieredPricing(pricedEntry)) {
+          challengeBody.tiers = normaliseTiersMap(pricedEntry)
+        }
+
+        // Store invoice data from L402 rail if present
+        const l402Data = challengeBody.l402 as Record<string, unknown> | undefined
+        if (l402Data?.payment_hash) {
+          const paymentHash = l402Data.payment_hash as string
+          const statusToken = randomBytes(32).toString('hex')
+          storage.storeInvoice(
+            paymentHash,
+            (l402Data.invoice as string) ?? '',
+            defaultAmount,
+            l402Data.macaroon as string,
+            statusToken,
+            req.ip,
+          )
+          l402Data.payment_url = `/invoice-status/${paymentHash}?token=${statusToken}`
+          l402Data.status_token = statusToken
+        }
+
+        config.onChallenge?.({
+          timestamp: new Date().toISOString(),
+          endpoint: path,
+          amountSats: defaultAmount,
+          clientIp: req.ip,
+        })
+
+        return { action: 'challenge', status: 402, headers: challengeHeaders, body: challengeBody }
+      }
+
       // Unpriced routes: pass through unless strictPricing is enabled
       if (pricedEntry === undefined && !config.strictPricing) {
         return { action: 'pass', upstream, headers: {} }
       }
 
-      // Pricing for this route, normalised to PriceInfo
-      const priceInfo = pricedEntry !== undefined
-        ? normalisePricing(pricedEntry)
-        : { sats: defaultAmount }
+      // Tier-aware pricing resolution
+      let priceInfo: PriceInfo
+      let resolvedTier: string | undefined
+
+      if (pricedEntry !== undefined && isTieredPricing(pricedEntry)) {
+        const tierKey = req.tier ?? 'default'
+
+        // Validate tier name format
+        if (tierKey !== 'default' && !TIER_NAME_RE.test(tierKey)) {
+          return issueChallenge()
+        }
+
+        // Look up the requested tier
+        if (!(tierKey in pricedEntry)) {
+          return issueChallenge()
+        }
+
+        priceInfo = normaliseTierValue(pricedEntry[tierKey])
+        resolvedTier = tierKey
+      } else if (pricedEntry !== undefined) {
+        priceInfo = normalisePricing(pricedEntry)
+      } else {
+        priceInfo = { sats: defaultAmount }
+      }
 
       // Try each rail
       for (const rail of rails) {
@@ -116,6 +211,9 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
             if (remaining !== undefined) {
               headers['X-Credit-Balance'] = String(remaining)
             }
+            if (resolvedTier !== undefined) {
+              headers['X-Toll-Tier'] = resolvedTier
+            }
             if (result.customCaveats) {
               for (const [key, value] of Object.entries(result.customCaveats)) {
                 if (/^[a-zA-Z0-9_]+$/.test(key)) {
@@ -133,6 +231,7 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
               authenticated: true,
               clientIp: req.ip,
               currency: result.currency,
+              tier: resolvedTier,
             })
 
             return {
@@ -142,6 +241,7 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
               paymentHash: result.paymentId,
               estimatedCost: cost,
               creditBalance: remaining,
+              tier: resolvedTier,
             }
           }
 
@@ -172,46 +272,7 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
         }
       }
 
-      // Issue multi-rail challenge
-      const challengeHeaders: Record<string, string> = {}
-      const challengeBody: Record<string, unknown> = {}
-
-      const normalisedPrice = normalisedPricing[req.path] ?? { sats: defaultAmount }
-
-      for (const rail of rails) {
-        if (rail.canChallenge && !rail.canChallenge(normalisedPrice)) continue
-        const fragment = await rail.challenge(req.path, normalisedPrice)
-        Object.assign(challengeHeaders, fragment.headers)
-        Object.assign(challengeBody, fragment.body)
-      }
-
-      challengeBody.message = 'Payment required.'
-
-      // Store invoice data from L402 rail if present
-      const l402Data = challengeBody.l402 as Record<string, unknown> | undefined
-      if (l402Data?.payment_hash) {
-        const paymentHash = l402Data.payment_hash as string
-        const statusToken = randomBytes(32).toString('hex')
-        storage.storeInvoice(
-          paymentHash,
-          (l402Data.invoice as string) ?? '',
-          defaultAmount,
-          l402Data.macaroon as string,
-          statusToken,
-          req.ip,
-        )
-        l402Data.payment_url = `/invoice-status/${paymentHash}?token=${statusToken}`
-        l402Data.status_token = statusToken
-      }
-
-      config.onChallenge?.({
-        timestamp: new Date().toISOString(),
-        endpoint: path,
-        amountSats: defaultAmount,
-        clientIp: req.ip,
-      })
-
-      return { action: 'challenge', status: 402, headers: challengeHeaders, body: challengeBody }
+      return issueChallenge()
     },
 
     reconcile(paymentHash: string, actualCost: number): ReconcileResult {
