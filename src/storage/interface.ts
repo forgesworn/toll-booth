@@ -1,4 +1,5 @@
 // src/storage/interface.ts
+import type { Currency } from '../core/payment-rail.js'
 
 export interface DebitResult {
   success: boolean
@@ -20,17 +21,17 @@ export interface PendingClaim {
 }
 
 export interface StorageBackend {
-  credit(paymentHash: string, amount: number): void
-  debit(paymentHash: string, amount: number): DebitResult
-  balance(paymentHash: string): number
+  credit(paymentHash: string, amount: number, currency?: Currency): void
+  debit(paymentHash: string, amount: number, currency?: Currency): DebitResult
+  balance(paymentHash: string, currency?: Currency): number
   /** Adjust credits by delta. Positive = refund, negative = additional charge. Clamps to zero. Returns new balance. */
-  adjustCredits(paymentHash: string, delta: number): number
+  adjustCredits(paymentHash: string, delta: number, currency?: Currency): number
   /** Atomically mark a payment hash as settled. Returns true if newly settled, false if already was. */
   settle(paymentHash: string): boolean
   /** Check whether a payment hash has been settled. */
   isSettled(paymentHash: string): boolean
   /** Atomically settle and credit in one operation. Returns true if newly settled, false if already was. */
-  settleWithCredit(paymentHash: string, amount: number, settlementSecret?: string): boolean
+  settleWithCredit(paymentHash: string, amount: number, settlementSecret?: string, currency?: Currency): boolean
   /** Optional secret required for non-preimage L402 authorisation after settlement (e.g. Cashu flow). */
   getSettlementSecret(paymentHash: string): string | undefined
   /**

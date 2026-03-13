@@ -1,5 +1,6 @@
 // src/storage/memory.ts
 import { timingSafeEqual } from 'node:crypto'
+import type { Currency } from '../core/payment-rail.js'
 import type { StorageBackend, DebitResult, StoredInvoice, PendingClaim } from './interface.js'
 
 const DEFAULT_LEASE_MS = 30_000
@@ -15,37 +16,49 @@ function toStoredInvoice(record: StoredInvoiceRecord): StoredInvoice {
   }
 }
 
+interface DualBalance { sat: number; usd: number }
+
+function getBalance(balances: Map<string, DualBalance>, paymentHash: string, currency: Currency): number {
+  return balances.get(paymentHash)?.[currency] ?? 0
+}
+
+function setBalance(balances: Map<string, DualBalance>, paymentHash: string, currency: Currency, value: number): void {
+  const entry = balances.get(paymentHash) ?? { sat: 0, usd: 0 }
+  entry[currency] = value
+  balances.set(paymentHash, entry)
+}
+
 export function memoryStorage(): StorageBackend {
-  const balances = new Map<string, number>()
+  const balances = new Map<string, DualBalance>()
   const invoices = new Map<string, StoredInvoiceRecord>()
   const invoiceIps = new Map<string, string>()
   const settled = new Map<string, string | undefined>()
   const claims = new Map<string, { token: string; claimedAt: string; leaseExpiresAt: number }>()
 
   return {
-    credit(paymentHash: string, amount: number): void {
-      const current = balances.get(paymentHash) ?? 0
-      balances.set(paymentHash, current + amount)
+    credit(paymentHash: string, amount: number, currency: Currency = 'sat'): void {
+      const current = getBalance(balances, paymentHash, currency)
+      setBalance(balances, paymentHash, currency, current + amount)
     },
 
-    debit(paymentHash: string, amount: number): DebitResult {
-      const current = balances.get(paymentHash) ?? 0
+    debit(paymentHash: string, amount: number, currency: Currency = 'sat'): DebitResult {
+      const current = getBalance(balances, paymentHash, currency)
       if (current < amount) {
         return { success: false, remaining: current }
       }
       const remaining = current - amount
-      balances.set(paymentHash, remaining)
+      setBalance(balances, paymentHash, currency, remaining)
       return { success: true, remaining }
     },
 
-    balance(paymentHash: string): number {
-      return balances.get(paymentHash) ?? 0
+    balance(paymentHash: string, currency: Currency = 'sat'): number {
+      return getBalance(balances, paymentHash, currency)
     },
 
-    adjustCredits(paymentHash: string, delta: number): number {
-      const current = balances.get(paymentHash) ?? 0
+    adjustCredits(paymentHash: string, delta: number, currency: Currency = 'sat'): number {
+      const current = getBalance(balances, paymentHash, currency)
       const newBalance = Math.max(0, current + delta)
-      balances.set(paymentHash, newBalance)
+      setBalance(balances, paymentHash, currency, newBalance)
       return newBalance
     },
 
@@ -59,12 +72,12 @@ export function memoryStorage(): StorageBackend {
       return settled.has(paymentHash)
     },
 
-    settleWithCredit(paymentHash: string, amount: number, settlementSecret?: string): boolean {
+    settleWithCredit(paymentHash: string, amount: number, settlementSecret?: string, currency: Currency = 'sat'): boolean {
       if (settled.has(paymentHash)) return false
       settled.set(paymentHash, settlementSecret)
       claims.delete(paymentHash)
-      const current = balances.get(paymentHash) ?? 0
-      balances.set(paymentHash, current + amount)
+      const current = getBalance(balances, paymentHash, currency)
+      setBalance(balances, paymentHash, currency, current + amount)
       return true
     },
 

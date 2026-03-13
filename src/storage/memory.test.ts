@@ -348,6 +348,44 @@ describe('memoryStorage', () => {
     })
   })
 
+  // --- Dual-currency ---
+
+  describe('dual-currency', () => {
+    it('tracks sats balance separately from usd balance', () => {
+      const store = memoryStorage()
+      store.settleWithCredit('hash-a', 1000)              // defaults to sat
+      store.settleWithCredit('hash-b', 500, undefined, 'usd')
+      expect(store.balance('hash-a')).toBe(1000)           // sat
+      expect(store.balance('hash-b', 'usd')).toBe(500)     // usd
+    })
+
+    it('same hash can hold both currencies independently', () => {
+      const store = memoryStorage()
+      store.credit('hash-a', 1000)                         // sat
+      store.credit('hash-a', 200, 'usd')
+      expect(store.balance('hash-a')).toBe(1000)           // sat unchanged
+      expect(store.balance('hash-a', 'usd')).toBe(200)     // usd separate
+    })
+
+    it('debits from correct currency', () => {
+      const store = memoryStorage()
+      store.settleWithCredit('hash-a', 1000)
+      store.debit('hash-a', 100)                           // sat
+      expect(store.balance('hash-a')).toBe(900)
+
+      store.settleWithCredit('hash-b', 500, undefined, 'usd')
+      store.debit('hash-b', 50, 'usd')
+      expect(store.balance('hash-b', 'usd')).toBe(450)
+    })
+
+    it('adjustCredits works with currency', () => {
+      const store = memoryStorage()
+      store.settleWithCredit('hash-a', 1000, undefined, 'usd')
+      store.adjustCredits('hash-a', -200, 'usd')
+      expect(store.balance('hash-a', 'usd')).toBe(800)
+    })
+  })
+
   // --- Close ---
 
   describe('close', () => {
