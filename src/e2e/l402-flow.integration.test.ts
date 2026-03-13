@@ -70,12 +70,15 @@ describe.skipIf(!hasCredentials)('L402 end-to-end flow', () => {
     const challengeRes = await request('/api/route')
     expect(challengeRes.status).toBe(402)
 
-    const challenge = await challengeRes.json() as {
-      invoice: string
-      macaroon: string
-      payment_hash: string
-      amount_sats: number
+    const challengeBody = await challengeRes.json() as {
+      l402: {
+        invoice: string
+        macaroon: string
+        payment_hash: string
+        amount_sats: number
+      }
     }
+    const challenge = challengeBody.l402
     expect(challenge.invoice).toMatch(/^lnbc/)
     expect(challenge.macaroon).toBeTruthy()
     expect(challenge.payment_hash).toMatch(/^[0-9a-f]{64}$/)
@@ -121,10 +124,10 @@ describe.skipIf(!hasCredentials)('L402 end-to-end flow', () => {
     const challengeRes = await request('/api/route')
     expect(challengeRes.status).toBe(402)
 
-    const challenge = await challengeRes.json() as {
-      invoice: string
-      macaroon: string
+    const challengeBody = await challengeRes.json() as {
+      l402: { invoice: string; macaroon: string }
     }
+    const challenge = challengeBody.l402
 
     // Bob pays
     const payRes = await fetch(`${bobUrl}/v1/channels/transactions`, {

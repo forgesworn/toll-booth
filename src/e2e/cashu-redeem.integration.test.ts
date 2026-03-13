@@ -102,12 +102,15 @@ describe.skipIf(!RUN_INTEGRATION)('Cashu redemption integration (requires Nutshe
     // 1. Trigger a 402 to get a payment hash + macaroon
     const challengeRes = await request('/api/data')
     expect(challengeRes.status).toBe(402)
-    const challenge = await challengeRes.json() as {
-      payment_hash: string
-      macaroon: string
-      amount_sats: number
-      payment_url: string
+    const challengeBody = await challengeRes.json() as {
+      l402: {
+        payment_hash: string
+        macaroon: string
+        amount_sats: number
+        payment_url: string
+      }
     }
+    const challenge = challengeBody.l402
     const statusToken = extractStatusToken(challenge.payment_url)
 
     // 2. Mint Cashu proofs for the invoice amount
@@ -135,12 +138,15 @@ describe.skipIf(!RUN_INTEGRATION)('Cashu redemption integration (requires Nutshe
   it('idempotent: second redemption returns credited=0', async () => {
     // Trigger a 402
     const challengeRes = await request('/api/data')
-    const challenge = await challengeRes.json() as {
-      payment_hash: string
-      macaroon: string
-      amount_sats: number
-      payment_url: string
+    const challengeBody = await challengeRes.json() as {
+      l402: {
+        payment_hash: string
+        macaroon: string
+        amount_sats: number
+        payment_url: string
+      }
     }
+    const challenge = challengeBody.l402
     const statusToken = extractStatusToken(challenge.payment_url)
 
     // Mint and redeem
@@ -168,12 +174,15 @@ describe.skipIf(!RUN_INTEGRATION)('Cashu redemption integration (requires Nutshe
   it('Cashu-paid macaroon authorises access via L402 header', async () => {
     // Trigger a 402
     const challengeRes = await request('/api/data')
-    const challenge = await challengeRes.json() as {
-      payment_hash: string
-      macaroon: string
-      amount_sats: number
-      payment_url: string
+    const challengeBody = await challengeRes.json() as {
+      l402: {
+        payment_hash: string
+        macaroon: string
+        amount_sats: number
+        payment_url: string
+      }
     }
+    const challenge = challengeBody.l402
     const statusToken = extractStatusToken(challenge.payment_url)
 
     // Mint + redeem
