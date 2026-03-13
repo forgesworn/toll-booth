@@ -66,6 +66,14 @@ Your API earns money the moment it receives a request. Clients pay with Lightnin
 
 ---
 
+## See it in production
+
+[**token-toll**](https://github.com/TheCryptoDonkey/token-toll) is a pay-per-token AI inference proxy built on toll-booth. It monetises any OpenAI-compatible endpoint — Ollama, vLLM, llama.cpp — with one command. Token counting, model pricing, streaming reconciliation, capacity management. Everything else — payments, credits, free tier, macaroon auth — is toll-booth.
+
+~400 lines of product logic on top of the middleware. That's what "monetise any API with one line of code" looks like in practice.
+
+---
+
 ## Let AI agents pay for your API
 
 toll-booth is the **server side** of a two-part stack for machine-to-machine payments.
@@ -402,8 +410,8 @@ See [docs/configuration.md](docs/configuration.md) for the full reference includ
 | Project | Role |
 |---------|------|
 | **[toll-booth](https://github.com/TheCryptoDonkey/toll-booth)** | **Payment-rail agnostic HTTP 402 middleware** |
-| [token-toll](https://github.com/TheCryptoDonkey/token-toll) | Pay-per-token AI inference proxy (built on toll-booth) |
-| [l402-mcp](https://github.com/TheCryptoDonkey/l402-mcp) | MCP client — AI agents discover, pay, and consume L402 APIs |
+| [token-toll](https://github.com/TheCryptoDonkey/token-toll) | Production showcase — pay-per-token AI inference proxy (~400 lines on toll-booth) |
+| [l402-mcp](https://github.com/TheCryptoDonkey/l402-mcp) | Client side — AI agents discover, pay, and consume L402 APIs |
 
 ---
 
