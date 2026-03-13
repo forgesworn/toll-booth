@@ -56,6 +56,10 @@ jobs:
         with:
           node-version: 22
           cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - name: Upgrade npm for trusted publishing support
+        run: npm install -g npm@latest
 
       - run: npm ci --ignore-scripts
       - run: npm run build
