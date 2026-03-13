@@ -384,6 +384,21 @@ describe('memoryStorage', () => {
       store.adjustCredits('hash-a', -200, 'usd')
       expect(store.balance('hash-a', 'usd')).toBe(800)
     })
+
+    it('debit fails for uncredited currency even when other currency has funds', () => {
+      const store = memoryStorage()
+      store.credit('hash-a', 1000)  // sat
+      const result = store.debit('hash-a', 500, 'usd')
+      expect(result.success).toBe(false)
+      expect(result.remaining).toBe(0)
+      expect(store.balance('hash-a')).toBe(1000)  // sat untouched
+    })
+
+    it('balance returns 0 for uncredited currency', () => {
+      const store = memoryStorage()
+      store.credit('hash-a', 1000)  // sat
+      expect(store.balance('hash-a', 'usd')).toBe(0)
+    })
   })
 
   // --- Close ---
