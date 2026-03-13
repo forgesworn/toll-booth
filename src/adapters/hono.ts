@@ -51,6 +51,7 @@ export type TollBoothEnv = {
     tollBoothEstimatedCost: number | undefined
     tollBoothCreditBalance: number | undefined
     tollBoothFreeRemaining: number | undefined
+    tollBoothTier: string | undefined
   }
 }
 
@@ -110,6 +111,7 @@ export function createHonoTollBooth(config: HonoTollBoothConfig): HonoTollBooth 
       headers: Object.fromEntries(req.headers.entries()),
       ip,
       body: req.body,
+      tier: c.req.query('tier') ?? c.req.header('x-toll-tier'),
     }
 
     const result = await engine.handle(tollReq)
@@ -127,6 +129,7 @@ export function createHonoTollBooth(config: HonoTollBoothConfig): HonoTollBooth 
       c.set('tollBoothEstimatedCost', result.estimatedCost)
       c.set('tollBoothCreditBalance', result.creditBalance)
       c.set('tollBoothFreeRemaining', result.freeRemaining)
+      c.set('tollBoothTier', result.tier)
     }
     c.set('tollBoothAction', result.action)
 

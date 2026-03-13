@@ -129,11 +129,16 @@ export function createExpressMiddleware(
     try {
       const fullPath = (req.baseUrl + req.path).replace(/\/$/, '') || '/'
 
+      const rawTier = req.query.tier
+      const tier = (Array.isArray(rawTier) ? rawTier[0] : rawTier) as string | undefined
+        ?? (typeof req.headers['x-toll-tier'] === 'string' ? req.headers['x-toll-tier'] : undefined)
+
       const result = await engine.handle({
         method: req.method,
         path: fullPath,
         headers,
         ip,
+        tier,
       })
 
       if (result.action === 'pass' || result.action === 'proxy') {

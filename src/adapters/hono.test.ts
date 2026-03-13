@@ -155,6 +155,104 @@ describe('createHonoTollBooth', () => {
   })
 })
 
+describe('Hono adapter tier extraction', () => {
+  it('extracts tier from query param', async () => {
+    const { engine } = createTestEngine({
+      pricing: { '/api/test': { default: 10, premium: 25 } },
+    })
+    const handleSpy = vi.spyOn(engine, 'handle')
+    const { authMiddleware } = createHonoTollBooth({ engine })
+
+    const app = new Hono<TollBoothEnv>()
+    app.use('/api/test', authMiddleware)
+    app.get('/api/test', (c) => c.json({ tier: c.get('tollBoothTier') }))
+
+    // Mock to return a proxy result with tier set
+    handleSpy.mockResolvedValue({
+      action: 'proxy',
+      upstream: 'http://upstream.test',
+      headers: { 'X-Toll-Tier': 'premium' },
+      paymentHash: 'a'.repeat(64),
+      estimatedCost: 25,
+      creditBalance: 975,
+      tier: 'premium',
+    })
+
+    const res = await app.request('/api/test?tier=premium')
+    expect(res.status).toBe(200)
+    expect(handleSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ tier: 'premium' }),
+    )
+    const body = await res.json() as Record<string, unknown>
+    expect(body.tier).toBe('premium')
+
+    handleSpy.mockRestore()
+  })
+
+  it('falls back to X-Toll-Tier header when no query param', async () => {
+    const { engine } = createTestEngine({
+      pricing: { '/api/test': { default: 10, premium: 25 } },
+    })
+    const handleSpy = vi.spyOn(engine, 'handle')
+    const { authMiddleware } = createHonoTollBooth({ engine })
+
+    const app = new Hono<TollBoothEnv>()
+    app.use('/api/test', authMiddleware)
+    app.get('/api/test', (c) => c.json({ tier: c.get('tollBoothTier') }))
+
+    handleSpy.mockResolvedValue({
+      action: 'proxy',
+      upstream: 'http://upstream.test',
+      headers: { 'X-Toll-Tier': 'premium' },
+      paymentHash: 'a'.repeat(64),
+      estimatedCost: 25,
+      creditBalance: 975,
+      tier: 'premium',
+    })
+
+    const res = await app.request('/api/test', {
+      headers: { 'X-Toll-Tier': 'premium' },
+    })
+    expect(res.status).toBe(200)
+    expect(handleSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ tier: 'premium' }),
+    )
+
+    handleSpy.mockRestore()
+  })
+
+  it('sets tollBoothTier context variable from engine result', async () => {
+    const { engine } = createTestEngine({
+      pricing: { '/api/test': { default: 10, premium: 25 } },
+    })
+    const handleSpy = vi.spyOn(engine, 'handle')
+    const { authMiddleware } = createHonoTollBooth({ engine })
+
+    const app = new Hono<TollBoothEnv>()
+    app.use('/api/test', authMiddleware)
+    app.get('/api/test', (c) => {
+      return c.json({ tier: c.get('tollBoothTier') })
+    })
+
+    handleSpy.mockResolvedValue({
+      action: 'proxy',
+      upstream: 'http://upstream.test',
+      headers: { 'X-Toll-Tier': 'premium' },
+      paymentHash: 'a'.repeat(64),
+      estimatedCost: 25,
+      creditBalance: 975,
+      tier: 'premium',
+    })
+
+    const res = await app.request('/api/test?tier=premium')
+    expect(res.status).toBe(200)
+    const body = await res.json() as Record<string, unknown>
+    expect(body.tier).toBe('premium')
+
+    handleSpy.mockRestore()
+  })
+})
+
 // -- Helpers for payment route tests ------------------------------------------
 
 function createPaymentTestApp(storage: StorageBackend, rootKey: string) {

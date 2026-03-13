@@ -421,6 +421,123 @@ describe('Web Standard adapter', () => {
     })
   })
 
+  describe('tier extraction', () => {
+    it('extracts tier from query param', async () => {
+      const backend = mockBackend()
+      const storage = memoryStorage()
+      const engine = createTollBooth({
+        backend,
+        storage,
+        pricing: { '/route': { default: 10, premium: 25 } },
+        upstream: 'http://upstream.test',
+        rootKey: ROOT_KEY,
+      })
+
+      const handleSpy = vi.spyOn(engine, 'handle')
+      handleSpy.mockResolvedValue({
+        action: 'proxy',
+        upstream: 'http://upstream.test',
+        headers: { 'X-Toll-Tier': 'premium' },
+        paymentHash: 'a'.repeat(64),
+        estimatedCost: 25,
+        creditBalance: 975,
+        tier: 'premium',
+      })
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response('ok', { status: 200 }),
+      )
+
+      try {
+        const handler = createWebStandardMiddleware(engine, 'http://upstream.test')
+        const res = await handler(new Request('http://localhost/route?tier=premium', { method: 'GET' }))
+        expect(res.status).toBe(200)
+        expect(handleSpy).toHaveBeenCalledWith(
+          expect.objectContaining({ tier: 'premium' }),
+        )
+      } finally {
+        handleSpy.mockRestore()
+        fetchSpy.mockRestore()
+      }
+    })
+
+    it('falls back to X-Toll-Tier header when no query param', async () => {
+      const backend = mockBackend()
+      const storage = memoryStorage()
+      const engine = createTollBooth({
+        backend,
+        storage,
+        pricing: { '/route': { default: 10, premium: 25 } },
+        upstream: 'http://upstream.test',
+        rootKey: ROOT_KEY,
+      })
+
+      const handleSpy = vi.spyOn(engine, 'handle')
+      handleSpy.mockResolvedValue({
+        action: 'proxy',
+        upstream: 'http://upstream.test',
+        headers: { 'X-Toll-Tier': 'premium' },
+        paymentHash: 'a'.repeat(64),
+        estimatedCost: 25,
+        creditBalance: 975,
+        tier: 'premium',
+      })
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response('ok', { status: 200 }),
+      )
+
+      try {
+        const handler = createWebStandardMiddleware(engine, 'http://upstream.test')
+        const res = await handler(new Request('http://localhost/route', {
+          method: 'GET',
+          headers: { 'X-Toll-Tier': 'premium' },
+        }))
+        expect(res.status).toBe(200)
+        expect(handleSpy).toHaveBeenCalledWith(
+          expect.objectContaining({ tier: 'premium' }),
+        )
+      } finally {
+        handleSpy.mockRestore()
+        fetchSpy.mockRestore()
+      }
+    })
+
+    it('forwards X-Toll-Tier header from engine result to response', async () => {
+      const backend = mockBackend()
+      const storage = memoryStorage()
+      const engine = createTollBooth({
+        backend,
+        storage,
+        pricing: { '/route': { default: 10, premium: 25 } },
+        upstream: 'http://upstream.test',
+        rootKey: ROOT_KEY,
+      })
+
+      const handleSpy = vi.spyOn(engine, 'handle')
+      handleSpy.mockResolvedValue({
+        action: 'proxy',
+        upstream: 'http://upstream.test',
+        headers: { 'X-Toll-Tier': 'premium' },
+        paymentHash: 'a'.repeat(64),
+        estimatedCost: 25,
+        creditBalance: 975,
+        tier: 'premium',
+      })
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response('ok', { status: 200 }),
+      )
+
+      try {
+        const handler = createWebStandardMiddleware(engine, 'http://upstream.test')
+        const res = await handler(new Request('http://localhost/route?tier=premium', { method: 'GET' }))
+        expect(res.status).toBe(200)
+        expect(res.headers.get('x-toll-tier')).toBe('premium')
+      } finally {
+        handleSpy.mockRestore()
+        fetchSpy.mockRestore()
+      }
+    })
+  })
+
   it('rejects oversized JSON bodies without reading them into memory', async () => {
     const backend = mockBackend()
     const storage = memoryStorage()

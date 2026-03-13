@@ -447,6 +447,148 @@ describe('Express adapter', () => {
     })
   })
 
+  describe('tier extraction', () => {
+    async function makeUpstreamRecordingTier(): Promise<{
+      port: number
+      close: () => void
+      receivedHeaders: () => Record<string, string | undefined>
+    }> {
+      const { createServer: createHttpServer } = await import('node:http')
+      let lastHeaders: Record<string, string | undefined> = {}
+      const upstream = createHttpServer((req, res) => {
+        lastHeaders = {}
+        for (const [key, value] of Object.entries(req.headers)) {
+          lastHeaders[key] = Array.isArray(value) ? value[0] : value
+        }
+        res.writeHead(200, { 'Content-Type': 'text/plain' })
+        res.end('ok')
+      })
+      await new Promise<void>((r) => upstream.listen(0, r))
+      const port = (upstream.address() as { port: number }).port
+      return { port, close: () => upstream.close(), receivedHeaders: () => lastHeaders }
+    }
+
+    it('extracts tier from query param', async () => {
+      const backend = mockBackend()
+      const storage = memoryStorage()
+      const engine = createTollBooth({
+        backend,
+        storage,
+        pricing: { '/route': { default: 10, premium: 25 } },
+        upstream: 'http://127.0.0.1:0',
+        rootKey: ROOT_KEY,
+      })
+
+      const handleSpy = vi.spyOn(engine, 'handle')
+      const upstream = await makeUpstreamRecordingTier()
+
+      // Mock handle to return a pass-through proxy result
+      handleSpy.mockResolvedValue({
+        action: 'proxy',
+        upstream: `http://127.0.0.1:${upstream.port}`,
+        headers: { 'X-Toll-Tier': 'premium' },
+        paymentHash: 'a'.repeat(64),
+        estimatedCost: 25,
+        creditBalance: 975,
+        tier: 'premium',
+      })
+
+      const app = express()
+      app.use('/route', createExpressMiddleware({ engine, upstream: `http://127.0.0.1:${upstream.port}` }))
+
+      try {
+        const res = await request(app, '/route?tier=premium', { method: 'GET' })
+        expect(res.status).toBe(200)
+        expect(handleSpy).toHaveBeenCalledWith(
+          expect.objectContaining({ tier: 'premium' }),
+        )
+      } finally {
+        upstream.close()
+        handleSpy.mockRestore()
+      }
+    })
+
+    it('falls back to X-Toll-Tier header when no query param', async () => {
+      const backend = mockBackend()
+      const storage = memoryStorage()
+      const engine = createTollBooth({
+        backend,
+        storage,
+        pricing: { '/route': { default: 10, premium: 25 } },
+        upstream: 'http://127.0.0.1:0',
+        rootKey: ROOT_KEY,
+      })
+
+      const handleSpy = vi.spyOn(engine, 'handle')
+      const upstream = await makeUpstreamRecordingTier()
+
+      handleSpy.mockResolvedValue({
+        action: 'proxy',
+        upstream: `http://127.0.0.1:${upstream.port}`,
+        headers: { 'X-Toll-Tier': 'premium' },
+        paymentHash: 'a'.repeat(64),
+        estimatedCost: 25,
+        creditBalance: 975,
+        tier: 'premium',
+      })
+
+      const app = express()
+      app.use('/route', createExpressMiddleware({ engine, upstream: `http://127.0.0.1:${upstream.port}` }))
+
+      try {
+        const res = await request(app, '/route', {
+          method: 'GET',
+          headers: { 'X-Toll-Tier': 'premium' },
+        })
+        expect(res.status).toBe(200)
+        expect(handleSpy).toHaveBeenCalledWith(
+          expect.objectContaining({ tier: 'premium' }),
+        )
+      } finally {
+        upstream.close()
+        handleSpy.mockRestore()
+      }
+    })
+
+    it('forwards X-Toll-Tier header from engine result to upstream', async () => {
+      const backend = mockBackend()
+      const storage = memoryStorage()
+      const engine = createTollBooth({
+        backend,
+        storage,
+        pricing: { '/route': { default: 10, premium: 25 } },
+        upstream: 'http://127.0.0.1:0',
+        rootKey: ROOT_KEY,
+      })
+
+      const handleSpy = vi.spyOn(engine, 'handle')
+      const upstream = await makeUpstreamRecordingTier()
+
+      handleSpy.mockResolvedValue({
+        action: 'proxy',
+        upstream: `http://127.0.0.1:${upstream.port}`,
+        headers: { 'X-Toll-Tier': 'premium' },
+        paymentHash: 'a'.repeat(64),
+        estimatedCost: 25,
+        creditBalance: 975,
+        tier: 'premium',
+      })
+
+      const app = express()
+      app.use('/route', createExpressMiddleware({ engine, upstream: `http://127.0.0.1:${upstream.port}` }))
+
+      try {
+        const res = await request(app, '/route?tier=premium', { method: 'GET' })
+        expect(res.status).toBe(200)
+        // The engine result headers are set on the client response
+        expect(res.headers.get('x-toll-tier')).toBe('premium')
+      } finally {
+        upstream.close()
+        handleSpy.mockRestore()
+      }
+    })
+  })
+
   it('does not allow absolute-form request targets to override the configured upstream host', async () => {
     const backend = mockBackend()
     const storage = memoryStorage()

@@ -163,6 +163,7 @@ export function createWebStandardMiddleware(
       headers,
       ip,
       body: req.body,
+      tier: url.searchParams.get('tier') ?? req.headers.get('x-toll-tier') ?? undefined,
     })
 
     if (result.action === 'pass' || result.action === 'proxy') {
