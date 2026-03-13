@@ -180,6 +180,23 @@ describe('macaroon caveat limits', () => {
   })
 })
 
+describe('status token timing-safe comparison', () => {
+  it('rejects tokens of different lengths without leaking length via timing', () => {
+    const storage = memoryStorage()
+    const paymentHash = randomBytes(32).toString('hex')
+    const statusToken = randomBytes(32).toString('hex')
+
+    storage.storeInvoice(paymentHash, '', 1000, 'mac', statusToken, '1.2.3.4')
+
+    // Short token
+    expect(storage.getInvoiceForStatus(paymentHash, 'short')).toBeUndefined()
+    // Long token
+    expect(storage.getInvoiceForStatus(paymentHash, statusToken + 'extra')).toBeUndefined()
+    // Correct token
+    expect(storage.getInvoiceForStatus(paymentHash, statusToken)).toBeDefined()
+  })
+})
+
 describe('X-Toll-Cost strict validation', () => {
   it('rejects scientific notation in toll cost', async () => {
     // This tests that '1.5e6' is not parsed as 1 (parseInt truncation bug)

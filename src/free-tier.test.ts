@@ -24,6 +24,18 @@ describe('FreeTier', () => {
     expect(ft.check('5.6.7.8')).toEqual({ allowed: true, remaining: 9 })
   })
 
+  it('rejects non-IP strings to prevent tracking map pollution', () => {
+    expect(ft.check('not-an-ip')).toEqual({ allowed: false, remaining: 0 })
+    expect(ft.check('DROP TABLE')).toEqual({ allowed: false, remaining: 0 })
+    expect(ft.check('')).toEqual({ allowed: false, remaining: 0 })
+    expect(ft.check('<script>')).toEqual({ allowed: false, remaining: 0 })
+  })
+
+  it('accepts valid IPv6 addresses', () => {
+    expect(ft.check('::1')).toEqual({ allowed: true, remaining: 9 })
+    expect(ft.check('2001:db8::1')).toEqual({ allowed: true, remaining: 9 })
+  })
+
   it('resets after midnight UTC', () => {
     for (let i = 0; i < 10; i++) ft.check('1.2.3.4')
     expect(ft.check('1.2.3.4').allowed).toBe(false)

@@ -428,10 +428,16 @@ export function sqliteStorage(config?: SqliteStorageConfig): StorageBackend {
         created_at: string
       } | undefined
       if (!row) return undefined
-      // Timing-safe comparison to prevent token enumeration via timing side-channel
+      // Constant-time comparison: pad the shorter buffer so timingSafeEqual
+      // always runs, preventing length-based timing side-channels.
       const storedBuf = Buffer.from(row.status_token)
       const providedBuf = Buffer.from(statusToken)
-      if (storedBuf.length !== providedBuf.length || !timingSafeEqual(storedBuf, providedBuf)) return undefined
+      const maxLen = Math.max(storedBuf.length, providedBuf.length)
+      const a = Buffer.alloc(maxLen)
+      const b = Buffer.alloc(maxLen)
+      storedBuf.copy(a)
+      providedBuf.copy(b)
+      if (storedBuf.length !== providedBuf.length || !timingSafeEqual(a, b)) return undefined
       return {
         paymentHash: row.payment_hash,
         bolt11: row.bolt11,

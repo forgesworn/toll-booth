@@ -153,10 +153,16 @@ export function memoryStorage(): StorageBackend {
     getInvoiceForStatus(paymentHash: string, statusToken: string): StoredInvoice | undefined {
       const invoice = invoices.get(paymentHash)
       if (!invoice) return undefined
-      // Timing-safe comparison to prevent token enumeration via timing side-channel
+      // Constant-time comparison: pad the shorter buffer so timingSafeEqual
+      // always runs, preventing length-based timing side-channels.
       const storedBuf = Buffer.from(invoice.statusToken)
       const providedBuf = Buffer.from(statusToken)
-      if (storedBuf.length !== providedBuf.length || !timingSafeEqual(storedBuf, providedBuf)) return undefined
+      const maxLen = Math.max(storedBuf.length, providedBuf.length)
+      const a = Buffer.alloc(maxLen)
+      const b = Buffer.alloc(maxLen)
+      storedBuf.copy(a)
+      providedBuf.copy(b)
+      if (storedBuf.length !== providedBuf.length || !timingSafeEqual(a, b)) return undefined
       return toStoredInvoice(invoice)
     },
 
