@@ -70,7 +70,9 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
               if (storage.isSettled(result.paymentId)) {
                 break  // fall through to challenge
               }
-              storage.settle(result.paymentId)
+              if (!storage.settle(result.paymentId)) {
+                break  // lost race; another request settled first
+              }
             }
 
             // Engine handles debit for credit mode
@@ -189,7 +191,7 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
       const l402Data = challengeBody.l402 as Record<string, unknown> | undefined
       if (l402Data?.payment_hash) {
         const paymentHash = l402Data.payment_hash as string
-        const statusToken = randomBytes(16).toString('hex')
+        const statusToken = randomBytes(32).toString('hex')
         storage.storeInvoice(
           paymentHash,
           (l402Data.invoice as string) ?? '',

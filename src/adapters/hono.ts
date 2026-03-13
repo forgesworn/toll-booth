@@ -198,7 +198,7 @@ export function createHonoTollBooth(config: HonoTollBoothConfig): HonoTollBooth 
         return c.json({ error: 'Invalid payment hash' }, 400)
       }
       const token = c.req.query('token')
-      const statusToken = token || undefined
+      const statusToken = token && token.length <= 128 ? token : undefined
       const accept = c.req.header('accept') ?? ''
 
       try {

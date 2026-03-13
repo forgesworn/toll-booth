@@ -37,6 +37,7 @@ export function memoryStorage(): StorageBackend {
 
   return {
     credit(paymentHash: string, amount: number, currency: Currency = 'sat'): void {
+      if (amount <= 0) throw new RangeError('credit amount must be positive')
       const current = getBalance(balances, paymentHash, currency)
       setBalance(balances, paymentHash, currency, current + amount)
     },
@@ -162,7 +163,7 @@ export function memoryStorage(): StorageBackend {
       const cutoff = new Date(Date.now() - maxAgeMs).toISOString()
       let pruned = 0
       for (const [hash, inv] of invoices) {
-        if (inv.createdAt < cutoff) {
+        if (inv.createdAt < cutoff && !claims.has(hash)) {
           invoices.delete(hash)
           pruned++
         }

@@ -89,7 +89,7 @@ export async function handleCashuRedeem(
       return { success: false, state: 'pending', retryAfterMs: 2000 }
     }
   } catch (err) {
-    console.error('[toll-booth] Cashu redeem error:', err instanceof Error ? err.message : err)
+    console.error('[toll-booth] Cashu redeem error:', err instanceof Error ? err.constructor.name : 'unknown')
     return { success: false, error: 'Cashu redemption failed', status: 500 }
   }
 }

@@ -257,7 +257,14 @@ function clientScript(): string {
       if (!d.bolt11) return;
       // Update QR code in-place
       var qrWrap = document.getElementById('qr-wrap');
-      if (qrWrap && d.qr_svg) qrWrap.innerHTML = d.qr_svg;
+      if (qrWrap && d.qr_svg) {
+        var doc = new DOMParser().parseFromString(d.qr_svg, 'image/svg+xml');
+        var svg = doc.querySelector('svg');
+        if (svg && !doc.querySelector('parsererror')) {
+          qrWrap.textContent = '';
+          qrWrap.appendChild(document.importNode(svg, true));
+        }
+      }
       // Update invoice string
       var invStr = document.getElementById('invoice-str');
       if (invStr) invStr.textContent = d.bolt11;

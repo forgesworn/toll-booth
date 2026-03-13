@@ -219,7 +219,7 @@ describe('Booth', () => {
     expect(res.status).toBe(402)
 
     const body = await res.json()
-    expect(body.l402.payment_url).toMatch(new RegExp(`^/invoice-status/${paymentHash}\\?token=[0-9a-f]{32}$`))
+    expect(body.l402.payment_url).toMatch(new RegExp(`^/invoice-status/${paymentHash}\\?token=[0-9a-f]{64}$`))
     expect(body.l402.payment_hash).toBe(paymentHash)
 
     booth.close()

@@ -210,6 +210,7 @@ export function sqliteStorage(config?: SqliteStorageConfig): StorageBackend {
   const stmtPruneInvoices = db.prepare(`
     DELETE FROM invoices
     WHERE datetime(created_at) <= datetime('now', '-' || ? || ' seconds')
+      AND payment_hash NOT IN (SELECT payment_hash FROM claims)
   `)
 
   const stmtPruneZeroCredits = db.prepare(`
@@ -320,6 +321,7 @@ export function sqliteStorage(config?: SqliteStorageConfig): StorageBackend {
 
   return {
     credit(paymentHash: string, amount: number, currency: Currency = 'sat'): void {
+      if (amount <= 0) throw new RangeError('credit amount must be positive')
       if (currency === 'usd') {
         stmtCreditUsd.run(paymentHash, amount)
       } else {

@@ -151,7 +151,7 @@ describe('renderPaymentPage', () => {
     })
 
     // Should update QR in-place, not redirect
-    expect(html).toContain('qrWrap.innerHTML')
+    expect(html).toContain('qrWrap.appendChild')
     expect(html).not.toContain('window.location.href')
     // Should update the browser URL without reload
     expect(html).toContain('history.replaceState')
