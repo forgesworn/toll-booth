@@ -23,7 +23,8 @@ const MAX_BODY_BYTES = 65_536
 
 /**
  * Reject requests with Content-Length exceeding the body size limit.
- * Defence-in-depth; the consumer should also configure express.json({ limit: '64kb' }).
+ * Defence-in-depth fast-reject via header; does not guard chunked requests.
+ * The consumer MUST configure express.json({ limit: '64kb' }) for full enforcement.
  */
 function rejectOversizedBody(req: Request, res: Response): boolean {
   const cl = req.headers['content-length']

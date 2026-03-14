@@ -17,7 +17,7 @@ app.use(cors({
   exposedHeaders: ['WWW-Authenticate', 'X-Coverage', 'X-Credit-Balance', 'X-Free-Remaining'],
 }))
 
-app.use(express.json())
+app.use(express.json({ limit: '64kb' }))
 
 const booth = new Booth({
   adapter: 'express',
