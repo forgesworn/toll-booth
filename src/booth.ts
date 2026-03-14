@@ -29,6 +29,25 @@ import {
   createWebStandardCashuHandler,
 } from './adapters/web-standard.js'
 
+/**
+ * Shannon entropy over the raw bytes of a hex-encoded key.
+ * Returns true if the key has dangerously low entropy (< 2.0 bits per byte).
+ * A 32-byte key from `crypto.randomBytes(32)` typically has ~7.5+ bits/byte.
+ */
+function hasLowEntropy(hexKey: string): boolean {
+  const bytes = Buffer.from(hexKey, 'hex')
+  const freq = new Map<number, number>()
+  for (const b of bytes) {
+    freq.set(b, (freq.get(b) ?? 0) + 1)
+  }
+  let entropy = 0
+  for (const count of freq.values()) {
+    const p = count / bytes.length
+    entropy -= p * Math.log2(p)
+  }
+  return entropy < 2.0
+}
+
 export type AdapterType = 'express' | 'web-standard'
 
 export interface BoothOptions extends BoothConfig {
@@ -87,10 +106,10 @@ export class Booth {
     }
     this.rootKey = rootKeyInput.toLowerCase()
 
-    // Warn on trivially weak keys (all same character)
-    if (/^(.)\1{63}$/.test(this.rootKey)) {
+    // Warn on trivially weak keys
+    if (hasLowEntropy(this.rootKey)) {
       console.warn(
-        '[toll-booth] WARNING: rootKey has zero entropy (all identical characters). ' +
+        '[toll-booth] WARNING: rootKey has very low entropy. ' +
         'Use a cryptographically random key for production.',
       )
     }

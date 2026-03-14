@@ -19,6 +19,24 @@ import {
   stripProxyResponseHeaders,
 } from './proxy-headers.js'
 
+const MAX_BODY_BYTES = 65_536
+
+/**
+ * Reject requests with Content-Length exceeding the body size limit.
+ * Defence-in-depth; the consumer should also configure express.json({ limit: '64kb' }).
+ */
+function rejectOversizedBody(req: Request, res: Response): boolean {
+  const cl = req.headers['content-length']
+  if (cl !== undefined) {
+    const len = parseInt(cl as string, 10)
+    if (!Number.isFinite(len) || len > MAX_BODY_BYTES) {
+      res.status(413).json({ error: 'Request body too large' })
+      return true
+    }
+  }
+  return false
+}
+
 // -- Middleware ---------------------------------------------------------------
 
 /**
@@ -308,6 +326,7 @@ export function createExpressCreateInvoiceHandler(
   const deps = config.deps
 
   return async (req: Request, res: Response, _next: NextFunction) => {
+    if (rejectOversizedBody(req, res)) return
     const body = req.body ?? {}
     const ip = config.trustProxy
       ? parseForwardedIp(typeof req.headers['x-forwarded-for'] === 'string' ? req.headers['x-forwarded-for'] : undefined) ??
@@ -345,6 +364,7 @@ export function createExpressCreateInvoiceHandler(
  */
 export function createExpressNwcHandler(deps: NwcPayDeps): RequestHandler {
   return async (req: Request, res: Response, _next: NextFunction) => {
+    if (rejectOversizedBody(req, res)) return
     const body = req.body ?? {}
     const result = await handleNwcPay(deps, body)
     if (result.success) {
@@ -365,6 +385,7 @@ export function createExpressNwcHandler(deps: NwcPayDeps): RequestHandler {
  */
 export function createExpressCashuHandler(deps: CashuRedeemDeps): RequestHandler {
   return async (req: Request, res: Response, _next: NextFunction) => {
+    if (rejectOversizedBody(req, res)) return
     const body = req.body ?? {}
     const result = await handleCashuRedeem(deps, body)
     if (result.success) {

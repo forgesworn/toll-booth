@@ -43,7 +43,7 @@ export function createX402Rail(config: X402RailConfig): PaymentRail {
 
     async verify(req: TollBoothRequest): Promise<RailVerifyResult> {
       const raw = req.headers['x-payment']
-      if (!raw) {
+      if (!raw || raw.length > 4096) {
         return { authenticated: false, paymentId: '', mode: 'per-request', currency: 'usd' }
       }
 

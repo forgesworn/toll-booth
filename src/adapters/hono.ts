@@ -58,10 +58,16 @@ export type TollBoothEnv = {
 export interface HonoTollBoothConfig {
   engine: TollBoothEngine
   /**
+   * Trust `X-Forwarded-For` / `X-Real-IP` headers for client IP resolution.
+   * Only enable this when the Hono app runs behind a trusted reverse proxy.
+   * Defaults to `false` (ignores proxy headers, uses `'0.0.0.0'` fallback).
+   */
+  trustProxy?: boolean
+  /**
    * Custom callback to extract client IP from the Hono context.
    * Use this for platform-specific IP resolution (e.g. Cloudflare's
    * `CF-Connecting-IP`, or `X-Real-IP` behind a trusted reverse proxy).
-   * Falls back to `X-Forwarded-For` header if not provided.
+   * Takes precedence over `trustProxy` when provided.
    */
   getClientIp?: (c: Context) => string
 }
@@ -104,7 +110,7 @@ export function createHonoTollBooth(config: HonoTollBoothConfig): HonoTollBooth 
   const authMiddleware: MiddlewareHandler<TollBoothEnv> = async (c, next) => {
     const req = c.req.raw
     const ip = config.getClientIp?.(c)
-      ?? parseForwardedIp(c.req.header('x-forwarded-for'))
+      ?? (config.trustProxy ? parseForwardedIp(c.req.header('x-forwarded-for')) : undefined)
       ?? '0.0.0.0'
 
     const tollReq: TollBoothRequest = {
@@ -169,7 +175,7 @@ export function createHonoTollBooth(config: HonoTollBoothConfig): HonoTollBooth 
     app.post('/create-invoice', async (c) => {
       const ip = paymentConfig.getClientIp?.(c)
         ?? config.getClientIp?.(c)
-        ?? parseForwardedIp(c.req.header('x-forwarded-for'))
+        ?? (config.trustProxy ? parseForwardedIp(c.req.header('x-forwarded-for')) : undefined)
         ?? '0.0.0.0'
 
       const body = await safeParseJson<CreateInvoiceRequest>(c)
