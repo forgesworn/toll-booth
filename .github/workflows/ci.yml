@@ -72,3 +72,16 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
+
+  deploy-jokes:
+    needs: release
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Deploy sats-for-laughs to jokes.trotters.dev
+        uses: appleboy/ssh-action@v1
+        with:
+          host: 95.217.39.110
+          username: deploy
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: /opt/sats-for-laughs/deploy.sh
