@@ -113,7 +113,8 @@ curl -H "Authorization: L402 <macaroon>:<preimage>" https://jokes.trotters.dev/a
 - **Alternative payment methods** - Cashu ecash tokens
 - **Cashu-only mode** - no Lightning node required; ideal for serverless and edge deployments
 - **Credit system** - pre-paid balance with volume discount tiers
-- **Free tier** - configurable daily allowance per IP
+- **Free tier** - configurable daily allowance (IP-hashed, no PII stored)
+- **Privacy by design** - no personal data collected or stored; IP addresses are one-way hashed with a daily-rotating salt before any processing
 - **Self-service payment page** - QR codes, tier selector, wallet adapter buttons
 - **SQLite persistence** - WAL mode, automatic invoice expiry pruning
 - **Three framework adapters** - Express, Web Standard (Deno/Bun/Workers), and Hono
