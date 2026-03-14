@@ -77,10 +77,10 @@ Your API earns money the moment it receives a request. Clients pay with Lightnin
 ## Let AI agents pay for your API
 
 toll-booth is the **server side** of a two-part stack for machine-to-machine payments.
-[l402-mcp](https://github.com/TheCryptoDonkey/l402-mcp) is the **client side** - an MCP server that gives AI agents the ability to discover, pay, and consume L402-gated APIs autonomously.
+[402-mcp](https://github.com/TheCryptoDonkey/402-mcp) is the **client side** - an MCP server that gives AI agents the ability to discover, pay, and consume L402-gated APIs autonomously.
 
 ```
-AI Agent -> l402-mcp -> toll-booth -> Your API
+AI Agent -> 402-mcp -> toll-booth -> Your API
 ```
 
 An agent using Claude, GPT, or any MCP-capable model can call your API, receive a 402 payment challenge, pay the Lightning invoice from its wallet, and retry - all without human intervention. No OAuth dance, no API key rotation, no billing portal.
@@ -402,7 +402,7 @@ See [docs/configuration.md](docs/configuration.md) for the full reference includ
 
 **[Why L402?](docs/vision.md)** - the case for permissionless, machine-to-machine payments on the web.
 
-**[Architecture](docs/architecture.md)** - how toll-booth, satgate, and l402-mcp fit together.
+**[Architecture](docs/architecture.md)** - how toll-booth, satgate, and 402-mcp fit together.
 
 ---
 
@@ -412,7 +412,7 @@ See [docs/configuration.md](docs/configuration.md) for the full reference includ
 |---------|------|
 | **[toll-booth](https://github.com/TheCryptoDonkey/toll-booth)** | **Payment-rail agnostic HTTP 402 middleware** |
 | [satgate](https://github.com/TheCryptoDonkey/satgate) | Production showcase — pay-per-token AI inference proxy (~400 lines on toll-booth) |
-| [l402-mcp](https://github.com/TheCryptoDonkey/l402-mcp) | Client side — AI agents discover, pay, and consume L402 APIs |
+| [402-mcp](https://github.com/TheCryptoDonkey/402-mcp) | Client side — AI agents discover, pay, and consume L402 APIs |
 
 ---
 
