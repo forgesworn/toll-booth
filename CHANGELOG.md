@@ -1,3 +1,22 @@
+# [3.0.0](https://github.com/TheCryptoDonkey/toll-booth/compare/v2.0.0...v3.0.0) (2026-03-14)
+
+
+### Bug Fixes
+
+* hash IP in free tier tracking ([58cd10a](https://github.com/TheCryptoDonkey/toll-booth/commit/58cd10ac5ebcf11623bf22a22dbf78eb8d20d1ab))
+
+
+### Features
+
+* hash IP addresses before storage ([f752a9a](https://github.com/TheCryptoDonkey/toll-booth/commit/f752a9ac455f3a2db52420c599add701d4b51156))
+* remove clientIp from event types ([86d4d66](https://github.com/TheCryptoDonkey/toll-booth/commit/86d4d66cfe9fe2874526b766e3eed92d8816d38d))
+
+
+### BREAKING CHANGES
+
+* RequestEvent and ChallengeEvent no longer include
+clientIp field.
+
 # [2.0.0](https://github.com/TheCryptoDonkey/toll-booth/compare/v1.4.0...v2.0.0) (2026-03-14)
 
 
