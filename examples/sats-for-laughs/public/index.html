@@ -485,6 +485,7 @@
   var pollTimer = null;
   var currentBolt11 = null;
   var fetching = false;
+  var purchasedTier = 'default'; // tier associated with the selected payment bundle
 
   // -- Storage helpers --
   function getToken() {
@@ -656,11 +657,11 @@
     var tiersDiv = document.createElement('div');
     tiersDiv.className = 'tiers';
     var tiers = [
-      { amountSats: 5,   creditSats: 5,   label: '1 cracker' },
-      { amountSats: 21,  creditSats: 21,  label: '1 standard' },
-      { amountSats: 42,  creditSats: 42,  label: '1 premium' },
-      { amountSats: 100, creditSats: 105, label: '5 standard' },
-      { amountSats: 210, creditSats: 252, label: '6 premium' },
+      { amountSats: 5,   creditSats: 5,   label: '1 cracker',  tier: 'default' },
+      { amountSats: 21,  creditSats: 21,  label: '1 standard', tier: 'standard' },
+      { amountSats: 42,  creditSats: 42,  label: '1 premium',  tier: 'premium' },
+      { amountSats: 100, creditSats: 105, label: '5 standard', tier: 'standard' },
+      { amountSats: 210, creditSats: 252, label: '6 premium',  tier: 'premium' },
     ];
 
     tiers.forEach(function (tier, i) {
@@ -689,6 +690,7 @@
       btn.addEventListener('click', function () {
         tiersDiv.querySelectorAll('.tier-btn').forEach(function (b) { b.classList.remove('active'); });
         btn.classList.add('active');
+        purchasedTier = tier.tier;
         loadInvoice(tier.amountSats);
       });
 
@@ -742,6 +744,7 @@
     paymentArea.classList.add('visible');
 
     // Load the default tier invoice
+    purchasedTier = tiers[0].tier;
     await loadInvoice(tiers[0].amountSats);
   }
 
@@ -796,11 +799,10 @@
             setToken('L402 ' + macaroon + ':' + suffix);
           }
 
-          // Reset tier to default so the first joke always succeeds
-          // regardless of credit amount purchased
-          activeTier = 'default';
+          // Set tier to match the bundle the user just purchased
+          activeTier = purchasedTier;
           tierButtons.forEach(function (b) {
-            b.classList.toggle('active', b.dataset.tier === 'default');
+            b.classList.toggle('active', b.dataset.tier === purchasedTier);
           });
 
           // Re-fetch the joke
