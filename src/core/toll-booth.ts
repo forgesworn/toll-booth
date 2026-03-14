@@ -44,7 +44,11 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
 
   const defaultAmount = config.defaultInvoiceAmount ?? 1000
   const upstream = config.upstream.replace(/\/$/, '')
-  const freeTier = config.freeTier ? new FreeTier(config.freeTier.requestsPerDay) : null
+  const freeTier: IFreeTier | null = config.freeTier
+    ? 'requestsPerDay' in config.freeTier
+      ? new FreeTier(config.freeTier.requestsPerDay)
+      : new CreditFreeTier(config.freeTier.creditsPerDay)
+    : null
   const storage = config.storage
 
   // Booth always provides explicit rails. This fallback exists for direct
@@ -254,12 +258,19 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
 
       // No rail authenticated — check free tier
       if (freeTier) {
-        const check = freeTier.check(req.ip)
+        const routeCost = normalisedPricing[req.path]?.sats ?? defaultAmount
+
+        // NOTE: Credit-based free tier does not reconcile. The route cost
+        // is debited upfront. If actual usage is lower, the difference is
+        // not refunded to the daily budget. This is intentional — the free
+        // tier is a quota, not a wallet.
+        const check = freeTier.check(req.ip, routeCost)
+
         if (check.allowed) {
           config.onRequest?.({
             timestamp: new Date().toISOString(),
             endpoint: path,
-            satsDeducted: 0,
+            satsDeducted: freeTier instanceof CreditFreeTier ? routeCost : 0,
             remainingBalance: 0,
             latencyMs: Date.now() - start,
             authenticated: false,

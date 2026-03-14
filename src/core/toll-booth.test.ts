@@ -657,6 +657,69 @@ describe('tiered pricing', () => {
   })
 })
 
+describe('credit-based free tier', () => {
+  it('allows credit-based free tier requests (deducts route cost)', async () => {
+    const engine = createTollBooth(makeConfig({
+      freeTier: { creditsPerDay: 100 },
+      pricing: { '/route': 10 },
+    }))
+    const result = await engine.handle(makeRequest())
+    expect(result.action).toBe('proxy')
+    if (result.action === 'proxy') {
+      expect(result.freeRemaining).toBe(90)
+    }
+  })
+
+  it('challenges after credit-based free tier exhausted', async () => {
+    const engine = createTollBooth(makeConfig({
+      freeTier: { creditsPerDay: 5 },
+      pricing: { '/route': 10 },
+    }))
+    const result = await engine.handle(makeRequest())
+    expect(result.action).toBe('challenge')
+  })
+
+  it('credit-based free tier tracks cumulative usage across requests', async () => {
+    const engine = createTollBooth(makeConfig({
+      freeTier: { creditsPerDay: 25 },
+      pricing: { '/route': 10 },
+    }))
+    const r1 = await engine.handle(makeRequest({ ip: '1.2.3.4' }))
+    expect(r1.action).toBe('proxy')
+    const r2 = await engine.handle(makeRequest({ ip: '1.2.3.4' }))
+    expect(r2.action).toBe('proxy')
+    const r3 = await engine.handle(makeRequest({ ip: '1.2.3.4' }))
+    expect(r3.action).toBe('challenge')
+  })
+
+  it('credit-based free tier uses sats cost for dual-currency routes', async () => {
+    const engine = createTollBooth(makeConfig({
+      freeTier: { creditsPerDay: 50 },
+      pricing: { '/route': { sats: 15, usd: 1 } },
+    }))
+    const result = await engine.handle(makeRequest())
+    expect(result.action).toBe('proxy')
+    if (result.action === 'proxy') {
+      expect(result.freeRemaining).toBe(35)
+    }
+  })
+
+  it('fires onRequest with satsDeducted for credit-based free tier', async () => {
+    const onRequest = vi.fn()
+    const engine = createTollBooth(makeConfig({
+      freeTier: { creditsPerDay: 100 },
+      pricing: { '/route': 10 },
+      onRequest,
+    }))
+    await engine.handle(makeRequest())
+    expect(onRequest).toHaveBeenCalledTimes(1)
+    expect(onRequest).toHaveBeenCalledWith(expect.objectContaining({
+      authenticated: false,
+      satsDeducted: 10,
+    }))
+  })
+})
+
 describe('config validation and challenge tiers map', () => {
   it('throws if tiered route has no default key', () => {
     expect(() => createTollBooth(makeConfig({
