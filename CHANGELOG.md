@@ -1,3 +1,14 @@
+## [3.2.1](https://github.com/TheCryptoDonkey/toll-booth/compare/v3.2.0...v3.2.1) (2026-03-14)
+
+
+### Bug Fixes
+
+* chown /data directory for non-root Docker user ([77bf894](https://github.com/TheCryptoDonkey/toll-booth/commit/77bf894064920ceddf2933f8a02043fa58a3e666))
+* clarify Express body guard limitation and set explicit 64kb parser limit in example ([3907a76](https://github.com/TheCryptoDonkey/toll-booth/commit/3907a76adfe0db001ec513b6d2b41df2e8ec6f80))
+* exclude source maps from npm, fix example env var mismatch, run Docker as non-root ([6927cb4](https://github.com/TheCryptoDonkey/toll-booth/commit/6927cb403b5ccbb7b73e37147b924dfe6c721060))
+* harden IP resolution, body size limits, rootKey entropy, and x402 header validation ([4d380a2](https://github.com/TheCryptoDonkey/toll-booth/commit/4d380a23674c78e0a003a7f3515b133d34361ed9))
+* read X-Real-IP when trustProxy is enabled in Hono adapter ([0e39fdc](https://github.com/TheCryptoDonkey/toll-booth/commit/0e39fdcea2a78bbbfb8a5a35a6ea605d4d11eccb))
+
 # [3.2.0](https://github.com/TheCryptoDonkey/toll-booth/compare/v3.1.0...v3.2.0) (2026-03-14)
 
 
