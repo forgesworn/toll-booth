@@ -110,7 +110,10 @@ export function createHonoTollBooth(config: HonoTollBoothConfig): HonoTollBooth 
   const authMiddleware: MiddlewareHandler<TollBoothEnv> = async (c, next) => {
     const req = c.req.raw
     const ip = config.getClientIp?.(c)
-      ?? (config.trustProxy ? parseForwardedIp(c.req.header('x-forwarded-for')) : undefined)
+      ?? (config.trustProxy
+        ? (parseForwardedIp(c.req.header('x-forwarded-for'))
+          ?? parseForwardedIp(c.req.header('x-real-ip')))
+        : undefined)
       ?? '0.0.0.0'
 
     const tollReq: TollBoothRequest = {
@@ -175,7 +178,10 @@ export function createHonoTollBooth(config: HonoTollBoothConfig): HonoTollBooth 
     app.post('/create-invoice', async (c) => {
       const ip = paymentConfig.getClientIp?.(c)
         ?? config.getClientIp?.(c)
-        ?? (config.trustProxy ? parseForwardedIp(c.req.header('x-forwarded-for')) : undefined)
+        ?? (config.trustProxy
+          ? (parseForwardedIp(c.req.header('x-forwarded-for'))
+            ?? parseForwardedIp(c.req.header('x-real-ip')))
+          : undefined)
         ?? '0.0.0.0'
 
       const body = await safeParseJson<CreateInvoiceRequest>(c)
