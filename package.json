@@ -86,6 +86,7 @@
   },
   "files": [
     "dist",
+    "!dist/**/*.map",
     "llms.txt"
   ],
   "scripts": {
