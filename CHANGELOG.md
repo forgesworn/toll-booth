@@ -1,3 +1,10 @@
+## [3.0.1](https://github.com/TheCryptoDonkey/toll-booth/compare/v3.0.0...v3.0.1) (2026-03-14)
+
+
+### Bug Fixes
+
+* use purchased bundle tier for post-payment joke fetch ([81cf55c](https://github.com/TheCryptoDonkey/toll-booth/commit/81cf55c5cc49903dea058eef0309065d7a26f45d))
+
 # [3.0.0](https://github.com/TheCryptoDonkey/toll-booth/compare/v2.0.0...v3.0.0) (2026-03-14)
 
 
