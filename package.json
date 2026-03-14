@@ -1,6 +1,6 @@
 {
   "name": "@thecryptodonkey/toll-booth",
-  "version": "1.3.1",
+  "version": "1.0.0",
   "type": "module",
   "description": "Monetise any API with HTTP 402 payments. Payment-rail agnostic middleware for Express, Hono, Deno, Bun, and Workers.",
   "license": "MIT",
