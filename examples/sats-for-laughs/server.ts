@@ -164,7 +164,7 @@ app.listen(port, async () => {
 
       let announceKey = process.env.ANNOUNCE_KEY ?? ''
       if (!announceKey) {
-        const keyDir = join(homedir(), '.sats-for-laughs')
+        const keyDir = process.env.DATA_DIR ?? join(homedir(), '.sats-for-laughs')
         const keyPath = join(keyDir, 'announce.key')
         try {
           announceKey = readFileSync(keyPath, 'utf-8').trim()
