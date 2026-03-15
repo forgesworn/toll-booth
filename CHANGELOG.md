@@ -1,3 +1,13 @@
+## [3.2.3](https://github.com/TheCryptoDonkey/toll-booth/compare/v3.2.2...v3.2.3) (2026-03-15)
+
+
+### Bug Fixes
+
+* Cashu amount mismatch warning, IPv4 octet validation, memory pruning ([c40668a](https://github.com/TheCryptoDonkey/toll-booth/commit/c40668abff0b65effd94ee64981545d70b06b00a))
+* harden demo body limit, Express getClientIp passthrough ([f1058b7](https://github.com/TheCryptoDonkey/toll-booth/commit/f1058b70ac9ed2caed33b41abf2604cbf4ba65a8))
+* preserve settlement markers in memory storage pruning ([9910760](https://github.com/TheCryptoDonkey/toll-booth/commit/99107605b7c92f2e7af92fec07e0f59637e0d261))
+* use random settlement secret for x402 instead of public txHash ([9c5deb7](https://github.com/TheCryptoDonkey/toll-booth/commit/9c5deb7b6e6f3c837527ac419f3ced0038bfc16c))
+
 ## [3.2.2](https://github.com/TheCryptoDonkey/toll-booth/compare/v3.2.1...v3.2.2) (2026-03-15)
 
 
