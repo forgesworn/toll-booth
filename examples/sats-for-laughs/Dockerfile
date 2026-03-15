@@ -15,6 +15,7 @@ WORKDIR /app
 COPY --from=toll-booth-build /toll-booth/toll-booth.tgz ./
 COPY examples/sats-for-laughs/package.json ./
 RUN sed -i 's|file:../../|file:./toll-booth.tgz|' package.json
+ARG CACHEBUST
 RUN npm install
 COPY examples/sats-for-laughs/server.ts ./
 COPY examples/sats-for-laughs/jokes.json ./

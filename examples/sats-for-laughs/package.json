@@ -8,7 +8,7 @@
     "generate-jokes": "node --import tsx scripts/generate-jokes.ts"
   },
   "dependencies": {
-    "402-announce": "^1.2.0",
+    "402-announce": "latest",
     "@thecryptodonkey/toll-booth": "file:../../",
     "express": "^5.2.1"
   },
