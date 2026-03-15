@@ -85,6 +85,7 @@ export class Booth {
   private readonly rootKey: string
   private readonly redeemCashu?: (token: string, paymentHash: string) => Promise<number>
   private readonly pruneTimer?: ReturnType<typeof setInterval>
+  private closed = false
 
   constructor(config: BoothOptions & EventHandler) {
     if (!config.backend && !config.redeemCashu && !config.x402) {
@@ -250,8 +251,8 @@ export class Booth {
     // Auto-recover any pending Cashu claims from a previous crash
     if (this.redeemCashu) {
       const fn = this.redeemCashu
-      this.recoverPendingClaims(fn).catch(() => {
-        // Recovery failures are non-fatal; claims stay pending for next restart
+      this.recoverPendingClaims(fn).catch((err) => {
+        console.warn('[toll-booth] Cashu recovery failed:', err instanceof Error ? err.message : err)
       })
     }
   }
@@ -279,12 +280,15 @@ export class Booth {
     let recovered = 0
     const renewIntervalMs = Math.max(1_000, Math.floor(REDEEM_LEASE_MS / 2))
     for (const claim of claims) {
+      if (this.closed) break
+
       // Respect active leases so startup recovery does not race in-flight requests
       // (or another process already handling this claim).
       const leasedClaim = this.storage.tryAcquireRecoveryLease(claim.paymentHash, REDEEM_LEASE_MS)
       if (!leasedClaim) continue
 
       const timer = setInterval(() => {
+        if (this.closed) { clearInterval(timer); return }
         this.storage.extendRecoveryLease(leasedClaim.paymentHash, REDEEM_LEASE_MS)
       }, renewIntervalMs)
 
@@ -313,6 +317,7 @@ export class Booth {
   }
 
   close(): void {
+    this.closed = true
     if (this.pruneTimer) clearInterval(this.pruneTimer)
     this.storage.close()
   }
