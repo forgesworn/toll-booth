@@ -290,6 +290,15 @@ export class Booth {
 
       try {
         const credited = await redeemFn(leasedClaim.token, leasedClaim.paymentHash)
+        // Guard against overpayment (same check as handleCashuRedeem)
+        const invoice = this.storage.getInvoice(leasedClaim.paymentHash)
+        if (invoice?.amountSats !== undefined && credited > invoice.amountSats) {
+          console.warn(
+            `[toll-booth] Recovery: rejecting overpayment for ${leasedClaim.paymentHash}: ` +
+            `expected ${invoice.amountSats}, got ${credited}`,
+          )
+          continue
+        }
         if (this.storage.settleWithCredit(leasedClaim.paymentHash, credited)) {
           recovered++
         }
