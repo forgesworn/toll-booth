@@ -61,6 +61,9 @@ export async function handleCashuRedeem(
           if (credited < 0) {
             return { success: false, error: 'Redeem callback returned negative amount', status: 500 }
           }
+          if (invoice.amountSats !== undefined && credited > invoice.amountSats) {
+            return { success: false, error: 'Redeemed amount exceeds invoice amount', status: 400 }
+          }
           const settlementSecret = randomBytes(32).toString('hex')
           const newlySettled = deps.storage.settleWithCredit(paymentHash, credited, settlementSecret)
           return {
