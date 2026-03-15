@@ -17,11 +17,6 @@ export function stripProxyRequestHeaders(source: HeaderSource): Headers {
   const disallowed = collectDisallowedHeaders(headers)
   disallowed.add('authorization')
   disallowed.add('host')
-  disallowed.add('cookie')
-  disallowed.add('x-forwarded-for')
-  disallowed.add('x-forwarded-host')
-  disallowed.add('x-forwarded-proto')
-  disallowed.add('x-real-ip')
 
   for (const name of disallowed) {
     headers.delete(name)
