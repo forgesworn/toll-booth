@@ -1,12 +1,12 @@
 # toll-booth
 
-> toll-booth lets AI agents discover, pay for, and consume any HTTP API using Lightning, Cashu, or NWC - no accounts, no API keys, no human in the loop. It's L402 payment middleware that embeds in your Node.js app as middleware, supporting Express 5, Deno, Bun, and Cloudflare Workers.
+> toll-booth lets AI agents discover, pay for, and consume any HTTP API using Lightning, Cashu, NWC, or x402 stablecoins - no accounts, no API keys, no human in the loop. It's payment-rail agnostic HTTP 402 middleware that embeds in your Node.js app, supporting Express 5, Hono, Deno, Bun, and Cloudflare Workers.
 
-toll-booth embeds in your existing Node.js application as middleware (not a separate proxy). It supports Express 5, Deno, Bun, and Cloudflare Workers. Five Lightning backends are supported (Phoenixd, LND, Core Lightning, LNbits, NWC), or you can run in Cashu-only mode with no Lightning node at all — ideal for serverless and edge deployments.
+toll-booth embeds in your existing Node.js application as middleware (not a separate proxy). It supports Express 5, Hono, Deno, Bun, and Cloudflare Workers. Five Lightning backends are supported (Phoenixd, LND, Core Lightning, LNbits, NWC), or you can run in Cashu-only mode with no Lightning node at all - ideal for serverless and edge deployments. x402 stablecoin payments (Coinbase's on-chain payment protocol) are also supported via a pluggable payment rail.
 
-The closest alternative is Aperture (Lightning Labs), a Go reverse proxy that requires LND. toll-booth is TypeScript middleware that works with any Lightning backend, runs serverless, and supports Cashu ecash payments.
+The closest alternative is Aperture (Lightning Labs), a Go reverse proxy that requires LND. toll-booth is TypeScript middleware that works with any Lightning backend, runs serverless, supports Cashu ecash, and accepts x402 stablecoins.
 
-Compared to x402 (Coinbase's on-chain stablecoin payment protocol), toll-booth settles in milliseconds over Lightning instead of waiting for block confirmations, charges fractions-of-a-sat routing fees instead of gas, and works with any Lightning wallet - no Coinbase dependency. As USDT-over-Lightning bridges go live, toll-booth APIs automatically accept stablecoins with zero code changes.
+Payment rails are pluggable - a single toll-booth deployment can accept Lightning, Cashu, and x402 stablecoins simultaneously. The seller doesn't care how they get paid.
 
 Try it instantly: `npx @thecryptodonkey/toll-booth demo`
 
@@ -62,7 +62,8 @@ const booth = new Booth({
 - **Payment methods** — Lightning (via any backend), Cashu ecash tokens (via `redeemCashu` callback), or Nostr Wallet Connect (via `nwcPayInvoice` callback). Methods can be combined.
 - **Credit system** — payments grant a credit balance. Each request deducts from the balance. Volume discount tiers available via `creditTiers`.
 - **Free tier** — optional per-IP daily allowance. Request-based: `freeTier: { requestsPerDay: N }`. Usage-based: `freeTier: { creditsPerDay: N }` (daily sats budget debited by each request's cost). Requests within the allowance bypass payment.
-- **Adapters** — `'express'` for Express 4/5, `'web-standard'` for Deno, Bun, and Cloudflare Workers.
+- **Payment rails** — pluggable payment rail abstraction (`PaymentRail` interface). Built-in rails: `createL402Rail()` for Lightning/macaroon auth, `createX402Rail()` for on-chain stablecoin payments. Multiple rails can run simultaneously on the same deployment.
+- **Adapters** — `'express'` for Express 4/5, `'web-standard'` for Deno, Bun, and Cloudflare Workers, `'hono'` for Hono. For Hono, use `createHonoTollBooth()` directly for idiomatic integration (auth middleware + payment route sub-app).
 
 ## API Surface
 
@@ -78,6 +79,11 @@ Subpath imports for tree-shaking:
 - `@thecryptodonkey/toll-booth/storage/memory` — in-memory storage (testing)
 - `@thecryptodonkey/toll-booth/adapters/express` — Express middleware factory
 - `@thecryptodonkey/toll-booth/adapters/web-standard` — Web Standard handler factory
+- `@thecryptodonkey/toll-booth/hono` — Hono middleware + payment route sub-app (`createHonoTollBooth`)
+
+Payment rail factories (for multi-rail setups):
+- `createL402Rail(config)` — L402 Lightning + macaroon rail
+- `createX402Rail(config)` — x402 on-chain stablecoin rail (requires a facilitator)
 
 Booth instance properties:
 - `.middleware` — main request handler (checks auth, proxies upstream)

@@ -27,7 +27,9 @@
     "api-monetisation",
     "payment-gateway",
     "ai-agents",
-    "machine-payments"
+    "machine-payments",
+    "api-monetization",
+    "x402"
   ],
   "repository": {
     "type": "git",
