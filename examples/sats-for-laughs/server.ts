@@ -153,6 +153,11 @@ app.listen(port, async () => {
   }
   const announceRelays = (process.env.ANNOUNCE_RELAYS ?? '').split(',').map(r => r.trim()).filter(Boolean)
   const publicUrl = process.env.PUBLIC_URL
+  if (!publicUrl) {
+    console.warn('  ⚠ PUBLIC_URL not set — skipping Nostr announcement (service will not be discoverable)')
+  } else if (announceRelays.length === 0) {
+    console.warn('  ⚠ ANNOUNCE_RELAYS not set — skipping Nostr announcement (service will not be discoverable)')
+  }
   if (announceRelays.length > 0 && publicUrl) {
     try {
       const { announceService } = await import('402-announce')
