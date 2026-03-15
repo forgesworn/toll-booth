@@ -1,3 +1,10 @@
+# [3.4.0](https://github.com/TheCryptoDonkey/toll-booth/compare/v3.3.1...v3.4.0) (2026-03-15)
+
+
+### Features
+
+* include credit_tiers in 402 body and accept custom top-up amounts ([0c1943c](https://github.com/TheCryptoDonkey/toll-booth/commit/0c1943c26aefad9017d01da738834f4c1e36233c))
+
 ## [3.3.1](https://github.com/TheCryptoDonkey/toll-booth/compare/v3.3.0...v3.3.1) (2026-03-15)
 
 
