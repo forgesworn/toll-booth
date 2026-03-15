@@ -9,6 +9,7 @@ import type { InvoiceStatusDeps } from './core/invoice-status.js'
 import { createTollBooth } from './core/toll-booth.js'
 import { createL402Rail } from './core/l402-rail.js'
 import { createX402Rail } from './core/x402-rail.js'
+import { createXCashuRail } from './core/xcashu-rail.js'
 import { sqliteStorage } from './storage/sqlite.js'
 import { StatsCollector } from './stats.js'
 import { randomBytes } from 'node:crypto'
@@ -88,8 +89,8 @@ export class Booth {
   private closed = false
 
   constructor(config: BoothOptions & EventHandler) {
-    if (!config.backend && !config.redeemCashu && !config.x402) {
-      throw new Error('At least one payment method required: provide a Lightning backend, redeemCashu callback, or x402 config')
+    if (!config.backend && !config.redeemCashu && !config.x402 && !config.xcashu) {
+      throw new Error('At least one payment method required: provide a Lightning backend, redeemCashu callback, x402 config, or xcashu config')
     }
 
     let rootKeyInput: string
@@ -140,6 +141,10 @@ export class Booth {
 
     if (config.x402) {
       rails.push(createX402Rail({ ...config.x402, storage: this.storage }))
+    }
+
+    if (config.xcashu) {
+      rails.push(createXCashuRail(config.xcashu, this.storage))
     }
 
     this.engine = createTollBooth({
