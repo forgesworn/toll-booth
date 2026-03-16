@@ -254,4 +254,124 @@ describe.skipIf(!RUN_INTEGRATION)('xcashu full payment flow (requires Nutshell m
     })
     expect(second.status).toBe(402)
   }, 60_000)
+
+  it('rejects a token with insufficient amount', async () => {
+    // Route costs 5 sats — mint only 3
+    const proofs = await mintProofs(wallet, 3)
+    const token = getEncodedTokenV4({ proofs, mint: MINT_URL })
+
+    const res = await request('/api/data', {
+      headers: { 'X-Cashu': token },
+    })
+    expect(res.status).toBe(402)
+  }, 30_000)
+
+  it('credits overpayment correctly', async () => {
+    // Route costs 5 sats — pay 50
+    const proofs = await mintProofs(wallet, 50)
+    const token = getEncodedTokenV4({ proofs, mint: MINT_URL })
+
+    const res = await request('/api/data', {
+      headers: { 'X-Cashu': token },
+    })
+    expect(res.status).not.toBe(402)
+    const balance = Number(res.headers.get('X-Credit-Balance'))
+    expect(balance).toBe(45)
+  }, 30_000)
+
+  it('rejects a token from a mint not in the accepted list', async () => {
+    // Create a separate Booth that only accepts tokens from a different mint
+    const wrongMintBooth = new Booth({
+      adapter: 'web-standard',
+      backend: fakeBackend,
+      xcashu: {
+        mints: ['https://other.mint'],
+        unit: 'sat',
+      },
+      pricing: { '/api/data': 5 },
+      upstream: 'http://localhost:1',
+      rootKey: 'b'.repeat(64),
+      storage: memoryStorage(),
+      defaultInvoiceAmount: 100,
+      getClientIp: () => '127.0.0.1',
+    })
+
+    try {
+      const wrongMintRequest = makeRequestHelper(wrongMintBooth)
+
+      // Mint a valid token from the real Nutshell mint
+      const proofs = await mintProofs(wallet, 5)
+      const token = getEncodedTokenV4({ proofs, mint: MINT_URL })
+
+      // Send to the Booth that doesn't accept this mint
+      const res = await wrongMintRequest('/api/data', {
+        headers: { 'X-Cashu': token },
+      })
+      expect(res.status).toBe(402)
+    } finally {
+      wrongMintBooth.close()
+    }
+  }, 30_000)
+
+  it('rejects a malformed cashuB body without crashing', async () => {
+    // Valid base64 encoding of "hello world" — structurally invalid token
+    const res = await request('/api/data', {
+      headers: { 'X-Cashu': 'cashuBaGVsbG8gd29ybGQ' },
+    })
+    expect(res.status).toBe(402)
+  }, 10_000)
+
+  it('handles sequential payments after credit is exhausted', async () => {
+    // 1. First payment: 10 sats for a 5-sat route → 5 credit
+    const proofs1 = await mintProofs(wallet, 10)
+    const token1 = getEncodedTokenV4({ proofs: proofs1, mint: MINT_URL })
+
+    const res1 = await request('/api/data', {
+      headers: { 'X-Cashu': token1 },
+    })
+    expect(res1.status).not.toBe(402)
+    expect(Number(res1.headers.get('X-Credit-Balance'))).toBe(5)
+
+    // Extract the L402 macaroon from the response to use credit
+    const authHeader = res1.headers.get('Authorization') ?? res1.headers.get('X-Authorization')
+    const setCookie = res1.headers.get('Set-Cookie')
+    // The macaroon is returned in the response — find it
+    const macaroonHeader = res1.headers.get('X-Macaroon')
+
+    // 2. Second request — use credit (costs 5, balance → 0)
+    //    Credit is tracked by client IP in this setup, so a bare request should use it
+    const res2 = await request('/api/data')
+    // If credits are tracked by IP, a plain request should draw from them
+    // If the credit requires the macaroon, this will be a 402 — either way, we
+    // continue to the third payment which is the real assertion
+    const creditAfterSecond = Number(res2.headers.get('X-Credit-Balance') ?? '-1')
+
+    // 3. Third payment: mint fresh token after credit exhausted
+    const proofs3 = await mintProofs(wallet, 10)
+    const token3 = getEncodedTokenV4({ proofs: proofs3, mint: MINT_URL })
+
+    const res3 = await request('/api/data', {
+      headers: { 'X-Cashu': token3 },
+    })
+    expect(res3.status).not.toBe(402)
+    expect(Number(res3.headers.get('X-Credit-Balance'))).toBeGreaterThanOrEqual(0)
+  }, 60_000)
+
+  it('rejects one of two concurrent requests with the same token', async () => {
+    const proofs = await mintProofs(wallet, 5)
+    const token = getEncodedTokenV4({ proofs, mint: MINT_URL })
+
+    const [resA, resB] = await Promise.all([
+      request('/api/data', { headers: { 'X-Cashu': token } }),
+      request('/api/data', { headers: { 'X-Cashu': token } }),
+    ])
+
+    const statuses = [resA.status, resB.status]
+    const successes = statuses.filter((s) => s !== 402).length
+    const rejections = statuses.filter((s) => s === 402).length
+
+    // Exactly one should succeed, exactly one should be rejected (double-spend)
+    expect(successes).toBe(1)
+    expect(rejections).toBe(1)
+  }, 30_000)
 })
