@@ -1,0 +1,264 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" width="1280" height="640">
+  <defs>
+    <!-- Amber/gold gradient for the barrier and lightning -->
+    <linearGradient id="amber" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#fbbf24"/>
+    </linearGradient>
+    <linearGradient id="amberDark" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#d97706"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
+    </linearGradient>
+    <linearGradient id="amberLight" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#fcd34d"/>
+    </linearGradient>
+    <!-- Steel gradient for the booth structure -->
+    <linearGradient id="steel" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#475569"/>
+      <stop offset="100%" stop-color="#334155"/>
+    </linearGradient>
+    <linearGradient id="steelLight" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#64748b"/>
+      <stop offset="100%" stop-color="#475569"/>
+    </linearGradient>
+    <!-- Lightning glow -->
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1280" height="640" fill="#0f172a"/>
+
+  <!-- Subtle hex grid -->
+  <g opacity="0.04" stroke="#94a3b8" stroke-width="0.5" fill="none">
+    <!-- Row 1 -->
+    <polygon points="40,20 60,10 80,20 80,40 60,50 40,40"/>
+    <polygon points="80,20 100,10 120,20 120,40 100,50 80,40"/>
+    <polygon points="120,20 140,10 160,20 160,40 140,50 120,40"/>
+    <polygon points="160,20 180,10 200,20 200,40 180,50 160,40"/>
+    <polygon points="200,20 220,10 240,20 240,40 220,50 200,40"/>
+    <polygon points="240,20 260,10 280,20 280,40 260,50 240,40"/>
+    <polygon points="280,20 300,10 320,20 320,40 300,50 280,40"/>
+    <polygon points="320,20 340,10 360,20 360,40 340,50 320,40"/>
+    <polygon points="360,20 380,10 400,20 400,40 380,50 360,40"/>
+    <polygon points="400,20 420,10 440,20 440,40 420,50 400,40"/>
+    <polygon points="440,20 460,10 480,20 480,40 460,50 440,40"/>
+    <polygon points="480,20 500,10 520,20 520,40 500,50 480,40"/>
+    <polygon points="520,20 540,10 560,20 560,40 540,50 520,40"/>
+    <polygon points="560,20 580,10 600,20 600,40 580,50 560,40"/>
+    <polygon points="600,20 620,10 640,20 640,40 620,50 600,40"/>
+    <polygon points="640,20 660,10 680,20 680,40 660,50 640,40"/>
+    <polygon points="680,20 700,10 720,20 720,40 700,50 680,40"/>
+    <polygon points="720,20 740,10 760,20 760,40 740,50 720,40"/>
+    <polygon points="760,20 780,10 800,20 800,40 780,50 760,40"/>
+    <polygon points="800,20 820,10 840,20 840,40 820,50 800,40"/>
+    <polygon points="840,20 860,10 880,20 880,40 860,50 840,40"/>
+    <polygon points="880,20 900,10 920,20 920,40 900,50 880,40"/>
+    <polygon points="920,20 940,10 960,20 960,40 940,50 920,40"/>
+    <polygon points="960,20 980,10 1000,20 1000,40 980,50 960,40"/>
+    <polygon points="1000,20 1020,10 1040,20 1040,40 1020,50 1000,40"/>
+    <polygon points="1040,20 1060,10 1080,20 1080,40 1060,50 1040,40"/>
+    <polygon points="1080,20 1100,10 1120,20 1120,40 1100,50 1080,40"/>
+    <polygon points="1120,20 1140,10 1160,20 1160,40 1140,50 1120,40"/>
+    <polygon points="1160,20 1180,10 1200,20 1200,40 1180,50 1160,40"/>
+    <polygon points="1200,20 1220,10 1240,20 1240,40 1220,50 1200,40"/>
+    <!-- Row 2 (offset) -->
+    <polygon points="60,50 80,40 100,50 100,70 80,80 60,70"/>
+    <polygon points="140,50 160,40 180,50 180,70 160,80 140,70"/>
+    <polygon points="220,50 240,40 260,50 260,70 240,80 220,70"/>
+    <polygon points="300,50 320,40 340,50 340,70 320,80 300,70"/>
+    <polygon points="380,50 400,40 420,50 420,70 400,80 380,70"/>
+    <polygon points="460,50 480,40 500,50 500,70 480,80 460,70"/>
+    <polygon points="540,50 560,40 580,50 580,70 560,80 540,70"/>
+    <polygon points="620,50 640,40 660,50 660,70 640,80 620,70"/>
+    <polygon points="700,50 720,40 740,50 740,70 720,80 700,70"/>
+    <polygon points="780,50 800,40 820,50 820,70 800,80 780,70"/>
+    <polygon points="860,50 880,40 900,50 900,70 880,80 860,70"/>
+    <polygon points="940,50 960,40 980,50 980,70 960,80 940,70"/>
+    <polygon points="1020,50 1040,40 1060,50 1060,70 1040,80 1020,70"/>
+    <polygon points="1100,50 1120,40 1140,50 1140,70 1120,80 1100,70"/>
+    <polygon points="1180,50 1200,40 1220,50 1220,70 1200,80 1180,70"/>
+    <!-- Row 3 -->
+    <polygon points="40,80 60,70 80,80 80,100 60,110 40,100"/>
+    <polygon points="120,80 140,70 160,80 160,100 140,110 120,100"/>
+    <polygon points="200,80 220,70 240,80 240,100 220,110 200,100"/>
+    <polygon points="280,80 300,70 320,80 320,100 300,110 280,100"/>
+    <polygon points="360,80 380,70 400,80 400,100 380,110 360,100"/>
+    <polygon points="440,80 460,70 480,80 480,100 460,110 440,100"/>
+    <polygon points="520,80 540,70 560,80 560,100 540,110 520,100"/>
+    <polygon points="600,80 620,70 640,80 640,100 620,110 600,100"/>
+    <polygon points="680,80 700,70 720,80 720,100 700,110 680,100"/>
+    <polygon points="760,80 780,70 800,80 800,100 780,110 760,100"/>
+    <polygon points="840,80 860,70 880,80 880,100 860,110 840,100"/>
+    <polygon points="920,80 940,70 960,80 960,100 940,110 920,100"/>
+    <polygon points="1000,80 1020,70 1040,80 1040,100 1020,110 1000,100"/>
+    <polygon points="1080,80 1100,70 1120,80 1120,100 1100,110 1080,100"/>
+    <polygon points="1160,80 1180,70 1200,80 1200,100 1180,110 1160,100"/>
+    <!-- Sparse lower rows -->
+    <polygon points="60,470 80,460 100,470 100,490 80,500 60,490"/>
+    <polygon points="180,470 200,460 220,470 220,490 200,500 180,490"/>
+    <polygon points="300,470 320,460 340,470 340,490 320,500 300,490"/>
+    <polygon points="420,470 440,460 460,470 460,490 440,500 420,490"/>
+    <polygon points="540,470 560,460 580,470 580,490 560,500 540,490"/>
+    <polygon points="660,470 680,460 700,470 700,490 680,500 660,490"/>
+    <polygon points="780,470 800,460 820,470 820,490 800,500 780,490"/>
+    <polygon points="900,470 920,460 940,470 940,490 920,500 900,490"/>
+    <polygon points="1020,470 1040,460 1060,470 1060,490 1040,500 1020,490"/>
+    <polygon points="1140,470 1160,460 1180,470 1180,490 1160,500 1140,490"/>
+    <polygon points="40,500 60,490 80,500 80,520 60,530 40,520"/>
+    <polygon points="160,500 180,490 200,500 200,520 180,530 160,520"/>
+    <polygon points="280,500 300,490 320,500 320,520 300,530 280,520"/>
+    <polygon points="400,500 420,490 440,500 440,520 420,530 400,520"/>
+    <polygon points="520,500 540,490 560,500 560,520 540,530 520,520"/>
+    <polygon points="640,500 660,490 680,500 680,520 660,530 640,520"/>
+    <polygon points="760,500 780,490 800,500 800,520 780,530 760,520"/>
+    <polygon points="880,500 900,490 920,500 920,520 900,530 880,520"/>
+    <polygon points="1000,500 1020,490 1040,500 1040,520 1020,530 1000,520"/>
+    <polygon points="1120,500 1140,490 1160,500 1160,520 1140,530 1120,520"/>
+    <polygon points="60,530 80,520 100,530 100,550 80,560 60,550"/>
+    <polygon points="180,530 200,520 220,530 220,550 200,560 180,550"/>
+    <polygon points="300,530 320,520 340,530 340,550 320,560 300,550"/>
+    <polygon points="420,530 440,520 460,530 460,550 440,560 420,550"/>
+    <polygon points="540,530 560,520 580,530 580,550 560,560 540,550"/>
+    <polygon points="660,530 680,520 700,530 700,550 680,560 660,550"/>
+    <polygon points="780,530 800,520 820,530 820,550 800,560 780,550"/>
+    <polygon points="900,530 920,520 940,530 940,550 920,560 900,550"/>
+    <polygon points="1020,530 1040,520 1060,530 1060,550 1040,560 1020,550"/>
+    <polygon points="1140,530 1160,520 1180,530 1180,550 1160,560 1140,550"/>
+    <polygon points="40,560 60,550 80,560 80,580 60,590 40,580"/>
+    <polygon points="160,560 180,550 200,560 200,580 180,590 160,580"/>
+    <polygon points="280,560 300,550 320,560 320,580 300,590 280,580"/>
+    <polygon points="400,560 420,550 440,560 440,580 420,590 400,580"/>
+    <polygon points="520,560 540,550 560,560 560,580 540,590 520,580"/>
+    <polygon points="640,560 660,550 680,560 680,580 660,590 640,580"/>
+    <polygon points="760,560 780,550 800,560 800,580 780,590 760,580"/>
+    <polygon points="880,560 900,550 920,560 920,580 900,590 880,580"/>
+    <polygon points="1000,560 1020,550 1040,560 1040,580 1020,590 1000,580"/>
+    <polygon points="1120,560 1140,550 1160,560 1160,580 1140,590 1120,580"/>
+    <polygon points="60,590 80,580 100,590 100,610 80,620 60,610"/>
+    <polygon points="180,590 200,580 220,590 220,610 200,620 180,610"/>
+    <polygon points="300,590 320,580 340,590 340,610 320,620 300,610"/>
+    <polygon points="420,590 440,580 460,590 460,610 440,620 420,610"/>
+    <polygon points="540,590 560,580 580,590 580,610 560,620 540,610"/>
+    <polygon points="660,590 680,580 700,590 700,610 680,620 660,610"/>
+    <polygon points="780,590 800,580 820,590 820,610 800,620 780,610"/>
+    <polygon points="900,590 920,580 940,590 940,610 920,620 900,610"/>
+    <polygon points="1020,590 1040,580 1060,590 1060,610 1040,620 1020,610"/>
+    <polygon points="1140,590 1160,580 1180,590 1180,610 1160,620 1140,610"/>
+  </g>
+
+  <!-- Toll booth illustration — centred at ~350,320 -->
+  <g transform="translate(240, 150)">
+    <!-- Ground / road surface -->
+    <rect x="20" y="300" width="280" height="8" rx="2" fill="#1e293b"/>
+    <line x1="80" y1="304" x2="100" y2="304" stroke="#475569" stroke-width="2" stroke-dasharray="8,6"/>
+    <line x1="120" y1="304" x2="140" y2="304" stroke="#475569" stroke-width="2" stroke-dasharray="8,6"/>
+    <line x1="160" y1="304" x2="180" y2="304" stroke="#475569" stroke-width="2" stroke-dasharray="8,6"/>
+    <line x1="200" y1="304" x2="220" y2="304" stroke="#475569" stroke-width="2" stroke-dasharray="8,6"/>
+
+    <!-- Booth structure (kiosk) -->
+    <rect x="55" y="160" width="70" height="140" rx="4" fill="url(#steel)"/>
+    <rect x="60" y="165" width="60" height="130" rx="3" fill="#1e293b"/>
+    <!-- Booth window -->
+    <rect x="68" y="180" width="44" height="35" rx="2" fill="#1e293b" stroke="#475569" stroke-width="1.5"/>
+    <!-- Screen glow in window -->
+    <rect x="72" y="184" width="36" height="27" rx="1" fill="#0f172a"/>
+    <rect x="76" y="188" width="28" height="6" rx="1" fill="#22d3ee" opacity="0.4"/>
+    <rect x="76" y="198" width="20" height="4" rx="1" fill="#22d3ee" opacity="0.25"/>
+    <rect x="76" y="205" width="24" height="4" rx="1" fill="#22d3ee" opacity="0.15"/>
+    <!-- Booth roof -->
+    <polygon points="48,160 135,160 130,148 53,148" fill="url(#steelLight)"/>
+    <rect x="48" y="145" width="87" height="5" rx="1" fill="#64748b"/>
+    <!-- Booth base -->
+    <rect x="55" y="295" width="70" height="5" rx="1" fill="#475569"/>
+
+    <!-- Barrier post (right side of booth) -->
+    <rect x="120" y="170" width="12" height="130" rx="2" fill="url(#steelLight)"/>
+    <rect x="118" y="168" width="16" height="8" rx="2" fill="#64748b"/>
+    <!-- Pivot joint -->
+    <circle cx="126" cy="180" r="6" fill="#475569" stroke="#64748b" stroke-width="1.5"/>
+    <circle cx="126" cy="180" r="2.5" fill="#334155"/>
+
+    <!-- Barrier arm (raised at ~30 degrees) -->
+    <g transform="rotate(-30, 126, 180)">
+      <rect x="126" y="176" width="160" height="8" rx="3" fill="url(#amber)"/>
+      <!-- Stripes on barrier -->
+      <rect x="150" y="176" width="12" height="8" fill="#0f172a" opacity="0.3"/>
+      <rect x="174" y="176" width="12" height="8" fill="#0f172a" opacity="0.3"/>
+      <rect x="198" y="176" width="12" height="8" fill="#0f172a" opacity="0.3"/>
+      <rect x="222" y="176" width="12" height="8" fill="#0f172a" opacity="0.3"/>
+      <rect x="246" y="176" width="12" height="8" fill="#0f172a" opacity="0.3"/>
+      <rect x="270" y="176" width="12" height="8" fill="#0f172a" opacity="0.3"/>
+      <!-- Barrier tip -->
+      <circle cx="288" cy="180" r="5" fill="#fbbf24"/>
+    </g>
+
+    <!-- Lightning bolt (passing through the gate) -->
+    <g filter="url(#glow)" transform="translate(185, 200)">
+      <polygon points="20,0 0,42 16,42 -4,85 50,32 30,32 52,0" fill="url(#amberLight)"/>
+    </g>
+
+    <!-- Floating coins/sats -->
+    <g opacity="0.6">
+      <!-- Coin 1 -->
+      <ellipse cx="210" cy="140" rx="10" ry="11" fill="none" stroke="#fbbf24" stroke-width="1.5"/>
+      <text x="210" y="144" text-anchor="middle" font-family="monospace" font-size="11" font-weight="bold" fill="#fbbf24">S</text>
+      <!-- Coin 2 -->
+      <ellipse cx="245" cy="115" rx="8" ry="9" fill="none" stroke="#f59e0b" stroke-width="1.2" opacity="0.5"/>
+      <text x="245" y="119" text-anchor="middle" font-family="monospace" font-size="9" font-weight="bold" fill="#f59e0b" opacity="0.5">S</text>
+      <!-- Coin 3 -->
+      <ellipse cx="270" cy="155" rx="7" ry="8" fill="none" stroke="#d97706" stroke-width="1" opacity="0.35"/>
+      <text x="270" y="159" text-anchor="middle" font-family="monospace" font-size="8" font-weight="bold" fill="#d97706" opacity="0.35">S</text>
+    </g>
+
+    <!-- Signal waves (like HTTP 402 being broadcast) -->
+    <g transform="translate(85, 140)" stroke="#22d3ee" fill="none" stroke-linecap="round" opacity="0.3">
+      <path d="M 0,-5 Q -12,-15 -12,-25 Q -12,-35 0,-45" stroke-width="2"/>
+      <path d="M -8,-10 Q -24,-20 -24,-30 Q -24,-40 -8,-50" stroke-width="1.5" opacity="0.5"/>
+    </g>
+  </g>
+
+  <!-- Divider -->
+  <g transform="translate(580, 220)">
+    <line x1="0" y1="0" x2="0" y2="200" stroke="#334155" stroke-width="1" opacity="0.5"/>
+    <line x1="6" y1="0" x2="6" y2="200" stroke="#334155" stroke-width="1" opacity="0.5"/>
+    <!-- 402 badge -->
+    <g transform="translate(-12, 82)">
+      <rect x="0" y="0" width="30" height="18" rx="3" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+      <text x="15" y="13" text-anchor="middle" font-family="'SF Mono', 'Fira Code', 'JetBrains Mono', monospace" font-size="9" font-weight="bold" fill="#f59e0b">402</text>
+    </g>
+  </g>
+
+  <!-- Text: toll-booth -->
+  <text x="660" y="330" font-family="'SF Mono', 'Fira Code', 'JetBrains Mono', 'Menlo', monospace" font-size="64" font-weight="bold" fill="#f8fafc" letter-spacing="-1">toll-booth</text>
+
+  <!-- Tagline -->
+  <text x="662" y="370" font-family="'Inter', -apple-system, 'Segoe UI', sans-serif" font-size="18" fill="#94a3b8">monetise any API. one line of code.</text>
+
+  <!-- Keyword ticker along bottom -->
+  <g opacity="0.06" fill="#94a3b8">
+    <text y="622" font-family="'SF Mono', 'Fira Code', 'JetBrains Mono', monospace" font-size="12" letter-spacing="1">
+      <tspan x="40">lightning</tspan>
+      <tspan x="140">cashu</tspan>
+      <tspan x="210">macaroon</tspan>
+      <tspan x="310">402</tspan>
+      <tspan x="355">express</tspan>
+      <tspan x="435">hono</tspan>
+      <tspan x="500">deno</tspan>
+      <tspan x="560">nwc</tspan>
+      <tspan x="610">ecash</tspan>
+      <tspan x="680">sats</tspan>
+      <tspan x="735">micropayments</tspan>
+      <tspan x="880">middleware</tspan>
+      <tspan x="990">x402</tspan>
+      <tspan x="1045">bitcoin</tspan>
+      <tspan x="1130">typescript</tspan>
+    </text>
+  </g>
+</svg>

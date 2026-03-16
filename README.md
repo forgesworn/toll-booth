@@ -1,5 +1,6 @@
 # toll-booth
 
+[![CI](https://github.com/TheCryptoDonkey/toll-booth/actions/workflows/ci.yml/badge.svg)](https://github.com/TheCryptoDonkey/toll-booth/actions/workflows/ci.yml)
 [![MIT licence](https://img.shields.io/badge/licence-MIT-blue.svg)](./LICENSE)
 [![Nostr](https://img.shields.io/badge/Nostr-Zap%20me-purple)](https://primal.net/p/npub1mgvlrnf5hm9yf0n5mf9nqmvarhvxkc6remu5ec3vf8r0txqkuk7su0e7q2)
 [![npm](https://img.shields.io/npm/v/@thecryptodonkey/toll-booth)](https://www.npmjs.com/package/@thecryptodonkey/toll-booth)
