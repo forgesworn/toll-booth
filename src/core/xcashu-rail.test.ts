@@ -105,3 +105,106 @@ describe('xcashu-rail', () => {
     })
   })
 })
+
+// ── Mocked verify tests ────────────────────────────────────────────────
+
+vi.mock('@cashu/cashu-ts', () => {
+  const getDecodedToken = vi.fn().mockImplementation(() => {
+    throw new Error('Invalid token')
+  })
+  const Wallet = vi.fn()
+  const Mint = vi.fn(() => ({}))
+  return { getDecodedToken, Wallet, Mint }
+})
+
+describe('xcashu-rail verify (mocked)', () => {
+  const config = {
+    mints: ['https://mint.example.com'],
+    unit: 'sat' as const,
+  }
+
+  let mockGetDecodedToken: ReturnType<typeof vi.fn>
+  let MockWallet: ReturnType<typeof vi.fn>
+
+  beforeEach(async () => {
+    vi.clearAllMocks()
+
+    const cashuTs = await import('@cashu/cashu-ts')
+    mockGetDecodedToken = vi.mocked(cashuTs.getDecodedToken)
+    MockWallet = vi.mocked(cashuTs.Wallet)
+
+    // Default: valid decoded token from accepted mint
+    mockGetDecodedToken.mockReturnValue({
+      mint: 'https://mint.example.com',
+      unit: 'sat',
+      proofs: [{ amount: 10, id: 'key1', C: 'sig1', secret: 's1' }],
+    })
+
+    // Default: wallet that successfully receives proofs
+    const mockWalletInstance = {
+      loadMint: vi.fn().mockResolvedValue(undefined),
+      receive: vi.fn().mockResolvedValue([{ amount: 10 }]),
+    }
+    MockWallet.mockImplementation(() => mockWalletInstance)
+  })
+
+  it('verify success path returns authenticated with credit', async () => {
+    const { createXCashuRail } = await import('./xcashu-rail.js')
+    const rail = createXCashuRail(config)
+    const result = await rail.verify(makeReq({ 'x-cashu': 'cashuBvalidtoken' }))
+
+    expect(result.authenticated).toBe(true)
+    expect(result.paymentId).toMatch(/^[0-9a-f]{64}$/)
+    expect(result.mode).toBe('credit')
+    expect(result.currency).toBe('sat')
+    expect(result.creditBalance).toBe(10)
+  })
+
+  it('verify settles to storage', async () => {
+    const mockStorage = {
+      settleWithCredit: vi.fn().mockReturnValue(true),
+      isSettled: vi.fn().mockReturnValue(false),
+    } as any
+
+    const { createXCashuRail } = await import('./xcashu-rail.js')
+    const rail = createXCashuRail(config, mockStorage)
+    const result = await rail.verify(makeReq({ 'x-cashu': 'cashuBvalidtoken' }))
+
+    expect(result.authenticated).toBe(true)
+    expect(mockStorage.settleWithCredit).toHaveBeenCalledOnce()
+
+    const args = mockStorage.settleWithCredit.mock.calls[0]
+    expect(args[0]).toMatch(/^[0-9a-f]{64}$/) // paymentId
+    expect(args[1]).toBe(10) // amount
+    expect(args[2]).toMatch(/^[0-9a-f]{64}$/) // settlementSecret
+    expect(args[3]).toBe('sat') // currency
+  })
+
+  it('rejects wrong mint in decoded token', async () => {
+    mockGetDecodedToken.mockReturnValue({
+      mint: 'https://wrong.mint',
+      unit: 'sat',
+      proofs: [{ amount: 10, id: 'key1', C: 'sig1', secret: 's1' }],
+    })
+
+    const { createXCashuRail } = await import('./xcashu-rail.js')
+    const rail = createXCashuRail(config)
+    const result = await rail.verify(makeReq({ 'x-cashu': 'cashuBvalidtoken' }))
+
+    expect(result.authenticated).toBe(false)
+  })
+
+  it('rejects unit mismatch in decoded token', async () => {
+    mockGetDecodedToken.mockReturnValue({
+      mint: 'https://mint.example.com',
+      unit: 'usd',
+      proofs: [{ amount: 100, id: 'key1', C: 'sig1', secret: 's1' }],
+    })
+
+    const { createXCashuRail } = await import('./xcashu-rail.js')
+    const rail = createXCashuRail(config)
+    const result = await rail.verify(makeReq({ 'x-cashu': 'cashuBvalidtoken' }))
+
+    expect(result.authenticated).toBe(false)
+  })
+})
