@@ -86,7 +86,7 @@ When `serviceName` is not configured, the body is unchanged from today. The `boo
 
 ### 2. `src/core/types.ts`
 
-- Add `serviceName?: string` and `description?: string` to `TollBoothCoreConfig`
+- Add `description?: string` to `TollBoothCoreConfig` (alongside existing `serviceName`)
 
 ### 3. `src/booth.ts`
 
@@ -108,7 +108,7 @@ if (config.serviceName) {
 
 ### 5. Hono adapter
 
-The Hono adapter (`src/adapters/hono.ts`) has its own config path via `HonoTollBoothConfig` and `PaymentAppConfig`. Forward `serviceName` and `description` through `createHonoTollBooth()` to the core config.
+The Hono adapter (`src/adapters/hono.ts`) takes a pre-built `engine` via `HonoTollBoothConfig`, so `booth` and `auth_hint` are already included in 402 responses from the engine. No Hono adapter changes needed — verify only.
 
 ### 6. Tests
 
