@@ -43,6 +43,8 @@ export type { X402RailConfig, X402Facilitator, X402Payment, X402VerifyResult } f
 export { DEFAULT_USDC_ASSETS } from './core/x402-types.js'
 export { createXCashuRail } from './core/xcashu-rail.js'
 export type { XCashuConfig } from './types.js'
+export { meltToLightning } from './core/melt-to-lightning.js'
+export type { MeltResult } from './core/melt-to-lightning.js'
 
 // Utilities
 export { mintMacaroon, verifyMacaroon, parseCaveats } from './macaroon.js'
