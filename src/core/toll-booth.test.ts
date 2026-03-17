@@ -757,3 +757,66 @@ describe('config validation and challenge tiers map', () => {
     }
   })
 })
+
+describe('agent-friendly 402 body', () => {
+  it('includes booth and auth_hint when serviceName is configured', async () => {
+    const engine = createTollBooth(makeConfig({
+      serviceName: 'Lightning Graph API',
+      description: 'Network intelligence and channel suggestions',
+    }))
+    const result = await engine.handle(makeRequest())
+    expect(result.action).toBe('challenge')
+    if (result.action !== 'challenge') return
+
+    const body = result.body as Record<string, unknown>
+    expect(body.booth).toEqual({
+      name: 'Lightning Graph API',
+      description: 'Network intelligence and channel suggestions',
+    })
+    expect(body.auth_hint).toBe(
+      'Pay the invoice, then send header \u2014 Authorization: L402 <macaroon>:<preimage>',
+    )
+  })
+
+  it('includes booth without description when only serviceName is set', async () => {
+    const engine = createTollBooth(makeConfig({
+      serviceName: 'Simple API',
+    }))
+    const result = await engine.handle(makeRequest())
+    expect(result.action).toBe('challenge')
+    if (result.action !== 'challenge') return
+
+    const body = result.body as Record<string, unknown>
+    expect(body.booth).toEqual({ name: 'Simple API' })
+    expect(body.auth_hint).toBe(
+      'Pay the invoice, then send header \u2014 Authorization: L402 <macaroon>:<preimage>',
+    )
+  })
+
+  it('omits booth and auth_hint when serviceName is not configured', async () => {
+    const engine = createTollBooth(makeConfig())
+    const result = await engine.handle(makeRequest())
+    expect(result.action).toBe('challenge')
+    if (result.action !== 'challenge') return
+
+    const body = result.body as Record<string, unknown>
+    expect(body.booth).toBeUndefined()
+    expect(body.auth_hint).toBeUndefined()
+  })
+
+  it('includes yields in credit_tiers when set', async () => {
+    const engine = createTollBooth(makeConfig({
+      creditTiers: [
+        { amountSats: 10, creditSats: 10, label: 'Basic', yields: '1 request' },
+        { amountSats: 100, creditSats: 110, label: 'Bulk' },
+      ],
+    }))
+    const result = await engine.handle(makeRequest())
+    expect(result.action).toBe('challenge')
+    if (result.action !== 'challenge') return
+
+    const tiers = result.body.credit_tiers as Array<Record<string, unknown>>
+    expect(tiers[0].yields).toBe('1 request')
+    expect(tiers[1].yields).toBeUndefined()
+  })
+})
