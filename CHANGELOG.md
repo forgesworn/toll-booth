@@ -1,3 +1,11 @@
+# [3.6.0](https://github.com/TheCryptoDonkey/toll-booth/compare/v3.5.0...v3.6.0) (2026-03-17)
+
+
+### Features
+
+* add meltToLightning utility for operator fund receipt ([a62d0c4](https://github.com/TheCryptoDonkey/toll-booth/commit/a62d0c4b01903cc1d07fdb1555ad56ddaf2883fa))
+* add onProofsReceived callback to xcashu rail ([be1691b](https://github.com/TheCryptoDonkey/toll-booth/commit/be1691b4be2c356a32fb71cb1f939bf048f5b5f4))
+
 # [3.5.0](https://github.com/TheCryptoDonkey/toll-booth/compare/v3.4.0...v3.5.0) (2026-03-17)
 
 
