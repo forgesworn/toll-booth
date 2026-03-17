@@ -106,6 +106,16 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
           challengeBody.credit_tiers = config.creditTiers
         }
 
+        // Agent-friendly service metadata (only when serviceName is configured).
+        // auth_hint is L402-specific; x402/xcashu have different auth mechanisms.
+        if (config.serviceName) {
+          challengeBody.booth = {
+            name: config.serviceName,
+            ...(config.description && { description: config.description }),
+          }
+          challengeBody.auth_hint = 'Pay the invoice, then send header \u2014 Authorization: L402 <macaroon>:<preimage>'
+        }
+
         // Store invoice data from L402 rail if present
         const l402Data = challengeBody.l402 as Record<string, unknown> | undefined
         if (l402Data?.payment_hash) {
