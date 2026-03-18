@@ -160,6 +160,8 @@ export class Booth {
       creditTiers: config.creditTiers,
       serviceName: config.serviceName,
       description: config.description,
+      blockedCountries: config.blockedCountries,
+      countryHeader: config.countryHeader,
       rails,
       onPayment: (event) => {
         stats.recordPayment(event)
