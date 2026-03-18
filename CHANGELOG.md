@@ -1,3 +1,19 @@
+# [4.0.0](https://github.com/forgesworn/toll-booth/compare/v3.8.0...v4.0.0) (2026-03-18)
+
+
+* feat!: migrate to forgesworn org, rename to @forgesworn/toll-booth ([8378479](https://github.com/forgesworn/toll-booth/commit/8378479356f4fa984b67c3068841b1917bee488b))
+
+
+### Bug Fixes
+
+* use memoryStorage in rootKey entropy test to avoid CI disk I/O errors ([dcdedbd](https://github.com/forgesworn/toll-booth/commit/dcdedbd40aedae8d1925df9e355d80c039bdeb11))
+
+
+### BREAKING CHANGES
+
+* npm package renamed from @thecryptodonkey/toll-booth to @forgesworn/toll-booth.
+Update imports: import { Booth } from '@forgesworn/toll-booth'
+
 # [3.8.0](https://github.com/TheCryptoDonkey/toll-booth/compare/v3.7.1...v3.8.0) (2026-03-18)
 
 
