@@ -54,6 +54,9 @@ export type { IFreeTier } from './free-tier.js'
 export { StatsCollector } from './stats.js'
 export { renderPaymentPage, renderErrorPage } from './payment-page.js'
 
+// Geo-fencing
+export { OFAC_SANCTIONED, isBlockedCountry } from './geo-fence.js'
+
 // Backends (re-exported for convenience — prefer subpath imports for tree-shaking)
 export { phoenixdBackend } from './backends/phoenixd.js'
 export type { PhoenixdConfig } from './backends/phoenixd.js'
