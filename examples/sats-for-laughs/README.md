@@ -1,6 +1,6 @@
 # sats-for-laughs
 
-A joke API gated by Lightning payments, powered by [toll-booth](https://github.com/TheCryptoDonkey/toll-booth).
+A joke API gated by Lightning payments, powered by [toll-booth](https://github.com/forgesworn/toll-booth).
 
 Pay 21 sats, get a joke. No account. No sign-up. This is the same code that runs the [live demo](https://jokes.trotters.dev/).
 

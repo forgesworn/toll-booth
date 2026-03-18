@@ -13,6 +13,6 @@ if (command === 'demo') {
   console.log('  demo    Start a self-contained demo server with mock Lightning')
   console.log('')
   console.log('Example:')
-  console.log('  npx @thecryptodonkey/toll-booth demo')
+  console.log('  npx @forgesworn/toll-booth demo')
   process.exit(command === undefined || command === '--help' || command === '-h' ? 0 : 1)
 }

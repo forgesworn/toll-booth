@@ -8,18 +8,18 @@ The closest alternative is Aperture (Lightning Labs), a Go reverse proxy that re
 
 Payment rails are pluggable - a single toll-booth deployment can accept Lightning, Cashu, and x402 stablecoins simultaneously. The seller doesn't care how they get paid.
 
-Try it instantly: `npx @thecryptodonkey/toll-booth demo`
+Try it instantly: `npx @forgesworn/toll-booth demo`
 
 ## Getting Started
 
 ```bash
-npm install @thecryptodonkey/toll-booth
+npm install @forgesworn/toll-booth
 ```
 
 ```typescript
 import express from 'express'
-import { Booth } from '@thecryptodonkey/toll-booth'
-import { phoenixdBackend } from '@thecryptodonkey/toll-booth/backends/phoenixd'
+import { Booth } from '@forgesworn/toll-booth'
+import { phoenixdBackend } from '@forgesworn/toll-booth/backends/phoenixd'
 
 const app = express()
 app.use(express.json())
@@ -67,19 +67,19 @@ const booth = new Booth({
 
 ## API Surface
 
-Main entry point: `import { Booth } from '@thecryptodonkey/toll-booth'`
+Main entry point: `import { Booth } from '@forgesworn/toll-booth'`
 
 Subpath imports for tree-shaking:
-- `@thecryptodonkey/toll-booth/backends/phoenixd` — Phoenixd backend
-- `@thecryptodonkey/toll-booth/backends/lnd` — LND backend
-- `@thecryptodonkey/toll-booth/backends/cln` — Core Lightning backend
-- `@thecryptodonkey/toll-booth/backends/lnbits` — LNbits backend
-- `@thecryptodonkey/toll-booth/backends/nwc` — Nostr Wallet Connect (NIP-47) backend
-- `@thecryptodonkey/toll-booth/storage/sqlite` — SQLite storage (default)
-- `@thecryptodonkey/toll-booth/storage/memory` — in-memory storage (testing)
-- `@thecryptodonkey/toll-booth/adapters/express` — Express middleware factory
-- `@thecryptodonkey/toll-booth/adapters/web-standard` — Web Standard handler factory
-- `@thecryptodonkey/toll-booth/hono` — Hono middleware + payment route sub-app (`createHonoTollBooth`)
+- `@forgesworn/toll-booth/backends/phoenixd` — Phoenixd backend
+- `@forgesworn/toll-booth/backends/lnd` — LND backend
+- `@forgesworn/toll-booth/backends/cln` — Core Lightning backend
+- `@forgesworn/toll-booth/backends/lnbits` — LNbits backend
+- `@forgesworn/toll-booth/backends/nwc` — Nostr Wallet Connect (NIP-47) backend
+- `@forgesworn/toll-booth/storage/sqlite` — SQLite storage (default)
+- `@forgesworn/toll-booth/storage/memory` — in-memory storage (testing)
+- `@forgesworn/toll-booth/adapters/express` — Express middleware factory
+- `@forgesworn/toll-booth/adapters/web-standard` — Web Standard handler factory
+- `@forgesworn/toll-booth/hono` — Hono middleware + payment route sub-app (`createHonoTollBooth`)
 
 Payment rail factories (for multi-rail setups):
 - `createL402Rail(config)` — L402 Lightning + macaroon rail

@@ -3,7 +3,7 @@
 ## Setup
 
 ```bash
-git clone https://github.com/TheCryptoDonkey/toll-booth.git
+git clone https://github.com/forgesworn/toll-booth.git
 cd toll-booth
 npm install
 ```

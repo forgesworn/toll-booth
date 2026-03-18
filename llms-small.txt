@@ -5,15 +5,15 @@ HTTP 402 payment middleware for Node.js. Gates any API behind Lightning, Cashu, 
 ## Install
 
 ```bash
-npm install @thecryptodonkey/toll-booth
+npm install @forgesworn/toll-booth
 ```
 
 ## Minimal Example
 
 ```typescript
 import express from 'express'
-import { Booth } from '@thecryptodonkey/toll-booth'
-import { phoenixdBackend } from '@thecryptodonkey/toll-booth/backends/phoenixd'
+import { Booth } from '@forgesworn/toll-booth'
+import { phoenixdBackend } from '@forgesworn/toll-booth/backends/phoenixd'
 
 const app = express()
 const booth = new Booth({
@@ -40,6 +40,6 @@ app.listen(3000)
 
 ## Links
 
-- Repository: https://github.com/TheCryptoDonkey/toll-booth
-- npm: https://www.npmjs.com/package/@thecryptodonkey/toll-booth
+- Repository: https://github.com/forgesworn/toll-booth
+- npm: https://www.npmjs.com/package/@forgesworn/toll-booth
 - Full docs: llms-full.txt

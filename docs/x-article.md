@@ -86,11 +86,11 @@ L402 gives machines a way to pay for what they use, instantly, without permissio
 ### Get started
 
 ```bash
-npm install @thecryptodonkey/toll-booth
+npm install @forgesworn/toll-booth
 ```
 
 Express, Deno, Bun, and Cloudflare Workers. MIT licence.
 
-**GitHub:** github.com/TheCryptoDonkey/toll-booth
+**GitHub:** github.com/forgesworn/toll-booth
 
 If you find it useful, zap me: thedonkey@strike.me

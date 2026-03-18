@@ -29,12 +29,12 @@ The `Booth` constructor accepts:
 Tree-shakeable imports for bundlers:
 
 ```typescript
-import { Booth } from '@thecryptodonkey/toll-booth'
-import { phoenixdBackend } from '@thecryptodonkey/toll-booth/backends/phoenixd'
-import { sqliteStorage } from '@thecryptodonkey/toll-booth/storage/sqlite'
-import { memoryStorage } from '@thecryptodonkey/toll-booth/storage/memory'
-import { createExpressMiddleware } from '@thecryptodonkey/toll-booth/adapters/express'
-import { createWebStandardMiddleware } from '@thecryptodonkey/toll-booth/adapters/web-standard'
+import { Booth } from '@forgesworn/toll-booth'
+import { phoenixdBackend } from '@forgesworn/toll-booth/backends/phoenixd'
+import { sqliteStorage } from '@forgesworn/toll-booth/storage/sqlite'
+import { memoryStorage } from '@forgesworn/toll-booth/storage/memory'
+import { createExpressMiddleware } from '@forgesworn/toll-booth/adapters/express'
+import { createWebStandardMiddleware } from '@forgesworn/toll-booth/adapters/web-standard'
 ```
 
 ## Payment flow

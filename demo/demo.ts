@@ -1,7 +1,7 @@
 /**
  * Development demo server (requires tsx and Express).
  *
- * For the production demo, use: npx @thecryptodonkey/toll-booth demo
+ * For the production demo, use: npx @forgesworn/toll-booth demo
  * The npx version uses the web-standard adapter with zero extra deps.
  *
  * This version runs a tiny upstream joke API on :4444 and a toll-booth

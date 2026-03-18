@@ -1,9 +1,9 @@
 # toll-booth
 
-[![CI](https://github.com/TheCryptoDonkey/toll-booth/actions/workflows/ci.yml/badge.svg)](https://github.com/TheCryptoDonkey/toll-booth/actions/workflows/ci.yml)
+[![CI](https://github.com/forgesworn/toll-booth/actions/workflows/ci.yml/badge.svg)](https://github.com/forgesworn/toll-booth/actions/workflows/ci.yml)
 [![MIT licence](https://img.shields.io/badge/licence-MIT-blue.svg)](./LICENSE)
 [![Nostr](https://img.shields.io/badge/Nostr-Zap%20me-purple)](https://primal.net/p/npub1mgvlrnf5hm9yf0n5mf9nqmvarhvxkc6remu5ec3vf8r0txqkuk7su0e7q2)
-[![npm](https://img.shields.io/npm/v/@thecryptodonkey/toll-booth)](https://www.npmjs.com/package/@thecryptodonkey/toll-booth)
+[![npm](https://img.shields.io/npm/v/@forgesworn/toll-booth)](https://www.npmjs.com/package/@forgesworn/toll-booth)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue)](https://www.typescriptlang.org/)
 [![Node](https://img.shields.io/badge/Node-%3E%3D18-green)](https://nodejs.org/)
 
@@ -16,7 +16,7 @@
 ### Try it now
 
 ```bash
-npx @thecryptodonkey/toll-booth demo
+npx @forgesworn/toll-booth demo
 ```
 
 Spins up a fully working L402-gated joke API on localhost. Mock Lightning backend, in-memory storage, zero configuration. Scan the QR code from your terminal when the free tier runs out.
@@ -27,8 +27,8 @@ Spins up a fully working L402-gated joke API on localhost. Mock Lightning backen
 
 ```typescript
 import express from 'express'
-import { Booth } from '@thecryptodonkey/toll-booth'
-import { phoenixdBackend } from '@thecryptodonkey/toll-booth/backends/phoenixd'
+import { Booth } from '@forgesworn/toll-booth'
+import { phoenixdBackend } from '@forgesworn/toll-booth/backends/phoenixd'
 
 const app = express()
 const booth = new Booth({
@@ -51,7 +51,7 @@ app.listen(3000)
 
 | | The old way | With toll-booth |
 |---|---|---|
-| **Step 1** | Create a Stripe account | `npm install @thecryptodonkey/toll-booth` |
+| **Step 1** | Create a Stripe account | `npm install @forgesworn/toll-booth` |
 | **Step 2** | Verify your identity (KYC) | Set your pricing: `{ '/api': 10 }` |
 | **Step 3** | Integrate billing SDK | `app.use(booth.middleware)` |
 | **Step 4** | Build a sign-up page | Done. No sign-up page needed. |
@@ -69,7 +69,7 @@ Your API earns money the moment it receives a request. Clients pay with Lightnin
 
 ## See it in production
 
-[**satgate**](https://github.com/TheCryptoDonkey/satgate) is a pay-per-token AI inference proxy built on toll-booth. It monetises any OpenAI-compatible endpoint — Ollama, vLLM, llama.cpp — with one command. Token counting, model pricing, streaming reconciliation, capacity management. Everything else — payments, credits, free tier, macaroon auth — is toll-booth.
+[**satgate**](https://github.com/forgesworn/satgate) is a pay-per-token AI inference proxy built on toll-booth. It monetises any OpenAI-compatible endpoint — Ollama, vLLM, llama.cpp — with one command. Token counting, model pricing, streaming reconciliation, capacity management. Everything else — payments, credits, free tier, macaroon auth — is toll-booth.
 
 ~400 lines of product logic on top of the middleware. That's what "monetise any API with one line of code" looks like in practice.
 
@@ -78,7 +78,7 @@ Your API earns money the moment it receives a request. Clients pay with Lightnin
 ## Let AI agents pay for your API
 
 toll-booth is the **server side** of a two-part stack for machine-to-machine payments.
-[402-mcp](https://github.com/TheCryptoDonkey/402-mcp) is the **client side** - an MCP server that gives AI agents the ability to discover, pay, and consume L402-gated APIs autonomously.
+[402-mcp](https://github.com/forgesworn/402-mcp) is the **client side** - an MCP server that gives AI agents the ability to discover, pay, and consume L402-gated APIs autonomously.
 
 ```
 AI Agent -> 402-mcp -> toll-booth -> Your API
@@ -126,15 +126,15 @@ curl -H "Authorization: L402 <macaroon>:<preimage>" https://jokes.trotters.dev/a
 ## Quick start
 
 ```bash
-npm install @thecryptodonkey/toll-booth
+npm install @forgesworn/toll-booth
 ```
 
 ### Express
 
 ```typescript
 import express from 'express'
-import { Booth } from '@thecryptodonkey/toll-booth'
-import { phoenixdBackend } from '@thecryptodonkey/toll-booth/backends/phoenixd'
+import { Booth } from '@forgesworn/toll-booth'
+import { phoenixdBackend } from '@forgesworn/toll-booth/backends/phoenixd'
 
 const app = express()
 app.use(express.json())
@@ -160,8 +160,8 @@ app.listen(3000)
 ### Web Standard (Deno / Bun / Workers)
 
 ```typescript
-import { Booth } from '@thecryptodonkey/toll-booth'
-import { lndBackend } from '@thecryptodonkey/toll-booth/backends/lnd'
+import { Booth } from '@forgesworn/toll-booth'
+import { lndBackend } from '@forgesworn/toll-booth/backends/lnd'
 
 const booth = new Booth({
   adapter: 'web-standard',
@@ -188,10 +188,10 @@ Deno.serve({ port: 3000 }, async (req: Request) => {
 
 ```typescript
 import { Hono } from 'hono'
-import { createHonoTollBooth, type TollBoothEnv } from '@thecryptodonkey/toll-booth/hono'
-import { phoenixdBackend } from '@thecryptodonkey/toll-booth/backends/phoenixd'
-import { createTollBooth } from '@thecryptodonkey/toll-booth'
-import { sqliteStorage } from '@thecryptodonkey/toll-booth/storage/sqlite'
+import { createHonoTollBooth, type TollBoothEnv } from '@forgesworn/toll-booth/hono'
+import { phoenixdBackend } from '@forgesworn/toll-booth/backends/phoenixd'
+import { createTollBooth } from '@forgesworn/toll-booth'
+import { sqliteStorage } from '@forgesworn/toll-booth/storage/sqlite'
 
 const storage = sqliteStorage({ path: './toll-booth.db' })
 const engine = createTollBooth({
@@ -226,7 +226,7 @@ export default app
 ### Cashu-only (no Lightning node)
 
 ```typescript
-import { Booth } from '@thecryptodonkey/toll-booth'
+import { Booth } from '@forgesworn/toll-booth'
 
 const booth = new Booth({
   adapter: 'web-standard',
@@ -245,7 +245,7 @@ No Lightning node, no channels, no liquidity management. Ideal for serverless an
 ### xcashu (Cashu ecash via NUT-24)
 
 ```typescript
-import { Booth } from '@thecryptodonkey/toll-booth'
+import { Booth } from '@forgesworn/toll-booth'
 
 const booth = new Booth({
   adapter: 'web-standard',
@@ -267,11 +267,11 @@ Unlike the `redeemCashu` callback (which integrates Cashu into the L402 payment-
 ## Lightning backends
 
 ```typescript
-import { phoenixdBackend } from '@thecryptodonkey/toll-booth/backends/phoenixd'
-import { lndBackend } from '@thecryptodonkey/toll-booth/backends/lnd'
-import { clnBackend } from '@thecryptodonkey/toll-booth/backends/cln'
-import { lnbitsBackend } from '@thecryptodonkey/toll-booth/backends/lnbits'
-import { nwcBackend } from '@thecryptodonkey/toll-booth/backends/nwc'
+import { phoenixdBackend } from '@forgesworn/toll-booth/backends/phoenixd'
+import { lndBackend } from '@forgesworn/toll-booth/backends/lnd'
+import { clnBackend } from '@forgesworn/toll-booth/backends/cln'
+import { lnbitsBackend } from '@forgesworn/toll-booth/backends/lnbits'
+import { nwcBackend } from '@forgesworn/toll-booth/backends/nwc'
 ```
 
 Each backend implements the `LightningBackend` interface (`createInvoice` + `checkInvoice`).
@@ -437,9 +437,9 @@ See [docs/configuration.md](docs/configuration.md) for the full reference includ
 
 | Project | Role |
 |---------|------|
-| **[toll-booth](https://github.com/TheCryptoDonkey/toll-booth)** | **Payment-rail agnostic HTTP 402 middleware** |
-| [satgate](https://github.com/TheCryptoDonkey/satgate) | Production showcase — pay-per-token AI inference proxy (~400 lines on toll-booth) |
-| [402-mcp](https://github.com/TheCryptoDonkey/402-mcp) | Client side — AI agents discover, pay, and consume L402 APIs |
+| **[toll-booth](https://github.com/forgesworn/toll-booth)** | **Payment-rail agnostic HTTP 402 middleware** |
+| [satgate](https://github.com/forgesworn/satgate) | Production showcase — pay-per-token AI inference proxy (~400 lines on toll-booth) |
+| [402-mcp](https://github.com/forgesworn/402-mcp) | Client side — AI agents discover, pay, and consume L402 APIs |
 
 ---
 

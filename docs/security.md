@@ -171,4 +171,4 @@ flowchart TD
 
 ## Reporting vulnerabilities
 
-If you discover a security vulnerability, please report it privately via GitHub Security Advisories on the [toll-booth repository](https://github.com/TheCryptoDonkey/toll-booth/security/advisories).
+If you discover a security vulnerability, please report it privately via GitHub Security Advisories on the [toll-booth repository](https://github.com/forgesworn/toll-booth/security/advisories).

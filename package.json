@@ -1,5 +1,5 @@
 {
-  "name": "@thecryptodonkey/toll-booth",
+  "name": "@forgesworn/toll-booth",
   "version": "3.8.0",
   "type": "module",
   "description": "Monetise any API with HTTP 402 payments. Payment-rail agnostic middleware for Express, Hono, Deno, Bun, and Workers.",
@@ -33,10 +33,10 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/TheCryptoDonkey/toll-booth.git"
+    "url": "git+https://github.com/forgesworn/toll-booth.git"
   },
-  "homepage": "https://github.com/TheCryptoDonkey/toll-booth#readme",
-  "funding": "https://github.com/TheCryptoDonkey/toll-booth#support",
+  "homepage": "https://github.com/forgesworn/toll-booth#readme",
+  "funding": "https://github.com/forgesworn/toll-booth#support",
   "bin": {
     "toll-booth": "dist/cli.js"
   },

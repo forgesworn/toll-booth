@@ -41,7 +41,7 @@ If you need client identification for analytics, use the `getClientIp` callback 
 
 | v1 | v2 |
 |----|-----|
-| `import { albyBackend } from '@thecryptodonkey/toll-booth/backends/alby'` | `import { nwcBackend } from '@thecryptodonkey/toll-booth/backends/nwc'` |
+| `import { albyBackend } from '@forgesworn/toll-booth/backends/alby'` | `import { nwcBackend } from '@forgesworn/toll-booth/backends/nwc'` |
 | `AlbyConfig` | `NwcConfig` |
 | `albyBackend(config)` | `nwcBackend(config)` |
 | Unauthenticated JSON relay transport | NIP-44 encrypted Nostr relay transport |
@@ -55,7 +55,7 @@ The v1 Alby backend used an unauthenticated JSON relay transport that required a
 
 ```typescript
 // v1
-import { albyBackend } from '@thecryptodonkey/toll-booth/backends/alby'
+import { albyBackend } from '@forgesworn/toll-booth/backends/alby'
 
 const backend = albyBackend({
   nwcUrl: 'nostr+walletconnect://...',
@@ -63,7 +63,7 @@ const backend = albyBackend({
 })
 
 // v2
-import { nwcBackend } from '@thecryptodonkey/toll-booth/backends/nwc'
+import { nwcBackend } from '@forgesworn/toll-booth/backends/nwc'
 
 const backend = nwcBackend({
   nwcUrl: 'nostr+walletconnect://...',

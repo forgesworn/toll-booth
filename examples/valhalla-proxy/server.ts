@@ -1,8 +1,8 @@
 // examples/valhalla-proxy/server.ts
 import express from 'express'
 import cors from 'cors'
-import { Booth } from '@thecryptodonkey/toll-booth'
-import { phoenixdBackend } from '@thecryptodonkey/toll-booth/backends/phoenixd'
+import { Booth } from '@forgesworn/toll-booth'
+import { phoenixdBackend } from '@forgesworn/toll-booth/backends/phoenixd'
 
 const app = express()
 const trustProxy = (process.env.TRUST_PROXY ?? 'false') === 'true'

@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "402-announce": "latest",
-    "@thecryptodonkey/toll-booth": "file:../../",
+    "@forgesworn/toll-booth": "file:../../",
     "express": "^5.2.1"
   },
   "devDependencies": {

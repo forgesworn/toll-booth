@@ -135,7 +135,7 @@ Caddy automatically provisions TLS and sets `X-Forwarded-For`.
 Serverless deployment using the Web Standard adapter. No Lightning node required; payments are accepted via Cashu ecash tokens.
 
 ```typescript
-import { Booth } from '@thecryptodonkey/toll-booth'
+import { Booth } from '@forgesworn/toll-booth'
 
 const booth = new Booth({
   adapter: 'web-standard',
@@ -178,8 +178,8 @@ export default {
 ## Deno Deploy
 
 ```typescript
-import { Booth } from '@thecryptodonkey/toll-booth'
-import { lndBackend } from '@thecryptodonkey/toll-booth/backends/lnd'
+import { Booth } from '@forgesworn/toll-booth'
+import { lndBackend } from '@forgesworn/toll-booth/backends/lnd'
 
 const booth = new Booth({
   adapter: 'web-standard',
@@ -208,9 +208,9 @@ Deno Deploy can reach an external LND node over HTTPS. Use `memoryStorage()` or 
 ## Bun
 
 ```typescript
-import { Booth } from '@thecryptodonkey/toll-booth'
-import { phoenixdBackend } from '@thecryptodonkey/toll-booth/backends/phoenixd'
-import { sqliteStorage } from '@thecryptodonkey/toll-booth/storage/sqlite'
+import { Booth } from '@forgesworn/toll-booth'
+import { phoenixdBackend } from '@forgesworn/toll-booth/backends/phoenixd'
+import { sqliteStorage } from '@forgesworn/toll-booth/storage/sqlite'
 
 const booth = new Booth({
   adapter: 'web-standard',
@@ -245,10 +245,10 @@ Hono runs on Node.js, Deno, Bun, and Cloudflare Workers with the same code:
 
 ```typescript
 import { Hono } from 'hono'
-import { createHonoTollBooth, type TollBoothEnv } from '@thecryptodonkey/toll-booth/hono'
-import { createTollBooth } from '@thecryptodonkey/toll-booth'
-import { phoenixdBackend } from '@thecryptodonkey/toll-booth/backends/phoenixd'
-import { sqliteStorage } from '@thecryptodonkey/toll-booth/storage/sqlite'
+import { createHonoTollBooth, type TollBoothEnv } from '@forgesworn/toll-booth/hono'
+import { createTollBooth } from '@forgesworn/toll-booth'
+import { phoenixdBackend } from '@forgesworn/toll-booth/backends/phoenixd'
+import { sqliteStorage } from '@forgesworn/toll-booth/storage/sqlite'
 
 const storage = sqliteStorage({ path: './toll-booth.db' })
 const engine = createTollBooth({

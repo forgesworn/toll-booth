@@ -4,9 +4,9 @@ import { resolve, dirname, join } from 'node:path'
 import { homedir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import express from 'express'
-import { Booth, memoryStorage } from '@thecryptodonkey/toll-booth'
-import { phoenixdBackend } from '@thecryptodonkey/toll-booth/backends/phoenixd'
-import type { LightningBackend, Invoice, InvoiceStatus, StorageBackend } from '@thecryptodonkey/toll-booth'
+import { Booth, memoryStorage } from '@forgesworn/toll-booth'
+import { phoenixdBackend } from '@forgesworn/toll-booth/backends/phoenixd'
+import type { LightningBackend, Invoice, InvoiceStatus, StorageBackend } from '@forgesworn/toll-booth'
 import type { Announcement } from '402-announce'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -68,8 +68,8 @@ upstream.get('/api/joke', (req, res) => {
     poweredBy: {
       name: 'toll-booth',
       description: 'L402 Lightning payment middleware',
-      npm: 'npm install @thecryptodonkey/toll-booth',
-      github: 'https://github.com/TheCryptoDonkey/toll-booth',
+      npm: 'npm install @forgesworn/toll-booth',
+      github: 'https://github.com/forgesworn/toll-booth',
     },
   })
 })
