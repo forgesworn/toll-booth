@@ -1,3 +1,10 @@
+## [3.7.1](https://github.com/TheCryptoDonkey/toll-booth/compare/v3.7.0...v3.7.1) (2026-03-18)
+
+
+### Bug Fixes
+
+* use aperture-compatible binary macaroon identifier for lnget interop ([97458f1](https://github.com/TheCryptoDonkey/toll-booth/commit/97458f150884f9ab8735e549cb6dedfa3433783a))
+
 # [3.7.0](https://github.com/TheCryptoDonkey/toll-booth/compare/v3.6.0...v3.7.0) (2026-03-18)
 
 
