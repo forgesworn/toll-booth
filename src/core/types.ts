@@ -30,6 +30,7 @@ export type TollBoothResult =
   | { action: 'proxy'; upstream: string; headers: Record<string, string>; paymentHash?: string; estimatedCost?: number; creditBalance?: number; freeRemaining?: number; tier?: string }
   | { action: 'challenge'; status: 401 | 402; headers: Record<string, string>; body: Record<string, unknown> }
   | { action: 'pass'; upstream: string; headers: Record<string, string> }
+  | { action: 'blocked'; status: 403; body: Record<string, unknown> }
 
 export interface ReconcileResult {
   adjusted: boolean
@@ -54,6 +55,10 @@ export interface TollBoothCoreConfig {
   serviceName?: string
   /** Service description for 402 response bodies. */
   description?: string
+  /** ISO 3166-1 alpha-2 country codes to block. Requests from these countries receive 403. */
+  blockedCountries?: readonly string[]
+  /** HTTP header containing the country code. Set by reverse proxy/CDN. Default: 'CF-IPCountry'. */
+  countryHeader?: string
   onPayment?: (event: PaymentEvent) => void
   onRequest?: (event: RequestEvent) => void
   onChallenge?: (event: ChallengeEvent) => void

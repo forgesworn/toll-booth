@@ -231,6 +231,24 @@ export interface BoothConfig {
    * pending (unpaid) invoices per client IP.
    */
   invoiceRateLimit?: { maxPendingPerIp: number }
+
+  /**
+   * Optional list of ISO 3166-1 alpha-2 country codes to block.
+   * Requests from these countries receive 403 Forbidden.
+   * Country is determined from the header specified by `countryHeader`.
+   * If not set, no geo-blocking is applied.
+   *
+   * @example blockedCountries: OFAC_SANCTIONED
+   * @example blockedCountries: [...OFAC_SANCTIONED, 'BY']
+   */
+  blockedCountries?: readonly string[]
+
+  /**
+   * HTTP header containing the ISO 3166-1 alpha-2 country code.
+   * Typically set by a reverse proxy or CDN (e.g. Cloudflare, nginx GeoIP2).
+   * Default: 'CF-IPCountry'.
+   */
+  countryHeader?: string
 }
 
 /**
