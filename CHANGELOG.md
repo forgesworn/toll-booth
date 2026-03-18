@@ -1,3 +1,10 @@
+# [3.7.0](https://github.com/TheCryptoDonkey/toll-booth/compare/v3.6.0...v3.7.0) (2026-03-18)
+
+
+### Features
+
+* lightweight HEAD price probe for indexers and lnget dry-run ([565f555](https://github.com/TheCryptoDonkey/toll-booth/commit/565f555bcf23baabe430a2c169bcde3d49892f1d))
+
 # [3.6.0](https://github.com/TheCryptoDonkey/toll-booth/compare/v3.5.0...v3.6.0) (2026-03-17)
 
 
