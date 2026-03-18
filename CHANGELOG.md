@@ -1,3 +1,10 @@
+## [4.0.1](https://github.com/forgesworn/toll-booth/compare/v4.0.0...v4.0.1) (2026-03-18)
+
+
+### Bug Fixes
+
+* update Dockerfile npm pack glob for @forgesworn/toll-booth ([9f7e553](https://github.com/forgesworn/toll-booth/commit/9f7e5538d5f2fe69bba42b48d28301607bc66b2d))
+
 # [4.0.0](https://github.com/forgesworn/toll-booth/compare/v3.8.0...v4.0.0) (2026-03-18)
 
 
