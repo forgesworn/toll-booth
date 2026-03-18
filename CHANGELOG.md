@@ -1,3 +1,20 @@
+# [4.1.0](https://github.com/forgesworn/toll-booth/compare/v4.0.1...v4.1.0) (2026-03-18)
+
+
+### Bug Fixes
+
+* add security headers to blocked response in Hono and Web Standard adapters ([26fb3ee](https://github.com/forgesworn/toll-booth/commit/26fb3ee6e254a6ad03766ff6515c528e4f8a870c))
+
+
+### Features
+
+* add blockedCountries and countryHeader config fields ([4124bd7](https://github.com/forgesworn/toll-booth/commit/4124bd75c75a2e4b411c2cc86f66e880f3c9dfb5))
+* add OFAC_SANCTIONED constant and isBlockedCountry helper ([b7c4db7](https://github.com/forgesworn/toll-booth/commit/b7c4db74ca1856cd010ae47f4b3073035da52a3e))
+* export OFAC_SANCTIONED and isBlockedCountry ([791e5eb](https://github.com/forgesworn/toll-booth/commit/791e5eb3bb91a607e13f9c69efdf9fb73fdb43f0))
+* geo-fence check in engine, blocks sanctioned countries ([1ccf152](https://github.com/forgesworn/toll-booth/commit/1ccf152f83022305ca5eb74b8aacef7c47c2fb3e))
+* handle blocked action in all adapters ([efbb99a](https://github.com/forgesworn/toll-booth/commit/efbb99a836f1169a4f7576136e0efe9a97c2686a))
+* pass geo-fence config through Booth to engine ([cd4e4f3](https://github.com/forgesworn/toll-booth/commit/cd4e4f3e1e660a5bac0b62bbe9a05ac806713d79))
+
 ## [4.0.1](https://github.com/forgesworn/toll-booth/compare/v4.0.0...v4.0.1) (2026-03-18)
 
 
