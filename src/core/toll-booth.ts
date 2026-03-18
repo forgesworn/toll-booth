@@ -87,6 +87,20 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
 
         const normalisedPrice = normalisedPricing[req.path] ?? { sats: defaultAmount }
 
+        // HEAD requests return a lightweight price probe without creating
+        // invoices or storing state. Useful for lnget --dry-run and indexers.
+        if (req.method === 'HEAD') {
+          if (normalisedPrice.sats !== undefined) {
+            challengeHeaders['X-L402-Price-Sats'] = String(normalisedPrice.sats)
+          }
+          if (normalisedPrice.usd !== undefined) {
+            challengeHeaders['X-L402-Price-Usd'] = String(normalisedPrice.usd)
+          }
+          challengeHeaders['WWW-Authenticate'] = 'L402 price-only'
+          challengeBody.message = 'Payment required.'
+          return { action: 'challenge', status: 402, headers: challengeHeaders, body: challengeBody }
+        }
+
         for (const rail of rails) {
           if (rail.canChallenge && !rail.canChallenge(normalisedPrice)) continue
           const fragment = await rail.challenge(req.path, normalisedPrice)

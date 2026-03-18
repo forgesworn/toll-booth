@@ -476,4 +476,158 @@ describe('lnget v1.0.0 compatibility', () => {
       expect(LNGET_CHALLENGE_RE.test(result.headers['WWW-Authenticate']!)).toBe(true)
     })
   })
+
+  describe('HEAD request price probe (lnget --dry-run / indexer)', () => {
+    it('returns 402 with X-L402-Price-Sats header on HEAD', async () => {
+      const preimageMap = new Map<string, string>()
+      const storage = mockStorage()
+      const backend = mockBackend(preimageMap)
+
+      const engine = createTollBooth({
+        rootKey: ROOT_KEY,
+        upstream: 'http://localhost:9999',
+        pricing: { '/api/test': 42 },
+        defaultInvoiceAmount: 42,
+        storage,
+        backend,
+      })
+
+      const result = expectChallenge(await engine.handle({
+        method: 'HEAD',
+        path: '/api/test',
+        headers: {},
+        ip: '10.0.0.1',
+      }))
+
+      expect(result.status).toBe(402)
+      expect(result.headers['X-L402-Price-Sats']).toBe('42')
+    })
+
+    it('does not create a Lightning invoice for HEAD requests', async () => {
+      const preimageMap = new Map<string, string>()
+      const storage = mockStorage()
+      const backend = mockBackend(preimageMap)
+
+      const engine = createTollBooth({
+        rootKey: ROOT_KEY,
+        upstream: 'http://localhost:9999',
+        pricing: { '/api/test': 100 },
+        defaultInvoiceAmount: 100,
+        storage,
+        backend,
+      })
+
+      await engine.handle({
+        method: 'HEAD',
+        path: '/api/test',
+        headers: {},
+        ip: '10.0.0.1',
+      })
+
+      expect(backend.createInvoice).not.toHaveBeenCalled()
+    })
+
+    it('does not store an invoice for HEAD requests', async () => {
+      const preimageMap = new Map<string, string>()
+      const storage = mockStorage()
+      const backend = mockBackend(preimageMap)
+
+      const engine = createTollBooth({
+        rootKey: ROOT_KEY,
+        upstream: 'http://localhost:9999',
+        pricing: { '/api/test': 100 },
+        defaultInvoiceAmount: 100,
+        storage,
+        backend,
+      })
+
+      await engine.handle({
+        method: 'HEAD',
+        path: '/api/test',
+        headers: {},
+        ip: '10.0.0.1',
+      })
+
+      expect(storage.storeInvoice).not.toHaveBeenCalled()
+    })
+
+    it('still returns WWW-Authenticate parseable by lnget regex', async () => {
+      const preimageMap = new Map<string, string>()
+      const storage = mockStorage()
+      const backend = mockBackend(preimageMap)
+
+      const engine = createTollBooth({
+        rootKey: ROOT_KEY,
+        upstream: 'http://localhost:9999',
+        pricing: { '/api/test': 100 },
+        defaultInvoiceAmount: 100,
+        storage,
+        backend,
+      })
+
+      const result = expectChallenge(await engine.handle({
+        method: 'HEAD',
+        path: '/api/test',
+        headers: {},
+        ip: '10.0.0.1',
+      }))
+
+      // lnget's dry-run still parses the WWW-Authenticate header
+      const wwwAuth = result.headers['WWW-Authenticate']
+      expect(wwwAuth).toBeDefined()
+      expect(wwwAuth).toMatch(/^L402\s/)
+    })
+
+    it('returns correct price for tiered endpoints', async () => {
+      const preimageMap = new Map<string, string>()
+      const storage = mockStorage()
+      const backend = mockBackend(preimageMap)
+
+      const engine = createTollBooth({
+        rootKey: ROOT_KEY,
+        upstream: 'http://localhost:9999',
+        pricing: {
+          '/api/tiered': { default: 5, premium: 42 },
+        },
+        defaultInvoiceAmount: 100,
+        storage,
+        backend,
+      })
+
+      const result = expectChallenge(await engine.handle({
+        method: 'HEAD',
+        path: '/api/tiered',
+        headers: {},
+        ip: '10.0.0.1',
+      }))
+
+      // Default tier price
+      expect(result.headers['X-L402-Price-Sats']).toBe('5')
+    })
+
+    it('GET requests still create invoices as normal', async () => {
+      const preimageMap = new Map<string, string>()
+      const storage = mockStorage()
+      const backend = mockBackend(preimageMap)
+
+      const engine = createTollBooth({
+        rootKey: ROOT_KEY,
+        upstream: 'http://localhost:9999',
+        pricing: { '/api/test': 100 },
+        defaultInvoiceAmount: 100,
+        storage,
+        backend,
+      })
+
+      await engine.handle({
+        method: 'GET',
+        path: '/api/test',
+        headers: {},
+        ip: '10.0.0.1',
+      })
+
+      // GET should still create a real invoice
+      expect(backend.createInvoice).toHaveBeenCalled()
+    })
+  })
 })
