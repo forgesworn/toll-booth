@@ -114,7 +114,14 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
         for (const rail of rails) {
           if (rail.canChallenge && !rail.canChallenge(normalisedPrice)) continue
           const fragment = await rail.challenge(req.path, normalisedPrice)
-          Object.assign(challengeHeaders, fragment.headers)
+          // Multi-value merge: concatenate WWW-Authenticate values (RFC 9110 §11.6.1)
+          for (const [key, value] of Object.entries(fragment.headers)) {
+            if (key === 'WWW-Authenticate' && challengeHeaders[key]) {
+              challengeHeaders[key] += ', ' + value
+            } else {
+              challengeHeaders[key] = value
+            }
+          }
           Object.assign(challengeBody, fragment.body)
         }
 
@@ -278,6 +285,16 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
                   headers[`X-Toll-Caveat-${key.charAt(0).toUpperCase() + key.slice(1)}`] = value.replace(/[\r\n]/g, '')
                 }
               }
+            }
+
+            // IETF Payment auth: inject Payment-Receipt header (draft-ryan-httpauth-payment-01 §5)
+            if (rail.type === 'ietf-payment' && result.paymentId) {
+              const { buildReceiptHeader } = await import('./ietf-payment.js')
+              headers['Payment-Receipt'] = buildReceiptHeader({
+                method: 'lightning',
+                reference: result.paymentId,
+              })
+              headers['Cache-Control'] = 'private'
             }
 
             config.onRequest?.({
