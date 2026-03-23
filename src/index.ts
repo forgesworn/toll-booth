@@ -45,6 +45,9 @@ export { createXCashuRail } from './core/xcashu-rail.js'
 export type { XCashuConfig } from './types.js'
 export { meltToLightning } from './core/melt-to-lightning.js'
 export type { MeltResult } from './core/melt-to-lightning.js'
+export { createIETFPaymentRail, computeChallengeId, verifyChallengeId, buildReceiptHeader, encodeJCS } from './core/ietf-payment.js'
+export type { IETFPaymentRailConfig, IETFChallengeParams, IETFCredential, IETFReceipt, LightningChargeRequest, LightningChargePayload, ReceiptOptions } from './core/ietf-payment.js'
+export type { IETFPaymentConfig } from './types.js'
 
 // Utilities
 export { mintMacaroon, verifyMacaroon, parseCaveats } from './macaroon.js'

@@ -10,9 +10,10 @@ import { createTollBooth } from './core/toll-booth.js'
 import { createL402Rail } from './core/l402-rail.js'
 import { createX402Rail } from './core/x402-rail.js'
 import { createXCashuRail } from './core/xcashu-rail.js'
+import { createIETFPaymentRail } from './core/ietf-payment.js'
 import { sqliteStorage } from './storage/sqlite.js'
 import { StatsCollector } from './stats.js'
-import { randomBytes } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import { REDEEM_LEASE_MS } from './core/cashu-redeem.js'
 
 import {
@@ -145,6 +146,26 @@ export class Booth {
 
     if (config.xcashu) {
       rails.push(createXCashuRail(config.xcashu, this.storage))
+    }
+
+    if (config.ietfPayment) {
+      if (!config.backend) {
+        throw new Error('IETF Payment rail requires a Lightning backend for invoice creation')
+      }
+      // Derive HMAC secret from rootKey if not explicitly provided.
+      // SHA256("toll-booth-ietf-hmac-v1" || rootKey) for domain separation.
+      const hmacSecret = config.ietfPayment.hmacSecret ?? createHash('sha256')
+        .update(`toll-booth-ietf-hmac-v1${this.rootKey}`)
+        .digest('hex')
+      rails.push(createIETFPaymentRail({
+        hmacSecret,
+        realm: config.ietfPayment.realm,
+        backend: config.backend,
+        storage: this.storage,
+        challengeExpirySecs: config.ietfPayment.challengeExpirySecs,
+        description: config.ietfPayment.description,
+        serviceName: config.serviceName,
+      }))
     }
 
     this.engine = createTollBooth({

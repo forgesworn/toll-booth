@@ -99,6 +99,21 @@ export interface XCashuConfig {
 }
 
 /**
+ * Configuration for the IETF Payment authentication rail.
+ * Implements draft-ryan-httpauth-payment-01 with Lightning charge intent.
+ */
+export interface IETFPaymentConfig {
+  /** Protection space (e.g. 'api.example.com'). Used in WWW-Authenticate realm. */
+  realm: string
+  /** 64-char hex HMAC secret for stateless challenge binding. Auto-derived from rootKey if omitted. */
+  hmacSecret?: string
+  /** Challenge expiry in seconds. Default: 900 (15 minutes). */
+  challengeExpirySecs?: number
+  /** Human-readable service description for challenges. */
+  description?: string
+}
+
+/**
  * Configuration for a toll-booth instance.
  */
 export interface BoothConfig {
@@ -199,6 +214,13 @@ export interface BoothConfig {
    * Proofs are swapped at the configured mint(s) using cashu-ts.
    */
   xcashu?: XCashuConfig
+
+  /**
+   * IETF Payment authentication rail (draft-ryan-httpauth-payment-01).
+   * Adds `WWW-Authenticate: Payment` challenges alongside L402.
+   * Requires a Lightning backend for invoice creation.
+   */
+  ietfPayment?: IETFPaymentConfig
 
   /**
    * Human-readable service name used in Lightning invoice descriptions.
