@@ -1,3 +1,12 @@
+# [4.2.0](https://github.com/forgesworn/toll-booth/compare/v4.1.2...v4.2.0) (2026-03-23)
+
+
+### Features
+
+* IETF Payment auth rail — challenge, verify, receipt ([d9e1e45](https://github.com/forgesworn/toll-booth/commit/d9e1e459b4b05de4f9da5db304dd07ab967fabfc))
+* multi-value WWW-Authenticate + Payment-Receipt injection ([eb4e955](https://github.com/forgesworn/toll-booth/commit/eb4e95581f8cc88ce62ec732ef5ea579db91d554))
+* wire IETF Payment rail into Booth config ([49def6b](https://github.com/forgesworn/toll-booth/commit/49def6bc6eee2693c9f4caeb1a03fe7152e5b9c0))
+
 ## [4.1.2](https://github.com/forgesworn/toll-booth/compare/v4.1.1...v4.1.2) (2026-03-20)
 
 
