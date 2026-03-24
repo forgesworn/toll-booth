@@ -188,7 +188,7 @@ app.listen(port, async () => {
           { capability: 'standard-joke', price: 21, currency: 'sats' },
           { capability: 'premium-joke', price: 42, currency: 'sats' },
         ],
-        paymentMethods: ['bitcoin-lightning-bolt11'],
+        paymentMethods: [['l402', 'lightning']],
         topics: ['jokes', 'humour', 'bitcoin', 'lightning', 'nostr', 'l402'],
         capabilities: [
           {
