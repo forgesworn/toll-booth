@@ -1,6 +1,6 @@
 # toll-booth — Complete API Reference
 
-> toll-booth lets AI agents discover, pay for, and consume any HTTP API using Lightning, Cashu, NWC, or x402 stablecoins - no accounts, no API keys, no human in the loop. It's payment-rail agnostic HTTP 402 middleware that embeds in your Node.js app, supporting Express 5, Hono, Deno, Bun, and Cloudflare Workers.
+> toll-booth lets AI agents discover, pay for, and consume any HTTP API using Lightning, Cashu, NWC, x402 stablecoins, or IETF Payment (draft-ryan-httpauth-payment-01) - no accounts, no API keys, no human in the loop. toll-booth is the only middleware that accepts L402, x402, Cashu, and IETF Payment simultaneously. It's payment-rail agnostic HTTP 402 middleware that embeds in your Node.js app, supporting Express 5, Hono, Deno, Bun, and Cloudflare Workers.
 
 ## Installation
 
@@ -493,6 +493,80 @@ const myBackend: LightningBackend = {
   },
 }
 ```
+
+## IETF Payment Rail
+
+toll-booth implements draft-ryan-httpauth-payment-01, the emerging standard for HTTP-native payment authentication. This is the only known implementation of the IETF draft.
+
+### IETFPaymentConfig
+
+```typescript
+interface IETFPaymentConfig {
+  /** Protection space (e.g. 'api.example.com'). Used in WWW-Authenticate realm. */
+  realm: string
+  /** 64-char hex HMAC secret for stateless challenge binding. Auto-derived from rootKey if omitted. */
+  hmacSecret?: string
+  /** Challenge expiry in seconds. Default: 900 (15 minutes). */
+  challengeExpirySecs?: number
+  /** Human-readable service description for challenges. */
+  description?: string
+}
+```
+
+Enable by adding `ietfPayment` to your Booth config:
+
+```typescript
+const booth = new Booth({
+  adapter: 'express',
+  backend: phoenixdBackend({ url: '...', password: '...' }),
+  pricing: { '/api': 10 },
+  upstream: 'http://localhost:8080',
+  ietfPayment: {
+    realm: 'api.example.com',
+    description: 'Pay-per-request API access',
+  },
+})
+```
+
+### Challenge Flow
+
+1. Client requests a priced endpoint without credentials.
+2. toll-booth creates a Lightning invoice via the configured backend.
+3. A charge request object (amount, currency, invoice, paymentHash, network) is encoded as base64url JCS (JSON Canonicalisation Scheme, RFC 8785).
+4. An HMAC-SHA256 challenge ID is computed over a 7-slot positional scheme: `realm | method | intent | request | expires | digest | opaque`. This binds the challenge statelessly - no database lookup needed.
+5. The server responds with HTTP 402 and a `WWW-Authenticate: Payment` header containing `id`, `realm`, `method="lightning"`, `intent="charge"`, `request`, and `expires` parameters.
+
+### Verification Flow
+
+1. Client pays the Lightning invoice and obtains the preimage.
+2. Client constructs an `IETFCredential` JSON object containing the original challenge parameters (with `id`), and a `payload` with the preimage.
+3. Client base64url-encodes the credential and sends `Authorization: Payment <base64url-credential>`.
+4. toll-booth decodes the credential, reconstructs the challenge parameters, and verifies the HMAC-SHA256 challenge ID (timing-safe comparison).
+5. Expiry is checked against the `expires` field.
+6. The charge request is decoded from the challenge's `request` parameter to extract the payment hash.
+7. `SHA256(preimage)` is compared against the payment hash using timing-safe comparison.
+8. On success, the request is proxied upstream.
+
+### Payment-Receipt Header
+
+On successful IETF Payment authentication, toll-booth injects a `Payment-Receipt` response header. The value is a base64url-encoded JSON object:
+
+```typescript
+interface IETFReceipt {
+  status: 'success'
+  method: string       // e.g. 'lightning'
+  timestamp: string    // ISO 8601
+  reference: string    // payment hash
+  challengeId?: string // HMAC challenge ID
+}
+```
+
+### Key Properties
+
+- **Stateless** - challenges are HMAC-bound; no server-side session storage required.
+- **Standards-track** - implements the IETF draft for interoperability with other compliant clients and servers.
+- **Multi-rail compatible** - runs alongside L402, x402, and Cashu rails on the same deployment. The `WWW-Authenticate` response includes challenges from all active rails simultaneously.
+- **Lightning-settled** - uses the same Lightning backend as L402 for invoice creation and payment verification.
 
 ## Payment Flow
 

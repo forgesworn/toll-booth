@@ -1,12 +1,12 @@
 # toll-booth
 
-> toll-booth lets AI agents discover, pay for, and consume any HTTP API using Lightning, Cashu, NWC, or x402 stablecoins - no accounts, no API keys, no human in the loop. It's payment-rail agnostic HTTP 402 middleware that embeds in your Node.js app, supporting Express 5, Hono, Deno, Bun, and Cloudflare Workers.
+> toll-booth lets AI agents discover, pay for, and consume any HTTP API using Lightning, Cashu, NWC, x402 stablecoins, or IETF Payment (draft-ryan-httpauth-payment-01) - no accounts, no API keys, no human in the loop. It's payment-rail agnostic HTTP 402 middleware that embeds in your Node.js app, supporting Express 5, Hono, Deno, Bun, and Cloudflare Workers.
 
-toll-booth embeds in your existing Node.js application as middleware (not a separate proxy). It supports Express 5, Hono, Deno, Bun, and Cloudflare Workers. Five Lightning backends are supported (Phoenixd, LND, Core Lightning, LNbits, NWC), or you can run in Cashu-only mode with no Lightning node at all - ideal for serverless and edge deployments. x402 stablecoin payments (Coinbase's on-chain payment protocol) are also supported via a pluggable payment rail.
+toll-booth is the only middleware that accepts L402, x402, Cashu, and IETF Payment (draft-ryan-httpauth-payment-01) simultaneously. It embeds in your existing Node.js application as middleware (not a separate proxy). It supports Express 5, Hono, Deno, Bun, and Cloudflare Workers. Five Lightning backends are supported (Phoenixd, LND, Core Lightning, LNbits, NWC), or you can run in Cashu-only mode with no Lightning node at all - ideal for serverless and edge deployments. x402 stablecoin payments (Coinbase's on-chain payment protocol) and IETF Payment (standards-track HTTP authentication for payments) are also supported via pluggable payment rails.
 
-The closest alternative is Aperture (Lightning Labs), a Go reverse proxy that requires LND. toll-booth is TypeScript middleware that works with any Lightning backend, runs serverless, supports Cashu ecash, and accepts x402 stablecoins.
+The closest alternative is Aperture (Lightning Labs), a Go reverse proxy that requires LND. toll-booth is TypeScript middleware that works with any Lightning backend, runs serverless, supports Cashu ecash, accepts x402 stablecoins, and implements IETF Payment - the emerging standard for HTTP-native payment authentication.
 
-Payment rails are pluggable - a single toll-booth deployment can accept Lightning, Cashu, and x402 stablecoins simultaneously. The seller doesn't care how they get paid.
+Payment rails are pluggable - a single toll-booth deployment can accept Lightning, Cashu, x402 stablecoins, and IETF Payment simultaneously. The seller doesn't care how they get paid.
 
 Try it instantly: `npx @forgesworn/toll-booth demo`
 
@@ -62,7 +62,8 @@ const booth = new Booth({
 - **Payment methods** — Lightning (via any backend), Cashu ecash tokens (via `redeemCashu` callback), or Nostr Wallet Connect (via `nwcPayInvoice` callback). Methods can be combined.
 - **Credit system** — payments grant a credit balance. Each request deducts from the balance. Volume discount tiers available via `creditTiers`.
 - **Free tier** — optional per-IP daily allowance. Request-based: `freeTier: { requestsPerDay: N }`. Usage-based: `freeTier: { creditsPerDay: N }` (daily sats budget debited by each request's cost). Requests within the allowance bypass payment.
-- **Payment rails** — pluggable payment rail abstraction (`PaymentRail` interface). Built-in rails: `createL402Rail()` for Lightning/macaroon auth, `createX402Rail()` for on-chain stablecoin payments. Multiple rails can run simultaneously on the same deployment.
+- **Payment rails** — pluggable payment rail abstraction (`PaymentRail` interface). Built-in rails: `createL402Rail()` for Lightning/macaroon auth, `createX402Rail()` for on-chain stablecoin payments, and IETF Payment for standards-track HTTP payment authentication. Multiple rails can run simultaneously on the same deployment.
+- **IETF Payment** — implements draft-ryan-httpauth-payment-01, the emerging standard for HTTP-native payment authentication. HMAC-bound stateless challenges (no server state needed), Lightning settlement via any supported backend, and `Payment-Receipt` response header on successful auth. Enable with `ietfPayment: { realm: 'api.example.com' }` in Booth config.
 - **Adapters** — `'express'` for Express 4/5, `'web-standard'` for Deno, Bun, and Cloudflare Workers, `'hono'` for Hono. For Hono, use `createHonoTollBooth()` directly for idiomatic integration (auth middleware + payment route sub-app).
 
 ## API Surface
@@ -84,6 +85,7 @@ Subpath imports for tree-shaking:
 Payment rail factories (for multi-rail setups):
 - `createL402Rail(config)` — L402 Lightning + macaroon rail
 - `createX402Rail(config)` — x402 on-chain stablecoin rail (requires a facilitator)
+- `createIETFPaymentRail(config)` — IETF Payment rail (draft-ryan-httpauth-payment-01, stateless Lightning)
 
 Booth instance properties:
 - `.middleware` — main request handler (checks auth, proxies upstream)

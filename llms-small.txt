@@ -1,6 +1,6 @@
 # toll-booth
 
-HTTP 402 payment middleware for Node.js. Gates any API behind Lightning, Cashu, or NWC payments.
+HTTP 402 payment middleware for Node.js. Gates any API behind Lightning, Cashu, NWC, x402, or IETF Payment (draft-ryan-httpauth-payment-01) - the only middleware supporting all five rails simultaneously.
 
 ## Install
 
