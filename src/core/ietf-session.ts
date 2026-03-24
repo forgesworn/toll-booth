@@ -16,6 +16,32 @@ import {
 } from './ietf-payment.js'
 import type { IETFChallengeParams, IETFCredential } from './ietf-payment.js'
 
+// --- BOLT11 amount parsing ---
+
+/**
+ * Extract the amount in satoshis from a BOLT11 invoice.
+ * Returns undefined for amountless invoices.
+ * Only parses the human-readable prefix — no full BOLT11 decode needed.
+ */
+function parseBolt11AmountSats(bolt11: string): number | undefined {
+  // BOLT11 format: ln + network + amount + separator
+  // Amount is digits + optional multiplier: m=milli, u=micro, n=nano, p=pico
+  const match = bolt11.match(/^ln[a-z]*?(\d+)([munp]?)1/)
+  if (!match) return undefined
+  const num = parseInt(match[1], 10)
+  const multiplier = match[2]
+  // Base unit is BTC. Convert to satoshis (1 BTC = 100,000,000 sats)
+  const btcToSats = 100_000_000
+  switch (multiplier) {
+    case 'm': return Math.round(num * btcToSats / 1000)       // milli-BTC
+    case 'u': return Math.round(num * btcToSats / 1_000_000)  // micro-BTC
+    case 'n': return Math.round(num * btcToSats / 1_000_000_000) // nano-BTC
+    case 'p': return Math.round(num * btcToSats / 1_000_000_000_000) // pico-BTC
+    case '':  return Math.round(num * btcToSats)               // full BTC
+    default:  return undefined
+  }
+}
+
 // --- Session-specific types ---
 
 /** Session challenge request (embedded in challenge `request` param). */
@@ -116,6 +142,9 @@ export function createIETFSessionRail(config: IETFSessionRailConfig): PaymentRai
   getSessionByBearer(token: string): Session | null
 } {
   const { hmacSecret, realm, backend, storage, description } = config
+  if (!backend.sendPayment) {
+    throw new Error('Session intent requires a Lightning backend that supports sendPayment() for refunds')
+  }
   const label = config.serviceName ?? 'toll-booth'
   const maxDurationMs = config.session.maxSessionDurationMs ?? DEFAULT_MAX_DURATION_MS
   const maxDepositSats = config.session.maxDepositSats ?? DEFAULT_MAX_DEPOSIT_SATS
@@ -133,9 +162,16 @@ export function createIETFSessionRail(config: IETFSessionRailConfig): PaymentRai
       try {
         await refundAndClose(session)
         count++
-      } catch {
-        // Log failure but continue sweeping other sessions.
-        // Session remains open for next sweep attempt.
+      } catch (err) {
+        // Emit event so operators can observe stuck sessions
+        emitEvent({
+          type: 'expire',
+          sessionId: session.sessionId,
+          paymentHash: session.paymentHash,
+          amountSats: session.balanceSats,
+          balanceSats: session.balanceSats,
+          timestamp: new Date().toISOString(),
+        })
       }
     }
     // Also prune long-closed sessions
@@ -143,17 +179,38 @@ export function createIETFSessionRail(config: IETFSessionRailConfig): PaymentRai
     return count
   }
 
-  /** Refund remaining balance and close a session. */
+  /**
+   * Refund remaining balance and close a session.
+   * Uses atomic close-before-pay to prevent TOCTOU double-refund:
+   * the session is marked closed BEFORE the payment is sent.
+   */
   async function refundAndClose(session: Session): Promise<string | undefined> {
+    // TOCTOU protection: close the session first, then attempt refund.
+    // This prevents concurrent close + sweep from both sending payments.
+    storage.closeSession(session.sessionId)
+
     let refundPreimage: string | undefined
-    if (session.balanceSats > 0 && session.returnInvoice) {
-      if (!backend.sendPayment) {
-        throw new Error('Lightning backend does not support sendPayment — cannot refund session')
+    if (session.balanceSats > 0 && session.returnInvoice && backend.sendPayment) {
+      // Validate return invoice amount matches remaining balance
+      const invoiceAmountSats = parseBolt11AmountSats(session.returnInvoice)
+      if (invoiceAmountSats !== undefined && invoiceAmountSats !== session.balanceSats) {
+        // Amount mismatch — do not pay. Session is already closed.
+        emitEvent({
+          type: 'expire',
+          sessionId: session.sessionId,
+          paymentHash: session.paymentHash,
+          amountSats: session.balanceSats,
+          balanceSats: 0,
+          timestamp: new Date().toISOString(),
+        })
+        return undefined
       }
       const result = await backend.sendPayment(session.returnInvoice)
       refundPreimage = result.preimage
+      // Update the closed session with the refund preimage
+      storage.closeSession(session.sessionId, refundPreimage)
     }
-    storage.closeSession(session.sessionId, refundPreimage)
+
     emitEvent({
       type: session.balanceSats > 0 ? 'close' : 'expire',
       sessionId: session.sessionId,
@@ -351,8 +408,13 @@ export function createIETFSessionRail(config: IETFSessionRailConfig): PaymentRai
           return { authenticated: false, paymentId: paymentHash, mode: 'credit', currency: 'sat' }
         }
 
-        // Create session
+        // Create session — reject replay of same deposit
         const sessionId = paymentHash // Deterministic: one session per deposit
+        const existing = storage.getSession(sessionId)
+        if (existing) {
+          return { authenticated: false, paymentId: paymentHash, mode: 'credit', currency: 'sat' }
+        }
+
         const bearerToken = randomBytes(32).toString('hex')
         const expiresAt = new Date(Date.now() + maxDurationMs).toISOString()
 
@@ -445,12 +507,40 @@ export function createIETFSessionRail(config: IETFSessionRailConfig): PaymentRai
           return { authenticated: false, paymentId: paymentHash, mode: 'credit', currency: 'sat' }
         }
 
-        // Use return invoice from close request or from session open
-        const returnInvoice = close.returnInvoice ?? session.returnInvoice
+        // Refund-to-originator: always use the return invoice from session open.
+        // Close-time override is not permitted (prevents refund redirect attacks).
+        const returnInvoice = session.returnInvoice
 
         // Attempt refund if balance > 0 and return invoice exists
         let refundPreimage: string | undefined
         if (session.balanceSats > 0 && returnInvoice && backend.sendPayment) {
+          // CRITICAL: validate return invoice amount matches remaining balance.
+          // Amountless invoices are always safe; amount-specified invoices must
+          // match the remaining balance to prevent operator fund drain.
+          const invoiceAmountSats = parseBolt11AmountSats(returnInvoice)
+          if (invoiceAmountSats !== undefined && invoiceAmountSats !== session.balanceSats) {
+            // Amount mismatch — do not pay. Emit event for operator visibility.
+            emitEvent({
+              type: 'close',
+              sessionId: session.sessionId,
+              paymentHash: session.paymentHash,
+              amountSats: session.balanceSats,
+              balanceSats: 0,
+              timestamp: new Date().toISOString(),
+            })
+            storage.closeSession(session.sessionId)
+            return {
+              authenticated: true,
+              paymentId: session.sessionId,
+              mode: 'credit',
+              creditBalance: 0,
+              currency: 'sat',
+              customCaveats: {
+                'X-Session-Closed': 'true',
+                'X-Refund-Status': 'amount-mismatch',
+              },
+            }
+          }
           try {
             const result = await backend.sendPayment(returnInvoice)
             refundPreimage = result.preimage

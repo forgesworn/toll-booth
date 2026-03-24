@@ -98,8 +98,11 @@ export function lndBackend(config: LndConfig): LightningBackend {
       const lines = text.trim().split('\n').filter(Boolean)
 
       for (let i = lines.length - 1; i >= 0; i--) {
-        const entry = JSON.parse(lines[i]) as {
-          result?: { status?: string; payment_preimage?: string }
+        let entry: { result?: { status?: string; payment_preimage?: string } }
+        try {
+          entry = JSON.parse(lines[i])
+        } catch {
+          continue // skip malformed JSON lines (network truncation)
         }
         if (entry.result?.status === 'SUCCEEDED' && entry.result.payment_preimage) {
           return {
