@@ -8,7 +8,7 @@ Flat-rate pricing does not work either. A 20-token completion and a 4,000-token 
 
 ## The solution
 
-[satgate](https://github.com/forgesworn/satgate) is a reverse proxy that sits in front of any OpenAI-compatible inference endpoint. It uses toll-booth for all payment infrastructure and adds token counting, model-specific pricing, and streaming reconciliation on top. The entire product is roughly 400 lines of application logic; everything else - payment gating, credit accounting, free tiers, macaroon authentication, persistence - is toll-booth.
+[satgate](https://github.com/TheCryptoDonkey/satgate) is a reverse proxy that sits in front of any OpenAI-compatible inference endpoint. It uses toll-booth for all payment infrastructure and adds token counting, model-specific pricing, and streaming reconciliation on top. The entire product is roughly 400 lines of application logic; everything else - payment gating, credit accounting, free tiers, macaroon authentication, persistence - is toll-booth.
 
 One command turns your local model into a paid API. No accounts. No sign-up. No billing dashboard.
 
@@ -68,7 +68,7 @@ If you are building a paid API, you probably do not need to write payment code a
 
 ## Links
 
-- **satgate:** [github.com/forgesworn/satgate](https://github.com/forgesworn/satgate)
+- **satgate:** [github.com/TheCryptoDonkey/satgate](https://github.com/TheCryptoDonkey/satgate)
 - **toll-booth:** [github.com/forgesworn/toll-booth](https://github.com/forgesworn/toll-booth)
 - **402-mcp:** [github.com/forgesworn/402-mcp](https://github.com/forgesworn/402-mcp)
 - **Live:** [satgate.trotters.dev](https://satgate.trotters.dev)

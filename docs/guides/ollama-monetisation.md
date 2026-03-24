@@ -171,7 +171,7 @@ The `X-Credit-Balance` response header shows remaining sats.
 
 ## For production
 
-This flat-rate approach works for simple cases, but AI inference varies wildly per request. A short completion might use 50 tokens; a long one might use 4,000. For production deployments, look at [**satgate**](https://github.com/forgesworn/satgate) - a production-grade inference gateway built on toll-booth (~400 lines) that adds:
+This flat-rate approach works for simple cases, but AI inference varies wildly per request. A short completion might use 50 tokens; a long one might use 4,000. For production deployments, look at [**satgate**](https://github.com/TheCryptoDonkey/satgate) - a production-grade inference gateway built on toll-booth (~400 lines) that adds:
 
 - **Per-token metering** - charges based on actual token usage, not flat rates
 - **Streaming reconciliation** - counts tokens in real-time SSE streams

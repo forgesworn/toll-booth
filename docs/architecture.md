@@ -201,7 +201,7 @@ graph TB
 | Layer | Project | What it does | What it doesn't do |
 |-------|---------|-------------|-------------------|
 | **Client** | [402-mcp](https://github.com/forgesworn/402-mcp) | Discovers, pays, consumes L402 APIs | Doesn't gate or price anything |
-| **Product** | [satgate](https://github.com/forgesworn/satgate) | Token counting, model pricing, capacity, streaming | Doesn't handle payments directly |
+| **Product** | [satgate](https://github.com/TheCryptoDonkey/satgate) | Token counting, model pricing, capacity, streaming | Doesn't handle payments directly |
 | **Middleware** | [toll-booth](https://github.com/forgesworn/toll-booth) | Payment gating, credit accounting, free tiers | Doesn't know about tokens or models |
 | **Rails** | Lightning / Cashu / NWC / x402 | Moves money | Doesn't know about HTTP or APIs |
 

@@ -12,7 +12,7 @@ A wide cinematic scene of a futuristic toll booth on an elevated highway at nigh
 
 ## Article
 
-In 1999, the architects of the web reserved HTTP status code 402 -Payment Required. It was a placeholder for a future where the internet had native payments. Twenty-five years later, we still don't use it.
+In 1999, the architects of the web reserved HTTP status code 402 -Payment Required. It was a placeholder for a future where the internet had native payments. Twenty-seven years later, we still don't use it.
 
 Every API on the web assumes you're a human with a credit card. Sign up. Get a key. Add a billing method. Wait for approval. This works fine when the consumer is a developer at a desk. It falls apart completely when the consumer is an autonomous AI agent that needs to call your API at 3am.
 
@@ -73,7 +73,7 @@ Three payment rails. One middleware. The client picks.
 
 ### Not vapourware
 
-toll-booth is running in production right now. It gates a Valhalla routing engine at routing.trotters.cc -real Lightning invoices, real payments, real map queries returned.
+toll-booth is running in production right now. It gates a joke API at jokes.trotters.dev and an AI inference gateway at satgate.trotters.dev -real Lightning invoices, real payments, real responses.
 
 It includes a free tier for discovery (configurable daily allowance per IP), volume discount tiers for committed users, and a self-service payment page with QR codes and wallet adapter buttons.
 
