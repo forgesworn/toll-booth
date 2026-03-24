@@ -53,7 +53,7 @@ export interface ChallengeFragment {
 export interface RailVerifyResult {
   authenticated: boolean
   paymentId: string
-  mode: 'per-request' | 'credit'
+  mode: 'per-request' | 'credit' | 'session'
   creditBalance?: number
   currency: Currency
   customCaveats?: Record<string, string>

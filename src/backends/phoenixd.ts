@@ -71,5 +71,28 @@ export function phoenixdBackend(config: PhoenixdConfig): LightningBackend {
         preimage: data.isPaid ? data.preimage : undefined,
       }
     },
+
+    async sendPayment(bolt11: string): Promise<{ preimage: string }> {
+      const body = new URLSearchParams()
+      body.set('invoice', bolt11)
+
+      const res = await fetch(`${baseUrl}/payinvoice`, {
+        method: 'POST',
+        headers: {
+          'Authorization': authHeader,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body,
+        signal: AbortSignal.timeout(timeoutMs),
+      })
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => '')
+        throw new Error(`Phoenixd payinvoice failed (${res.status}): ${text.slice(0, 200)}`)
+      }
+
+      const data = await res.json() as { paymentPreimage: string }
+      return { preimage: data.paymentPreimage }
+    },
   }
 }

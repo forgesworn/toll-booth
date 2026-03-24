@@ -72,5 +72,35 @@ export function lnbitsBackend(config: LNbitsConfig): LightningBackend {
         preimage: data.paid ? data.preimage : undefined,
       }
     },
+
+    async sendPayment(bolt11: string): Promise<{ preimage: string }> {
+      const res = await fetch(`${baseUrl}/api/v1/payments`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ out: true, bolt11 }),
+        signal: AbortSignal.timeout(timeoutMs),
+      })
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => '')
+        throw new Error(`LNbits sendPayment failed (${res.status}): ${text.slice(0, 200)}`)
+      }
+
+      const payData = await res.json() as { checking_id: string; payment_hash: string }
+
+      // Look up the completed payment to retrieve the preimage
+      const detailRes = await fetch(`${baseUrl}/api/v1/payments/${payData.checking_id}`, {
+        headers: { 'X-Api-Key': config.apiKey },
+        signal: AbortSignal.timeout(timeoutMs),
+      })
+
+      if (!detailRes.ok) {
+        const text = await detailRes.text().catch(() => '')
+        throw new Error(`LNbits sendPayment detail lookup failed (${detailRes.status}): ${text.slice(0, 200)}`)
+      }
+
+      const detail = await detailRes.json() as { details: { preimage: string } }
+      return { preimage: detail.details.preimage }
+    },
   }
 }

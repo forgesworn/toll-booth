@@ -46,6 +46,15 @@ export interface LightningBackend {
    * @returns The current invoice status.
    */
   checkInvoice(paymentHash: string): Promise<InvoiceStatus>
+
+  /**
+   * Pay a Lightning invoice (outbound payment).
+   * Required for session intent refunds — not all deployments need this.
+   * Backends that don't support outbound payments should throw.
+   * @param bolt11 - The BOLT11 invoice to pay.
+   * @returns The payment preimage proving payment was made.
+   */
+  sendPayment?(bolt11: string): Promise<{ preimage: string }>
 }
 
 import type { Proof } from '@cashu/cashu-ts'
@@ -111,6 +120,22 @@ export interface IETFPaymentConfig {
   challengeExpirySecs?: number
   /** Human-readable service description for challenges. */
   description?: string
+}
+
+/**
+ * Configuration for the IETF Payment session intent.
+ * Enables deposit/bearer/top-up/close lifecycle for streaming payments.
+ * Requires a Lightning backend that supports `sendPayment()` for refunds.
+ */
+export interface SessionConfig {
+  /** Maximum session duration in milliseconds. Default: 86,400,000 (24 hours). */
+  maxSessionDurationMs?: number
+  /** Maximum deposit amount in satoshis. Default: 100,000. */
+  maxDepositSats?: number
+  /** Interval for sweeping expired sessions in milliseconds. Default: 3,600,000 (1 hour). */
+  sessionPruneIntervalMs?: number
+  /** Balance threshold (sats) below which NeedTopUp events are emitted. Default: 10% of deposit. */
+  needTopUpThresholdSats?: number
 }
 
 /**
@@ -221,6 +246,13 @@ export interface BoothConfig {
    * Requires a Lightning backend for invoice creation.
    */
   ietfPayment?: IETFPaymentConfig
+
+  /**
+   * IETF Payment session intent configuration.
+   * Enables deposit/bearer/top-up/close for streaming payments.
+   * Requires `ietfPayment` and a Lightning backend with `sendPayment()`.
+   */
+  ietfSession?: SessionConfig
 
   /**
    * Human-readable service name used in Lightning invoice descriptions.

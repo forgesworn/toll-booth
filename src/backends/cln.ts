@@ -80,5 +80,22 @@ export function clnBackend(config: ClnConfig): LightningBackend {
         preimage: inv.payment_preimage,
       }
     },
+
+    async sendPayment(bolt11: string): Promise<{ preimage: string }> {
+      const res = await fetch(`${baseUrl}/v1/pay`, {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bolt11 }),
+        signal: AbortSignal.timeout(timeoutMs),
+      })
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => '')
+        throw new Error(`CLN sendPayment failed (${res.status}): ${text.slice(0, 200)}`)
+      }
+
+      const data = await res.json() as { payment_preimage: string }
+      return { preimage: data.payment_preimage }
+    },
   }
 }

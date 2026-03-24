@@ -75,5 +75,46 @@ export function lndBackend(config: LndConfig): LightningBackend {
           : undefined,
       }
     },
+
+    async sendPayment(bolt11: string): Promise<{ preimage: string }> {
+      const res = await fetch(`${baseUrl}/v2/router/send`, {
+        method: 'POST',
+        headers: {
+          'Grpc-Metadata-macaroon': macaroonHex,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ payment_request: bolt11, timeout_seconds: 30 }),
+        signal: AbortSignal.timeout(timeoutMs),
+      })
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => '')
+        throw new Error(`LND sendPayment failed (${res.status}): ${text.slice(0, 200)}`)
+      }
+
+      // v2/router/send returns newline-delimited JSON (streaming).
+      // Each line is a payment status update; we want the final one.
+      const text = await res.text()
+      const lines = text.trim().split('\n').filter(Boolean)
+
+      for (let i = lines.length - 1; i >= 0; i--) {
+        let entry: { result?: { status?: string; payment_preimage?: string } }
+        try {
+          entry = JSON.parse(lines[i])
+        } catch {
+          continue // skip malformed JSON lines (network truncation)
+        }
+        if (entry.result?.status === 'SUCCEEDED' && entry.result.payment_preimage) {
+          return {
+            preimage: Buffer.from(entry.result.payment_preimage, 'base64').toString('hex'),
+          }
+        }
+        if (entry.result?.status === 'FAILED') {
+          throw new Error('LND sendPayment: payment failed')
+        }
+      }
+
+      throw new Error('LND sendPayment: no successful payment result in response')
+    },
   }
 }

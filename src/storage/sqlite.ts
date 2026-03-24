@@ -2,7 +2,7 @@
 import { timingSafeEqual } from 'node:crypto'
 import Database from 'better-sqlite3'
 import type { Currency } from '../core/payment-rail.js'
-import type { StorageBackend, DebitResult, StoredInvoice, PendingClaim } from './interface.js'
+import type { StorageBackend, DebitResult, StoredInvoice, PendingClaim, Session } from './interface.js'
 
 const DEFAULT_LEASE_MS = 30_000
 
@@ -99,6 +99,23 @@ export function sqliteStorage(config?: SqliteStorageConfig): StorageBackend {
   }
   // Copy legacy balance into balance_sats for existing rows.
   db.exec('UPDATE credits SET balance_sats = balance WHERE balance > 0 AND balance_sats = 0')
+
+  // Migration: add sessions table.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS sessions (
+      session_id TEXT PRIMARY KEY,
+      payment_hash TEXT NOT NULL,
+      balance_sats INTEGER NOT NULL DEFAULT 0,
+      deposit_sats INTEGER NOT NULL DEFAULT 0,
+      return_invoice TEXT,
+      bearer_token TEXT NOT NULL UNIQUE,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      expires_at TEXT NOT NULL,
+      closed_at TEXT,
+      refund_preimage TEXT
+    )
+  `)
+  db.exec('CREATE INDEX IF NOT EXISTS idx_sessions_bearer ON sessions(bearer_token)')
 
   // Per-currency prepared statements for credit operations
   const stmtCreditSat = db.prepare(`
@@ -302,6 +319,74 @@ export function sqliteStorage(config?: SqliteStorageConfig): StorageBackend {
     return updated.balance
   })
 
+  // Session prepared statements
+  const stmtCreateSession = db.prepare(`
+    INSERT INTO sessions (session_id, payment_hash, balance_sats, deposit_sats, bearer_token, expires_at, return_invoice)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `)
+
+  const stmtGetSession = db.prepare(
+    'SELECT session_id, payment_hash, balance_sats, deposit_sats, return_invoice, bearer_token, created_at, expires_at, closed_at, refund_preimage FROM sessions WHERE session_id = ?'
+  )
+
+  const stmtGetSessionByBearer = db.prepare(
+    'SELECT session_id, payment_hash, balance_sats, deposit_sats, return_invoice, bearer_token, created_at, expires_at, closed_at, refund_preimage FROM sessions WHERE bearer_token = ?'
+  )
+
+  const stmtDeductSession = db.prepare(
+    'UPDATE sessions SET balance_sats = balance_sats - ? WHERE session_id = ? AND balance_sats >= ? AND closed_at IS NULL'
+  )
+
+  const stmtTopUpSession = db.prepare(
+    'UPDATE sessions SET balance_sats = balance_sats + ?, deposit_sats = deposit_sats + ? WHERE session_id = ? AND closed_at IS NULL'
+  )
+
+  const stmtCloseSession = db.prepare(
+    "UPDATE sessions SET closed_at = datetime('now'), refund_preimage = ? WHERE session_id = ? AND closed_at IS NULL"
+  )
+
+  const stmtGetExpiredSessions = db.prepare(
+    "SELECT session_id, payment_hash, balance_sats, deposit_sats, return_invoice, bearer_token, created_at, expires_at, closed_at, refund_preimage FROM sessions WHERE closed_at IS NULL AND expires_at < datetime('now')"
+  )
+
+  const stmtPruneClosedSessions = db.prepare(
+    "DELETE FROM sessions WHERE closed_at IS NOT NULL AND closed_at < datetime('now', '-' || ? || ' seconds')"
+  )
+
+  const stmtGetSessionBalance = db.prepare(
+    'SELECT balance_sats FROM sessions WHERE session_id = ? AND closed_at IS NULL'
+  )
+
+  function rowToSession(row: Record<string, unknown>): Session {
+    return {
+      sessionId: row.session_id as string,
+      paymentHash: row.payment_hash as string,
+      balanceSats: row.balance_sats as number,
+      depositSats: row.deposit_sats as number,
+      returnInvoice: row.return_invoice as string | null,
+      bearerToken: row.bearer_token as string,
+      createdAt: row.created_at as string,
+      expiresAt: row.expires_at as string,
+      closedAt: row.closed_at as string | null,
+      refundPreimage: row.refund_preimage as string | null,
+    }
+  }
+
+  const txnDeductSession = db.transaction((sessionId: string, amount: number): { newBalance: number } => {
+    const row = stmtGetSessionBalance.get(sessionId) as { balance_sats: number } | undefined
+    if (!row) throw new Error(`Session not found or closed: ${sessionId}`)
+    if (row.balance_sats < amount) throw new Error(`Insufficient session balance: ${row.balance_sats} < ${amount}`)
+    stmtDeductSession.run(amount, sessionId, amount)
+    return { newBalance: row.balance_sats - amount }
+  })
+
+  const txnTopUpSession = db.transaction((sessionId: string, amount: number): { newBalance: number } => {
+    const row = stmtGetSessionBalance.get(sessionId) as { balance_sats: number } | undefined
+    if (!row) throw new Error(`Session not found or closed: ${sessionId}`)
+    stmtTopUpSession.run(amount, amount, sessionId)
+    return { newBalance: row.balance_sats + amount }
+  })
+
   const txnDebit = db.transaction((paymentHash: string, amount: number, currency: Currency = 'sat'): DebitResult => {
     const stmtBal = balanceFor(currency)
     const row = stmtBal.get(paymentHash) as { balance: number } | undefined
@@ -460,6 +545,43 @@ export function sqliteStorage(config?: SqliteStorageConfig): StorageBackend {
       total += stmtPruneClaims.run(maxAgeSecs).changes
       return total
     }),
+
+    createSession(session: { sessionId: string, paymentHash: string, balanceSats: number, depositSats: number, bearerToken: string, expiresAt: string, returnInvoice?: string }): void {
+      stmtCreateSession.run(session.sessionId, session.paymentHash, session.balanceSats, session.depositSats, session.bearerToken, session.expiresAt, session.returnInvoice ?? null)
+    },
+
+    getSession(sessionId: string): Session | null {
+      const row = stmtGetSession.get(sessionId) as Record<string, unknown> | undefined
+      return row ? rowToSession(row) : null
+    },
+
+    getSessionByBearer(bearerToken: string): Session | null {
+      const row = stmtGetSessionByBearer.get(bearerToken) as Record<string, unknown> | undefined
+      return row ? rowToSession(row) : null
+    },
+
+    deductSession(sessionId: string, amount: number): { newBalance: number } {
+      return txnDeductSession(sessionId, amount)
+    },
+
+    topUpSession(sessionId: string, amount: number): { newBalance: number } {
+      return txnTopUpSession(sessionId, amount)
+    },
+
+    closeSession(sessionId: string, refundPreimage?: string): void {
+      stmtCloseSession.run(refundPreimage ?? null, sessionId)
+    },
+
+    getExpiredSessions(): Session[] {
+      const rows = stmtGetExpiredSessions.all() as Array<Record<string, unknown>>
+      return rows.map(rowToSession)
+    },
+
+    pruneClosedSessions(maxAgeMs: number): number {
+      const maxAgeSecs = Math.floor(maxAgeMs / 1000)
+      const result = stmtPruneClosedSessions.run(maxAgeSecs)
+      return result.changes
+    },
 
     close(): void {
       db.close()

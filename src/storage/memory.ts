@@ -1,7 +1,7 @@
 // src/storage/memory.ts
 import { timingSafeEqual } from 'node:crypto'
 import type { Currency } from '../core/payment-rail.js'
-import type { StorageBackend, DebitResult, StoredInvoice, PendingClaim } from './interface.js'
+import type { StorageBackend, DebitResult, StoredInvoice, PendingClaim, Session } from './interface.js'
 
 const DEFAULT_LEASE_MS = 30_000
 type StoredInvoiceRecord = StoredInvoice & { statusToken: string }
@@ -34,6 +34,7 @@ export function memoryStorage(): StorageBackend {
   const invoiceIps = new Map<string, string>()
   const settled = new Map<string, string | undefined>()
   const claims = new Map<string, { token: string; claimedAt: string; leaseExpiresAt: number }>()
+  const sessions = new Map<string, Session>()
 
   return {
     credit(paymentHash: string, amount: number, currency: Currency = 'sat'): void {
@@ -194,12 +195,90 @@ export function memoryStorage(): StorageBackend {
       return pruned
     },
 
+    createSession(session: { sessionId: string, paymentHash: string, balanceSats: number, depositSats: number, bearerToken: string, expiresAt: string, returnInvoice?: string }): void {
+      sessions.set(session.sessionId, {
+        sessionId: session.sessionId,
+        paymentHash: session.paymentHash,
+        balanceSats: session.balanceSats,
+        depositSats: session.depositSats,
+        returnInvoice: session.returnInvoice ?? null,
+        bearerToken: session.bearerToken,
+        createdAt: new Date().toISOString(),
+        expiresAt: session.expiresAt,
+        closedAt: null,
+        refundPreimage: null,
+      })
+    },
+
+    getSession(sessionId: string): Session | null {
+      return sessions.get(sessionId) ?? null
+    },
+
+    getSessionByBearer(bearerToken: string): Session | null {
+      const providedBuf = Buffer.from(bearerToken)
+      for (const session of sessions.values()) {
+        const storedBuf = Buffer.from(session.bearerToken)
+        if (storedBuf.length === providedBuf.length && timingSafeEqual(storedBuf, providedBuf)) {
+          return session
+        }
+      }
+      return null
+    },
+
+    deductSession(sessionId: string, amount: number): { newBalance: number } {
+      const session = sessions.get(sessionId)
+      if (!session || session.closedAt !== null) throw new Error(`Session not found or closed: ${sessionId}`)
+      if (session.balanceSats < amount) throw new Error(`Insufficient session balance: ${session.balanceSats} < ${amount}`)
+      session.balanceSats -= amount
+      return { newBalance: session.balanceSats }
+    },
+
+    topUpSession(sessionId: string, amount: number): { newBalance: number } {
+      const session = sessions.get(sessionId)
+      if (!session || session.closedAt !== null) throw new Error(`Session not found or closed: ${sessionId}`)
+      session.balanceSats += amount
+      session.depositSats += amount
+      return { newBalance: session.balanceSats }
+    },
+
+    closeSession(sessionId: string, refundPreimage?: string): void {
+      const session = sessions.get(sessionId)
+      if (session && session.closedAt === null) {
+        session.closedAt = new Date().toISOString()
+        session.refundPreimage = refundPreimage ?? null
+      }
+    },
+
+    getExpiredSessions(): Session[] {
+      const now = new Date().toISOString()
+      const result: Session[] = []
+      for (const session of sessions.values()) {
+        if (session.closedAt === null && session.expiresAt < now) {
+          result.push(session)
+        }
+      }
+      return result
+    },
+
+    pruneClosedSessions(maxAgeMs: number): number {
+      const cutoff = new Date(Date.now() - maxAgeMs).toISOString()
+      let pruned = 0
+      for (const [id, session] of sessions) {
+        if (session.closedAt !== null && session.closedAt < cutoff) {
+          sessions.delete(id)
+          pruned++
+        }
+      }
+      return pruned
+    },
+
     close(): void {
       balances.clear()
       invoices.clear()
       invoiceIps.clear()
       settled.clear()
       claims.clear()
+      sessions.clear()
     },
   }
 }

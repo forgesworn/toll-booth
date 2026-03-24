@@ -159,6 +159,9 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
           if (activeTypes.includes('xcashu')) {
             hints.push('Cashu: Send token via \u2014 X-Cashu header')
           }
+          if (activeTypes.includes('ietf-session')) {
+            hints.push('IETF Session: Deposit for streaming \u2014 Authorization: Payment <base64url session credential>')
+          }
           challengeBody.auth_hint = hints.length === 1 ? hints[0] : hints
         }
 
@@ -249,9 +252,23 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
               }
             }
 
-            const remaining = result.mode === 'credit'
-              ? storage.balance(result.paymentId, result.currency)
-              : undefined
+            // Session mode: deduct from session balance (not credits table)
+            let sessionBalance: number | undefined
+            if (result.mode === 'session' && result.paymentId && cost > 0) {
+              try {
+                const { newBalance } = storage.deductSession(result.paymentId, cost)
+                sessionBalance = newBalance
+              } catch {
+                // Insufficient session balance — fall through to challenge
+                break
+              }
+            }
+
+            const remaining = result.mode === 'session'
+              ? (sessionBalance ?? result.creditBalance)
+              : result.mode === 'credit'
+                ? storage.balance(result.paymentId, result.currency)
+                : undefined
 
             // Fire onPayment exactly once per paymentHash (first time seen)
             if (result.paymentId && !estimatedCosts.has(result.paymentId)) {
@@ -310,6 +327,14 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
                 reference: result.paymentId,
               })
               headers['Cache-Control'] = 'private'
+            }
+
+            // Session auth: add session-specific headers
+            if (result.mode === 'session') {
+              if (remaining !== undefined) {
+                headers['X-Session-Balance'] = String(remaining)
+              }
+              headers['Cache-Control'] = 'private, no-store'
             }
 
             config.onRequest?.({

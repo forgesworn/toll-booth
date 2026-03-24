@@ -20,6 +20,19 @@ export interface PendingClaim {
   claimedAt: string
 }
 
+export interface Session {
+  sessionId: string
+  paymentHash: string
+  balanceSats: number
+  depositSats: number
+  returnInvoice: string | null
+  bearerToken: string
+  createdAt: string
+  expiresAt: string
+  closedAt: string | null
+  refundPreimage: string | null
+}
+
 export interface StorageBackend {
   credit(paymentHash: string, amount: number, currency?: Currency): void
   debit(paymentHash: string, amount: number, currency?: Currency): DebitResult
@@ -63,5 +76,13 @@ export interface StorageBackend {
   pruneExpiredInvoices(maxAgeMs: number): number
   /** Delete zero-balance credits and aged settlements/claims. Returns total deleted rows. */
   pruneStaleRecords(maxAgeMs: number): number
+  createSession(session: { sessionId: string, paymentHash: string, balanceSats: number, depositSats: number, bearerToken: string, expiresAt: string, returnInvoice?: string }): void
+  getSession(sessionId: string): Session | null
+  getSessionByBearer(bearerToken: string): Session | null
+  deductSession(sessionId: string, amount: number): { newBalance: number }
+  topUpSession(sessionId: string, amount: number): { newBalance: number }
+  closeSession(sessionId: string, refundPreimage?: string): void
+  getExpiredSessions(): Session[]
+  pruneClosedSessions(maxAgeMs: number): number
   close(): void
 }

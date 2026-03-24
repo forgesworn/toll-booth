@@ -78,5 +78,18 @@ export function nwcBackend(config: NwcConfig): LightningBackend {
         return { paid: false }
       }
     },
+
+    async sendPayment(bolt11: string): Promise<{ preimage: string }> {
+      const nwc = await getClient()
+      const timeoutMs = timeout ?? 60_000
+      const timer = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('NWC sendPayment: timed out')), timeoutMs),
+      )
+      const result = await Promise.race([nwc.payInvoice(bolt11), timer])
+      if (!result.preimage) {
+        throw new Error('NWC sendPayment: response missing preimage')
+      }
+      return { preimage: result.preimage }
+    },
   }
 }
