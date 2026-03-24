@@ -1,3 +1,10 @@
+## [4.4.1](https://github.com/forgesworn/toll-booth/compare/v4.4.0...v4.4.1) (2026-03-24)
+
+
+### Bug Fixes
+
+* update 402-announce call to v2 API (url → urls array) ([73ac7f6](https://github.com/forgesworn/toll-booth/commit/73ac7f66e12a82f2652a423ab0af5b8915a07a40))
+
 # [4.4.0](https://github.com/forgesworn/toll-booth/compare/v4.3.0...v4.4.0) (2026-03-24)
 
 

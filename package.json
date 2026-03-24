@@ -1,6 +1,6 @@
 {
   "name": "@forgesworn/toll-booth",
-  "version": "4.4.0",
+  "version": "4.4.1",
   "type": "module",
   "description": "Monetise any API with HTTP 402 payments. Payment-rail agnostic middleware for Express, Hono, Deno, Bun, and Workers.",
   "license": "MIT",
