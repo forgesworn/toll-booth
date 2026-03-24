@@ -181,7 +181,7 @@ app.listen(port, async () => {
         relays: announceRelays,
         identifier: `sats-for-laughs-${new URL(publicUrl).hostname}`,
         name: `sats-for-laughs @ ${publicUrl}`,
-        url: publicUrl,
+        urls: [publicUrl],
         about: 'Lightning-paid joke API — cracker, standard, and premium jokes across 6 topics. Powered by toll-booth.',
         pricing: [
           { capability: 'cracker-joke', price: 5, currency: 'sats' },
