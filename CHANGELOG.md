@@ -1,3 +1,10 @@
+## [4.2.1](https://github.com/forgesworn/toll-booth/compare/v4.2.0...v4.2.1) (2026-03-24)
+
+
+### Bug Fixes
+
+* dual-scheme UX — dynamic auth hints and body descriptions ([0cacd67](https://github.com/forgesworn/toll-booth/commit/0cacd672e9163ab50ec1577b9e490fa3fa4b123d))
+
 # [4.2.0](https://github.com/forgesworn/toll-booth/compare/v4.1.2...v4.2.0) (2026-03-23)
 
 
