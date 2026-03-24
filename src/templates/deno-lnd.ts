@@ -54,7 +54,7 @@ Deno.serve({ port }, async (req: Request) => {
 `
 }
 
-function generateDenoJson(ctx: TemplateContext): string {
+function generateDenoJson(_ctx: TemplateContext): string {
   const config = {
     tasks: {
       start: 'deno run --allow-net --allow-env --allow-read server.ts',

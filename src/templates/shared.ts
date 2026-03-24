@@ -10,7 +10,7 @@ export interface GeneratedProject {
 export function generatePackageJson(
   name: string,
   deps: string[],
-  framework: string,
+  _framework: string,
 ): string {
   const dependencies: Record<string, string> = {}
   for (const dep of deps) {

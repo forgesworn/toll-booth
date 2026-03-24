@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { buildTemplateContext, parseCliFlags } from './init-prompts.js'
-import type { InitConfig, Framework, Backend, PricingMode, TemplateContext } from './init-prompts.js'
+import type { InitConfig, Framework, Backend, PricingMode } from './init-prompts.js'
 
 describe('buildTemplateContext', () => {
   const baseConfig: InitConfig = {
@@ -108,7 +108,7 @@ describe('buildTemplateContext', () => {
 
     it('produces correct setup code', () => {
       expect(ctx.backendSetup).toBe(
-        "nwcBackend({ uri: process.env.NWC_URI! })",
+        "nwcBackend({ nwcUrl: process.env.NWC_URI! })",
       )
     })
 

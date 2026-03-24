@@ -78,7 +78,7 @@ const BACKEND_MAP: Record<Backend, {
   },
   nwc: {
     importStatement: "import { nwcBackend } from '@forgesworn/toll-booth/backends/nwc'",
-    setup: "nwcBackend({ uri: process.env.NWC_URI! })",
+    setup: "nwcBackend({ nwcUrl: process.env.NWC_URI! })",
     envVars: {
       NWC_URI: 'Nostr Wallet Connect URI (nostr+walletconnect://...)',
     },
