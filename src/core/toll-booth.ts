@@ -138,13 +138,28 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
         }
 
         // Agent-friendly service metadata (only when serviceName is configured).
-        // auth_hint is L402-specific; x402/xcashu have different auth mechanisms.
         if (config.serviceName) {
           challengeBody.booth = {
             name: config.serviceName,
             ...(config.description && { description: config.description }),
           }
-          challengeBody.auth_hint = 'Pay the invoice, then send header \u2014 Authorization: L402 <macaroon>:<preimage>'
+
+          // Build auth hints based on active rails
+          const activeTypes = rails.filter(r => !r.canChallenge || r.canChallenge(normalisedPrice)).map(r => r.type)
+          const hints: string[] = []
+          if (activeTypes.includes('l402')) {
+            hints.push('L402: Pay the invoice, then send \u2014 Authorization: L402 <macaroon>:<preimage>')
+          }
+          if (activeTypes.includes('ietf-payment')) {
+            hints.push('IETF Payment: Pay the invoice, then send \u2014 Authorization: Payment <base64url credential>')
+          }
+          if (activeTypes.includes('x402')) {
+            hints.push('x402: Sign the payment, then send \u2014 PAYMENT-SIGNATURE header')
+          }
+          if (activeTypes.includes('xcashu')) {
+            hints.push('Cashu: Send token via \u2014 X-Cashu header')
+          }
+          challengeBody.auth_hint = hints.length === 1 ? hints[0] : hints
         }
 
         // Store invoice data from L402 rail if present

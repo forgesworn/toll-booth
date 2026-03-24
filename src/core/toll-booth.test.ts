@@ -829,7 +829,7 @@ describe('agent-friendly 402 body', () => {
       description: 'Network intelligence and channel suggestions',
     })
     expect(body.auth_hint).toBe(
-      'Pay the invoice, then send header \u2014 Authorization: L402 <macaroon>:<preimage>',
+      'L402: Pay the invoice, then send \u2014 Authorization: L402 <macaroon>:<preimage>',
     )
   })
 
@@ -844,7 +844,7 @@ describe('agent-friendly 402 body', () => {
     const body = result.body as Record<string, unknown>
     expect(body.booth).toEqual({ name: 'Simple API' })
     expect(body.auth_hint).toBe(
-      'Pay the invoice, then send header \u2014 Authorization: L402 <macaroon>:<preimage>',
+      'L402: Pay the invoice, then send \u2014 Authorization: L402 <macaroon>:<preimage>',
     )
   })
 

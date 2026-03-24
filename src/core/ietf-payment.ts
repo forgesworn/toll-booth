@@ -225,6 +225,8 @@ export function createIETFPaymentRail(config: IETFPaymentRailConfig): PaymentRai
         },
         body: {
           ietf_payment: {
+            scheme: 'Payment',
+            description: 'Pay per request (IETF standard, stateless)',
             method: 'lightning',
             intent: 'charge',
             payment_hash: invoice.paymentHash,

@@ -52,6 +52,8 @@ export function createL402Rail(config: L402RailConfig): PaymentRail {
         },
         body: {
           l402: {
+            scheme: 'L402',
+            description: 'Buy credits \u2014 pay once, reuse for multiple requests',
             invoice: bolt11,
             macaroon,
             payment_hash: paymentHash,
