@@ -285,6 +285,14 @@ Implements the [IETF Payment authentication scheme](https://datatracker.ietf.org
 
 ---
 
+## Guides
+
+- [Monetise any Express API in 60 seconds](docs/guides/express-quickstart.md)
+- [Monetise your Ollama endpoint](docs/guides/ollama-monetisation.md)
+- [Let AI agents pay for your API](docs/guides/ai-agent-payments.md)
+
+---
+
 ## Lightning backends
 
 ```typescript
