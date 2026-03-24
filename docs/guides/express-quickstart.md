@@ -99,5 +99,5 @@ For local development, use a mock backend that auto-settles invoices. See [`exam
 - **[Cashu payments](../configuration.md)** - accept ecash tokens alongside Lightning
 - **[x402 stablecoins](../configuration.md)** - accept USD stablecoin payments via Base
 - **[IETF Payment](../configuration.md)** - standards-track `WWW-Authenticate: Payment` challenges
-- **[Hono quickstart](./hono-quickstart.md)** - same guide for Hono
+- **Hono quickstart** - use `createHonoTollBooth()` for idiomatic Hono integration (see [configuration](../configuration.md))
 - **[Full documentation](../configuration.md)** - all options, backends, and deployment patterns
