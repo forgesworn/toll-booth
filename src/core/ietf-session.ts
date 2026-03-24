@@ -340,7 +340,7 @@ export function createIETFSessionRail(config: IETFSessionRailConfig): PaymentRai
         return {
           authenticated: true,
           paymentId: session.sessionId,
-          mode: 'credit',
+          mode: 'session',
           creditBalance: session.balanceSats,
           currency: 'sat',
         }
@@ -440,7 +440,7 @@ export function createIETFSessionRail(config: IETFSessionRailConfig): PaymentRai
         return {
           authenticated: true,
           paymentId: sessionId,
-          mode: 'credit',
+          mode: 'session',
           creditBalance: depositSats,
           currency: 'sat',
           customCaveats: {
@@ -490,7 +490,7 @@ export function createIETFSessionRail(config: IETFSessionRailConfig): PaymentRai
         return {
           authenticated: true,
           paymentId: session.sessionId,
-          mode: 'credit',
+          mode: 'session',
           creditBalance: newBalance,
           currency: 'sat',
         }
@@ -532,7 +532,7 @@ export function createIETFSessionRail(config: IETFSessionRailConfig): PaymentRai
             return {
               authenticated: true,
               paymentId: session.sessionId,
-              mode: 'credit',
+              mode: 'session',
               creditBalance: 0,
               currency: 'sat',
               customCaveats: {
@@ -564,7 +564,7 @@ export function createIETFSessionRail(config: IETFSessionRailConfig): PaymentRai
         return {
           authenticated: true,
           paymentId: session.sessionId,
-          mode: 'credit',
+          mode: 'session',
           creditBalance: 0,
           currency: 'sat',
           customCaveats: {
@@ -574,7 +574,7 @@ export function createIETFSessionRail(config: IETFSessionRailConfig): PaymentRai
         }
       }
 
-      return { authenticated: false, paymentId: '', mode: 'credit', currency: 'sat' }
+      return { authenticated: false, paymentId: '', mode: 'session', currency: 'sat' }
     },
 
     startSweep(): () => void {

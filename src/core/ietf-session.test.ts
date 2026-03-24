@@ -188,7 +188,7 @@ describe('IETF Session Rail', () => {
       const { result } = await openSession(rail)
 
       expect(result.authenticated).toBe(true)
-      expect(result.mode).toBe('credit')
+      expect(result.mode).toBe('session')
       expect(result.creditBalance).toBe(500)
       expect(result.customCaveats?.['X-Session-Token']).toBeDefined()
       expect(result.customCaveats?.['X-Session-Id']).toBeDefined()
@@ -209,7 +209,7 @@ describe('IETF Session Rail', () => {
       const bearerResult = await rail.verify(makeRequest(bearerAuth))
 
       expect(bearerResult.authenticated).toBe(true)
-      expect(bearerResult.mode).toBe('credit')
+      expect(bearerResult.mode).toBe('session')
       expect(bearerResult.creditBalance).toBe(500)
     })
 
