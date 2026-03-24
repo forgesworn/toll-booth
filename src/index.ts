@@ -47,7 +47,11 @@ export { meltToLightning } from './core/melt-to-lightning.js'
 export type { MeltResult } from './core/melt-to-lightning.js'
 export { createIETFPaymentRail, computeChallengeId, verifyChallengeId, buildReceiptHeader, encodeJCS } from './core/ietf-payment.js'
 export type { IETFPaymentRailConfig, IETFChallengeParams, IETFCredential, IETFReceipt, LightningChargeRequest, LightningChargePayload, ReceiptOptions } from './core/ietf-payment.js'
-export type { IETFPaymentConfig } from './types.js'
+export type { IETFPaymentConfig, SessionConfig } from './types.js'
+
+// IETF Payment — session intent
+export { createIETFSessionRail } from './core/ietf-session.js'
+export type { IETFSessionRailConfig, SessionEvent, SessionChallengeRequest, SessionOpenPayload, SessionBearerPayload, SessionTopUpPayload, SessionClosePayload } from './core/ietf-session.js'
 
 // Utilities
 export { mintMacaroon, verifyMacaroon, parseCaveats } from './macaroon.js'
