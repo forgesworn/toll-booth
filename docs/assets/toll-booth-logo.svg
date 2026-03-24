@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="gate-grad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f7931a"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+    <radialGradient id="bg-glow" cx="50%" cy="45%" r="50%">
+      <stop offset="0%" stop-color="#1a1400" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#0d1117" stop-opacity="1"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="64" fill="#0d1117"/>
+  <rect width="512" height="512" rx="64" fill="url(#bg-glow)" opacity="0.5"/>
+
+  <!-- Toll booth gate structure -->
+  <!-- Left post -->
+  <rect x="120" y="100" width="16" height="312" rx="4" fill="#21262d"/>
+  <rect x="120" y="100" width="16" height="312" rx="4" fill="#f7931a" opacity="0.12"/>
+
+  <!-- Right post -->
+  <rect x="376" y="100" width="16" height="312" rx="4" fill="#21262d"/>
+  <rect x="376" y="100" width="16" height="312" rx="4" fill="#f7931a" opacity="0.12"/>
+
+  <!-- Top crossbar -->
+  <rect x="120" y="100" width="272" height="10" rx="4" fill="#21262d"/>
+  <rect x="120" y="100" width="272" height="10" rx="4" fill="#f7931a" opacity="0.15"/>
+
+  <!-- Gate barrier (raised) -->
+  <g>
+    <line x1="128" y1="110" x2="320" y2="68" stroke="url(#gate-grad)" stroke-width="6" stroke-linecap="round"/>
+    <!-- Pivot point -->
+    <circle cx="128" cy="110" r="8" fill="#f7931a"/>
+    <!-- Barrier stripes -->
+    <line x1="175" y1="98" x2="181" y2="96" stroke="#0d1117" stroke-width="4" stroke-linecap="round"/>
+    <line x1="220" y1="87" x2="226" y2="85" stroke="#0d1117" stroke-width="4" stroke-linecap="round"/>
+    <line x1="265" y1="76" x2="271" y2="74" stroke="#0d1117" stroke-width="4" stroke-linecap="round"/>
+  </g>
+
+  <!-- Lightning bolt in centre (the payment symbol) -->
+  <g transform="translate(256, 260)">
+    <path d="M -8 -50 L -28 0 L -4 0 L -16 50 L 28 -10 L 4 -10 Z"
+          fill="url(#gate-grad)" opacity="0.9"/>
+  </g>
+
+  <!-- "TB" letterforms subtly integrated -->
+  <text x="256" y="380" text-anchor="middle"
+        font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif"
+        font-size="48" font-weight="900" fill="#f0f6fc"
+        letter-spacing="12" opacity="0.9">TB</text>
+
+  <!-- Bottom accent bar -->
+  <rect x="120" y="408" width="272" height="4" rx="2" fill="#f7931a" opacity="0.5"/>
+</svg>

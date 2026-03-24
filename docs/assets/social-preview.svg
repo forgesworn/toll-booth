@@ -1,0 +1,126 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" width="1280" height="640">
+  <defs>
+    <!-- Gradient for the gate beam -->
+    <linearGradient id="beam" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#f7931a" stop-opacity="0"/>
+      <stop offset="15%" stop-color="#f7931a" stop-opacity="1"/>
+      <stop offset="85%" stop-color="#f7931a" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#f7931a" stop-opacity="0"/>
+    </linearGradient>
+    <!-- Subtle radial glow behind the title -->
+    <radialGradient id="glow" cx="50%" cy="42%" r="35%">
+      <stop offset="0%" stop-color="#f7931a" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#f7931a" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Grid pattern for background texture -->
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1a2332" stroke-width="0.5"/>
+    </pattern>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1280" height="640" fill="#0d1117"/>
+  <rect width="1280" height="640" fill="url(#grid)" opacity="0.5"/>
+  <rect width="1280" height="640" fill="url(#glow)"/>
+
+  <!-- Toll booth gate structure -->
+  <!-- Left post -->
+  <rect x="160" y="120" width="12" height="400" rx="2" fill="#21262d"/>
+  <rect x="160" y="120" width="12" height="400" rx="2" fill="#f7931a" opacity="0.15"/>
+  <!-- Right post -->
+  <rect x="1108" y="120" width="12" height="400" rx="2" fill="#21262d"/>
+  <rect x="1108" y="120" width="12" height="400" rx="2" fill="#f7931a" opacity="0.15"/>
+  <!-- Top crossbar -->
+  <rect x="160" y="120" width="960" height="6" rx="2" fill="#21262d"/>
+  <rect x="160" y="120" width="960" height="6" rx="2" fill="#f7931a" opacity="0.2"/>
+  <!-- Gate barrier beam (raised, angled) -->
+  <line x1="166" y1="126" x2="640" y2="80" stroke="url(#beam)" stroke-width="4" stroke-linecap="round"/>
+  <!-- Pivot dot -->
+  <circle cx="166" cy="126" r="6" fill="#f7931a" opacity="0.6"/>
+
+  <!-- Small decorative dots on posts -->
+  <circle cx="166" cy="180" r="3" fill="#f7931a" opacity="0.3"/>
+  <circle cx="166" cy="220" r="3" fill="#f7931a" opacity="0.2"/>
+  <circle cx="1114" cy="180" r="3" fill="#f7931a" opacity="0.3"/>
+  <circle cx="1114" cy="220" r="3" fill="#f7931a" opacity="0.2"/>
+
+  <!-- Main title -->
+  <text x="640" y="280" text-anchor="middle"
+        font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif"
+        font-size="96" font-weight="800" fill="#f0f6fc"
+        letter-spacing="-2">toll-booth</text>
+
+  <!-- Tagline -->
+  <text x="640" y="340" text-anchor="middle"
+        font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif"
+        font-size="28" font-weight="400" fill="#8b949e"
+        letter-spacing="1">Monetise any API with HTTP 402</text>
+
+  <!-- Divider line -->
+  <line x1="400" y1="380" x2="880" y2="380" stroke="#21262d" stroke-width="1"/>
+
+  <!-- Payment rail pills -->
+  <!-- Lightning -->
+  <g transform="translate(255, 420)">
+    <rect width="160" height="48" rx="24" fill="#21262d" stroke="#30363d" stroke-width="1"/>
+    <!-- Lightning bolt icon -->
+    <path d="M 36 12 L 28 26 L 36 26 L 30 38 L 42 22 L 34 22 Z"
+          fill="#f7931a"/>
+    <text x="84" y="30" text-anchor="middle"
+          font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif"
+          font-size="16" font-weight="600" fill="#c9d1d9">Lightning</text>
+  </g>
+
+  <!-- Cashu -->
+  <g transform="translate(440, 420)">
+    <rect width="140" height="48" rx="24" fill="#21262d" stroke="#30363d" stroke-width="1"/>
+    <!-- Nut/token icon (circle with C) -->
+    <circle cx="32" cy="24" r="10" fill="none" stroke="#f7931a" stroke-width="2"/>
+    <text x="32" y="29" text-anchor="middle"
+          font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif"
+          font-size="13" font-weight="700" fill="#f7931a">C</text>
+    <text x="80" y="30" text-anchor="middle"
+          font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif"
+          font-size="16" font-weight="600" fill="#c9d1d9">Cashu</text>
+  </g>
+
+  <!-- x402 -->
+  <g transform="translate(605, 420)">
+    <rect width="130" height="48" rx="24" fill="#21262d" stroke="#30363d" stroke-width="1"/>
+    <!-- x402 badge -->
+    <rect x="16" y="12" width="36" height="24" rx="4" fill="#f7931a" opacity="0.2"/>
+    <text x="34" y="29" text-anchor="middle"
+          font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif"
+          font-size="11" font-weight="700" fill="#f7931a">402</text>
+    <text x="82" y="30" text-anchor="middle"
+          font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif"
+          font-size="16" font-weight="600" fill="#c9d1d9">x402</text>
+  </g>
+
+  <!-- IETF Payment -->
+  <g transform="translate(760, 420)">
+    <rect width="200" height="48" rx="24" fill="#21262d" stroke="#30363d" stroke-width="1"/>
+    <!-- Document/standard icon -->
+    <rect x="18" y="12" width="18" height="24" rx="2" fill="none" stroke="#f7931a" stroke-width="1.5"/>
+    <line x1="23" y1="20" x2="31" y2="20" stroke="#f7931a" stroke-width="1.5"/>
+    <line x1="23" y1="25" x2="31" y2="25" stroke="#f7931a" stroke-width="1.5"/>
+    <line x1="23" y1="30" x2="28" y2="30" stroke="#f7931a" stroke-width="1.5"/>
+    <text x="114" y="30" text-anchor="middle"
+          font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif"
+          font-size="16" font-weight="600" fill="#c9d1d9">IETF Payment</text>
+  </g>
+
+  <!-- Bottom accent line -->
+  <rect x="0" y="634" width="1280" height="6" fill="#f7931a" opacity="0.6"/>
+
+  <!-- Subtle HTTP 402 watermark -->
+  <text x="640" y="570" text-anchor="middle"
+        font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif"
+        font-size="120" font-weight="900" fill="#161b22"
+        letter-spacing="8">402</text>
+
+  <!-- Package name -->
+  <text x="640" y="600" text-anchor="middle"
+        font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace"
+        font-size="14" fill="#484f58">npm i @forgesworn/toll-booth</text>
+</svg>
