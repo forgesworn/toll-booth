@@ -92,6 +92,23 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
 
       // Inner helper: issue a multi-rail 402 challenge for this route
       async function issueChallenge(): Promise<TollBoothResult> {
+        // Rate-limit pre-check: avoid calling backend.createInvoice for IPs
+        // already over the cap. Otherwise the LSP/Phoenixd mints an invoice
+        // we immediately throw away.
+        if (config.invoiceRateLimit?.maxPendingPerIp) {
+          const pending = storage.pendingInvoiceCount(hashIp(req.ip))
+          if (pending >= config.invoiceRateLimit.maxPendingPerIp) {
+            return {
+              action: 'challenge',
+              status: 429,
+              // Retry-After 1 hour: matches the default invoiceMaxAgeMs auto-prune cycle,
+              // after which old pending invoices are cleared and the counter resets.
+              headers: { 'Retry-After': '3600' },
+              body: { error: 'Invoice creation rate limit exceeded' },
+            }
+          }
+        }
+
         const challengeHeaders: Record<string, string> = {}
         const challengeBody: Record<string, unknown> = {}
 
@@ -170,22 +187,6 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
         if (l402Data?.payment_hash) {
           const paymentHash = l402Data.payment_hash as string
           const ipHash = hashIp(req.ip)
-
-          // Apply the same pending-invoice cap that POST /create-invoice
-          // uses. Without this, a single IP can mint unbounded unpaid
-          // invoices by hammering any priced endpoint.
-          if (config.invoiceRateLimit?.maxPendingPerIp) {
-            const pending = storage.pendingInvoiceCount(ipHash)
-            if (pending >= config.invoiceRateLimit.maxPendingPerIp) {
-              return {
-                action: 'challenge',
-                status: 429,
-                headers: { 'Retry-After': '3600' },
-                body: { error: 'Too many unpaid invoices; pay one to continue' },
-              }
-            }
-          }
-
           const statusToken = randomBytes(32).toString('hex')
           storage.storeInvoice(
             paymentHash,

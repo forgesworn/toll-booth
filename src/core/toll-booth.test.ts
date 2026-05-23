@@ -19,6 +19,20 @@ function mockBackend(): LightningBackend {
   }
 }
 
+function uniqueHashBackend(): LightningBackend {
+  let counter = 0
+  return {
+    createInvoice: vi.fn().mockImplementation(async () => {
+      counter += 1
+      return {
+        bolt11: `lnbc100n1mock_${counter}`,
+        paymentHash: counter.toString(16).padStart(64, '0'),
+      }
+    }),
+    checkInvoice: vi.fn().mockResolvedValue({ paid: false }),
+  }
+}
+
 function makePreimageAndHash(): { preimage: string; paymentHash: string } {
   const preimage = randomBytes(32).toString('hex')
   const paymentHash = createHash('sha256').update(Buffer.from(preimage, 'hex')).digest('hex')
@@ -812,20 +826,6 @@ describe('geo-fence', () => {
     expect(result.action).toBe('blocked')
   })
 })
-
-function uniqueHashBackend(): LightningBackend {
-  let counter = 0
-  return {
-    createInvoice: vi.fn().mockImplementation(async () => {
-      counter += 1
-      return {
-        bolt11: `lnbc100n1mock_${counter}`,
-        paymentHash: counter.toString(16).padStart(64, '0'),
-      }
-    }),
-    checkInvoice: vi.fn().mockResolvedValue({ paid: false }),
-  }
-}
 
 describe('TollBoothEngine — invoiceRateLimit on 402 path', () => {
   it('returns 429 after maxPendingPerIp unpaid invoices from same IP', async () => {
