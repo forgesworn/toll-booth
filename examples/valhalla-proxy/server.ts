@@ -34,6 +34,7 @@ const booth = new Booth({
   upstream: process.env.VALHALLA_URL ?? 'http://localhost:8002',
   responseHeaders: { 'X-Coverage': 'GB' },
   defaultInvoiceAmount: parseInt(process.env.DEFAULT_INVOICE_SATS ?? '1000', 10),
+  invoiceMaxAgeMs: parseInt(process.env.INVOICE_MAX_AGE_MS ?? '3600000', 10),
   dbPath: process.env.TOLL_BOOTH_DB_PATH ?? './toll-booth.db',
   rootKey: process.env.ROOT_KEY,
   trustProxy,
