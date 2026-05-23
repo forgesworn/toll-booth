@@ -901,6 +901,29 @@ describe('TollBoothEngine — invoiceRateLimit on 402 path', () => {
     const allowedAgain = await engine.handle(makeRequest({ ip }))
     expect(allowedAgain.status).toBe(402)
   })
+
+  it('does not call backend.createInvoice for a rate-limited request', async () => {
+    const backend = uniqueHashBackend()
+    const engine = createTollBooth(makeConfig({
+      backend,
+      freeTier: undefined,
+      invoiceRateLimit: { maxPendingPerIp: 2 },
+    }))
+
+    const ip = '203.0.113.55'
+
+    // Send exactly maxPendingPerIp requests — each should mint an invoice.
+    for (let i = 0; i < 2; i++) {
+      const result = await engine.handle(makeRequest({ ip }))
+      expect(result.status).toBe(402)
+    }
+    expect((backend.createInvoice as ReturnType<typeof vi.fn>).mock.calls.length).toBe(2)
+
+    // The next request must be rate-limited — createInvoice must NOT be called again.
+    const blocked = await engine.handle(makeRequest({ ip }))
+    expect(blocked.status).toBe(429)
+    expect((backend.createInvoice as ReturnType<typeof vi.fn>).mock.calls.length).toBe(2)
+  })
 })
 
 describe('agent-friendly 402 body', () => {
