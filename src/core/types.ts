@@ -28,7 +28,7 @@ export interface TollBoothRequest {
 
 export type TollBoothResult =
   | { action: 'proxy'; upstream: string; headers: Record<string, string>; paymentHash?: string; estimatedCost?: number; creditBalance?: number; freeRemaining?: number; tier?: string }
-  | { action: 'challenge'; status: 401 | 402; headers: Record<string, string>; body: Record<string, unknown> }
+  | { action: 'challenge'; status: 401 | 402 | 429; headers: Record<string, string>; body: Record<string, unknown> }
   | { action: 'pass'; upstream: string; headers: Record<string, string> }
   | { action: 'blocked'; status: 403; body: Record<string, unknown> }
 

@@ -813,6 +813,96 @@ describe('geo-fence', () => {
   })
 })
 
+function uniqueHashBackend(): LightningBackend {
+  let counter = 0
+  return {
+    createInvoice: vi.fn().mockImplementation(async () => {
+      counter += 1
+      return {
+        bolt11: `lnbc100n1mock_${counter}`,
+        paymentHash: counter.toString(16).padStart(64, '0'),
+      }
+    }),
+    checkInvoice: vi.fn().mockResolvedValue({ paid: false }),
+  }
+}
+
+describe('TollBoothEngine — invoiceRateLimit on 402 path', () => {
+  it('returns 429 after maxPendingPerIp unpaid invoices from same IP', async () => {
+    const engine = createTollBooth(makeConfig({
+      backend: uniqueHashBackend(),
+      freeTier: undefined,
+      invoiceRateLimit: { maxPendingPerIp: 3 },
+    }))
+
+    const ip = '203.0.113.7'
+
+    for (let i = 0; i < 3; i++) {
+      const result = await engine.handle(makeRequest({ ip }))
+      expect(result.action).toBe('challenge')
+      expect(result.status).toBe(402)
+    }
+
+    const blocked = await engine.handle(makeRequest({ ip }))
+    expect(blocked.action).toBe('challenge')
+    expect(blocked.status).toBe(429)
+    expect(blocked.headers?.['Retry-After']).toBe('3600')
+  })
+
+  it('does not rate-limit across distinct IPs', async () => {
+    const engine = createTollBooth(makeConfig({
+      backend: uniqueHashBackend(),
+      freeTier: undefined,
+      invoiceRateLimit: { maxPendingPerIp: 2 },
+    }))
+
+    for (let i = 0; i < 5; i++) {
+      const result = await engine.handle(makeRequest({ ip: `198.51.100.${i}` }))
+      expect(result.status).toBe(402)
+    }
+  })
+
+  it('is disabled when invoiceRateLimit is not configured', async () => {
+    const engine = createTollBooth(makeConfig({
+      backend: uniqueHashBackend(),
+      freeTier: undefined,
+    }))
+
+    for (let i = 0; i < 20; i++) {
+      const result = await engine.handle(makeRequest({ ip: '203.0.113.99' }))
+      expect(result.status).toBe(402)
+    }
+  })
+
+  it('settling a pending invoice frees a slot for the same IP', async () => {
+    const storage = memoryStorage()
+    const engine = createTollBooth(makeConfig({
+      storage,
+      backend: uniqueHashBackend(),
+      freeTier: undefined,
+      invoiceRateLimit: { maxPendingPerIp: 2 },
+    }))
+
+    const ip = '203.0.113.42'
+
+    const first = await engine.handle(makeRequest({ ip }))
+    const firstHash = (first.body as { l402: { payment_hash: string } }).l402.payment_hash
+    expect(first.status).toBe(402)
+
+    const second = await engine.handle(makeRequest({ ip }))
+    expect(second.status).toBe(402)
+
+    const blocked = await engine.handle(makeRequest({ ip }))
+    expect(blocked.status).toBe(429)
+
+    // Settle the first invoice — pending count for this IP drops to 1.
+    expect(storage.settle(firstHash)).toBe(true)
+
+    const allowedAgain = await engine.handle(makeRequest({ ip }))
+    expect(allowedAgain.status).toBe(402)
+  })
+})
+
 describe('agent-friendly 402 body', () => {
   it('includes booth and auth_hint when serviceName is configured', async () => {
     const engine = createTollBooth(makeConfig({
