@@ -110,6 +110,7 @@ Backend conformance tests (`conformance.ts`) export a shared factory; each backe
 | `ROOT_KEY` | — | Macaroon signing key (hex, 64 chars / 32 bytes). **Required for production.** |
 | `TRUST_PROXY` | false | Trust `X-Forwarded-For` / `X-Real-IP` headers |
 | `MAX_PENDING_PER_IP` | unset | If set, cap pending unpaid invoices per client IP (rate-limit /create-invoice abuse) |
+| `INVOICE_MAX_AGE_MS` | 3600000 | Max age of stored invoices in milliseconds before hourly auto-prune deletes them. Default 1 hour. |
 | `PORT` | 3000 | HTTP listen port |
 | `LND_REST_URL` | — | LND REST endpoint (integration tests) |
 | `LND_MACAROON` | — | LND admin macaroon, hex (integration tests) |
