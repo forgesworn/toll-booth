@@ -169,6 +169,23 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
         const l402Data = challengeBody.l402 as Record<string, unknown> | undefined
         if (l402Data?.payment_hash) {
           const paymentHash = l402Data.payment_hash as string
+          const ipHash = hashIp(req.ip)
+
+          // Apply the same pending-invoice cap that POST /create-invoice
+          // uses. Without this, a single IP can mint unbounded unpaid
+          // invoices by hammering any priced endpoint.
+          if (config.invoiceRateLimit?.maxPendingPerIp) {
+            const pending = storage.pendingInvoiceCount(ipHash)
+            if (pending >= config.invoiceRateLimit.maxPendingPerIp) {
+              return {
+                action: 'challenge',
+                status: 429,
+                headers: { 'Retry-After': '3600' },
+                body: { error: 'Too many unpaid invoices; pay one to continue' },
+              }
+            }
+          }
+
           const statusToken = randomBytes(32).toString('hex')
           storage.storeInvoice(
             paymentHash,
@@ -176,7 +193,7 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
             defaultAmount,
             l402Data.macaroon as string,
             statusToken,
-            hashIp(req.ip),
+            ipHash,
           )
           l402Data.payment_url = `/invoice-status/${paymentHash}?token=${statusToken}`
           l402Data.status_token = statusToken
