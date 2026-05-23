@@ -28,7 +28,7 @@ export interface TollBoothRequest {
 
 export type TollBoothResult =
   | { action: 'proxy'; upstream: string; headers: Record<string, string>; paymentHash?: string; estimatedCost?: number; creditBalance?: number; freeRemaining?: number; tier?: string }
-  | { action: 'challenge'; status: 401 | 402; headers: Record<string, string>; body: Record<string, unknown> }
+  | { action: 'challenge'; status: 401 | 402 | 429; headers: Record<string, string>; body: Record<string, unknown> }
   | { action: 'pass'; upstream: string; headers: Record<string, string> }
   | { action: 'blocked'; status: 403; body: Record<string, unknown> }
 
@@ -49,6 +49,13 @@ export interface TollBoothCoreConfig {
   rootKey: string
   freeTier?: { requestsPerDay: number } | { creditsPerDay: number }
   creditTiers?: CreditTier[]
+  /**
+   * Pending-invoice rate limit per client IP. When set, the engine will
+   * return 429 instead of issuing a fresh 402 + invoice once the same
+   * IP has this many unsettled invoices on file. Also applied by
+   * handleCreateInvoice for explicit POST /create-invoice calls.
+   */
+  invoiceRateLimit?: { maxPendingPerIp: number }
   rails?: PaymentRail[]
   normalisedPricing?: Record<string, PriceInfo>
   /** Human-readable service name for invoice descriptions. Defaults to 'toll-booth'. */

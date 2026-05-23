@@ -65,6 +65,23 @@ describe('createHonoTollBooth', () => {
     expect(typeof body.creditBalance).toBe('number')
   })
 
+  it('returns 429 on second challenge when invoiceRateLimit exceeded', async () => {
+    const { engine } = createTestEngine({ invoiceRateLimit: { maxPendingPerIp: 1 } })
+    const { authMiddleware } = createHonoTollBooth({ engine })
+
+    const app = new Hono<TollBoothEnv>()
+    app.use('/api/test', authMiddleware)
+    app.get('/api/test', (c) => c.text('ok'))
+
+    const res1 = await app.request('/api/test')
+    expect(res1.status).toBe(402)
+
+    const res2 = await app.request('/api/test')
+    expect(res2.status).toBe(429)
+    const body2 = await res2.json() as Record<string, unknown>
+    expect(body2).toHaveProperty('error')
+  })
+
   it('returns 402 challenge when no auth header is present', async () => {
     const { engine } = createTestEngine()
     const { authMiddleware } = createHonoTollBooth({ engine })

@@ -19,6 +19,20 @@ function mockBackend(): LightningBackend {
   }
 }
 
+function uniqueHashBackend(): LightningBackend {
+  let counter = 0
+  return {
+    createInvoice: vi.fn().mockImplementation(async () => {
+      counter += 1
+      return {
+        bolt11: `lnbc100n1mock_${counter}`,
+        paymentHash: counter.toString(16).padStart(64, '0'),
+      }
+    }),
+    checkInvoice: vi.fn().mockResolvedValue({ paid: false }),
+  }
+}
+
 function makePreimageAndHash(): { preimage: string; paymentHash: string } {
   const preimage = randomBytes(32).toString('hex')
   const paymentHash = createHash('sha256').update(Buffer.from(preimage, 'hex')).digest('hex')
@@ -810,6 +824,105 @@ describe('geo-fence', () => {
       headers: { 'cf-ipcountry': 'KP' },
     }))
     expect(result.action).toBe('blocked')
+  })
+})
+
+describe('TollBoothEngine — invoiceRateLimit on 402 path', () => {
+  it('returns 429 after maxPendingPerIp unpaid invoices from same IP', async () => {
+    const engine = createTollBooth(makeConfig({
+      backend: uniqueHashBackend(),
+      freeTier: undefined,
+      invoiceRateLimit: { maxPendingPerIp: 3 },
+    }))
+
+    const ip = '203.0.113.7'
+
+    for (let i = 0; i < 3; i++) {
+      const result = await engine.handle(makeRequest({ ip }))
+      expect(result.action).toBe('challenge')
+      expect(result.status).toBe(402)
+    }
+
+    const blocked = await engine.handle(makeRequest({ ip }))
+    expect(blocked.action).toBe('challenge')
+    expect(blocked.status).toBe(429)
+    expect(blocked.headers?.['Retry-After']).toBe('3600')
+  })
+
+  it('does not rate-limit across distinct IPs', async () => {
+    const engine = createTollBooth(makeConfig({
+      backend: uniqueHashBackend(),
+      freeTier: undefined,
+      invoiceRateLimit: { maxPendingPerIp: 2 },
+    }))
+
+    for (let i = 0; i < 5; i++) {
+      const result = await engine.handle(makeRequest({ ip: `198.51.100.${i}` }))
+      expect(result.status).toBe(402)
+    }
+  })
+
+  it('is disabled when invoiceRateLimit is not configured', async () => {
+    const engine = createTollBooth(makeConfig({
+      backend: uniqueHashBackend(),
+      freeTier: undefined,
+    }))
+
+    for (let i = 0; i < 20; i++) {
+      const result = await engine.handle(makeRequest({ ip: '203.0.113.99' }))
+      expect(result.status).toBe(402)
+    }
+  })
+
+  it('settling a pending invoice frees a slot for the same IP', async () => {
+    const storage = memoryStorage()
+    const engine = createTollBooth(makeConfig({
+      storage,
+      backend: uniqueHashBackend(),
+      freeTier: undefined,
+      invoiceRateLimit: { maxPendingPerIp: 2 },
+    }))
+
+    const ip = '203.0.113.42'
+
+    const first = await engine.handle(makeRequest({ ip }))
+    const firstHash = (first.body as { l402: { payment_hash: string } }).l402.payment_hash
+    expect(first.status).toBe(402)
+
+    const second = await engine.handle(makeRequest({ ip }))
+    expect(second.status).toBe(402)
+
+    const blocked = await engine.handle(makeRequest({ ip }))
+    expect(blocked.status).toBe(429)
+
+    // Settle the first invoice — pending count for this IP drops to 1.
+    expect(storage.settle(firstHash)).toBe(true)
+
+    const allowedAgain = await engine.handle(makeRequest({ ip }))
+    expect(allowedAgain.status).toBe(402)
+  })
+
+  it('does not call backend.createInvoice for a rate-limited request', async () => {
+    const backend = uniqueHashBackend()
+    const engine = createTollBooth(makeConfig({
+      backend,
+      freeTier: undefined,
+      invoiceRateLimit: { maxPendingPerIp: 2 },
+    }))
+
+    const ip = '203.0.113.55'
+
+    // Send exactly maxPendingPerIp requests — each should mint an invoice.
+    for (let i = 0; i < 2; i++) {
+      const result = await engine.handle(makeRequest({ ip }))
+      expect(result.status).toBe(402)
+    }
+    expect((backend.createInvoice as ReturnType<typeof vi.fn>).mock.calls.length).toBe(2)
+
+    // The next request must be rate-limited — createInvoice must NOT be called again.
+    const blocked = await engine.handle(makeRequest({ ip }))
+    expect(blocked.status).toBe(429)
+    expect((backend.createInvoice as ReturnType<typeof vi.fn>).mock.calls.length).toBe(2)
   })
 })
 

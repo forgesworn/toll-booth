@@ -81,6 +81,28 @@ describe('Web Standard adapter IP resolution', () => {
 })
 
 describe('Web Standard adapter', () => {
+  it('returns 429 on second challenge when invoiceRateLimit exceeded', async () => {
+    const backend = mockBackend()
+    const storage = memoryStorage()
+    const engine = createTollBooth({
+      backend,
+      storage,
+      pricing: { '/api/route': 10 },
+      upstream: 'http://localhost:8002',
+      rootKey: ROOT_KEY,
+      invoiceRateLimit: { maxPendingPerIp: 1 },
+    })
+
+    const handler = createWebStandardMiddleware(engine, 'http://localhost:8002')
+    const res1 = await handler(new Request('http://localhost/api/route', { method: 'POST' }))
+    expect(res1.status).toBe(402)
+
+    const res2 = await handler(new Request('http://localhost/api/route', { method: 'POST' }))
+    expect(res2.status).toBe(429)
+    const body2 = await res2.json() as Record<string, unknown>
+    expect(body2).toHaveProperty('error')
+  })
+
   it('returns 402 for priced routes without auth', async () => {
     const backend = mockBackend()
     const storage = memoryStorage()

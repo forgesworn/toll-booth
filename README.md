@@ -404,6 +404,7 @@ Deploy toll-booth as a sidecar (Docker Compose, Kubernetes) or as a standalone g
 - Set `trustProxy: true` when behind a reverse proxy, or provide a `getClientIp` callback for per-client free-tier isolation.
 - If you implement `redeemCashu`, make it idempotent for the same `paymentHash` - crash recovery depends on it.
 - Rate-limit `/create-invoice` at your reverse proxy - each call creates a real Lightning invoice.
+- You can also enable `invoiceRateLimit.maxPendingPerIp` in the Booth config to cap pending unpaid invoices per client IP. The cap applies to both `POST /create-invoice` and the 402 challenge issued by any priced endpoint — over the cap, the engine returns HTTP 429 (`Retry-After: 3600`) instead of minting another invoice.
 
 ---
 

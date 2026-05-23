@@ -179,6 +179,7 @@ export class Booth {
       freeTier: config.freeTier,
       strictPricing: config.strictPricing,
       creditTiers: config.creditTiers,
+      invoiceRateLimit: config.invoiceRateLimit,
       serviceName: config.serviceName,
       description: config.description,
       blockedCountries: config.blockedCountries,

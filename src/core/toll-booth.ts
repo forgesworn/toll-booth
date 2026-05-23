@@ -92,6 +92,23 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
 
       // Inner helper: issue a multi-rail 402 challenge for this route
       async function issueChallenge(): Promise<TollBoothResult> {
+        // Rate-limit pre-check: avoid calling backend.createInvoice for IPs
+        // already over the cap. Otherwise the LSP/Phoenixd mints an invoice
+        // we immediately throw away.
+        if (config.invoiceRateLimit?.maxPendingPerIp) {
+          const pending = storage.pendingInvoiceCount(hashIp(req.ip))
+          if (pending >= config.invoiceRateLimit.maxPendingPerIp) {
+            return {
+              action: 'challenge',
+              status: 429,
+              // Retry-After 1 hour: matches the default invoiceMaxAgeMs auto-prune cycle,
+              // after which old pending invoices are cleared and the counter resets.
+              headers: { 'Retry-After': '3600' },
+              body: { error: 'Invoice creation rate limit exceeded' },
+            }
+          }
+        }
+
         const challengeHeaders: Record<string, string> = {}
         const challengeBody: Record<string, unknown> = {}
 
@@ -169,6 +186,7 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
         const l402Data = challengeBody.l402 as Record<string, unknown> | undefined
         if (l402Data?.payment_hash) {
           const paymentHash = l402Data.payment_hash as string
+          const ipHash = hashIp(req.ip)
           const statusToken = randomBytes(32).toString('hex')
           storage.storeInvoice(
             paymentHash,
@@ -176,7 +194,7 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
             defaultAmount,
             l402Data.macaroon as string,
             statusToken,
-            hashIp(req.ip),
+            ipHash,
           )
           l402Data.payment_url = `/invoice-status/${paymentHash}?token=${statusToken}`
           l402Data.status_token = statusToken

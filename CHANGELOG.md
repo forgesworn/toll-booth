@@ -1,3 +1,15 @@
+## [4.7.0](https://github.com/forgesworn/toll-booth/compare/v4.6.1...v4.7.0) (2026-05-23)
+
+
+### Added
+- `invoiceRateLimit.maxPendingPerIp` now also applies to the 402 challenge code path, not only `POST /create-invoice`. A single client IP that exceeds the cap by hitting priced endpoints without paying will receive HTTP 429 (with `Retry-After: 3600`) instead of a fresh invoice + macaroon.
+- `INVOICE_MAX_AGE_MS` env var on the `valhalla-proxy` example (default 1 hour in the example; the library's `invoiceMaxAgeMs` default remains 24 hours).
+
+### Internal
+- `TollBoothCoreConfig` gains optional `invoiceRateLimit?: { maxPendingPerIp: number }`.
+- `Booth` forwards `invoiceRateLimit` from `BoothConfig` into the engine.
+- Public `TollBoothResult` type's `challenge` variant status union widened from `401 | 402` to `401 | 402 | 429`. Existing consumers narrowing on `status === 402` continue to compile; consumers should consider handling the new 429 case if they branch on the status field.
+
 ## [4.5.5](https://github.com/forgesworn/toll-booth/compare/v4.5.3...v4.5.5) (2026-04-12)
 
 
