@@ -235,7 +235,7 @@ export function createWebStandardMiddleware(
     }
     applyNoStoreHeaders(challengeHeaders)
     return Response.json(result.body, {
-      status: 402,
+      status: result.status,
       headers: challengeHeaders,
     })
   }

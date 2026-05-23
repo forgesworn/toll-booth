@@ -1,6 +1,7 @@
 // src/adapters/hono.ts
 import { Hono } from 'hono'
 import type { Context, MiddlewareHandler } from 'hono'
+import type { ContentfulStatusCode } from 'hono/utils/http-status'
 import type { TollBoothEngine } from '../core/toll-booth.js'
 import type { TollBoothRequest, CreateInvoiceRequest, NwcPayRequest, CashuRedeemRequest } from '../core/types.js'
 import { PAYMENT_HASH_RE } from '../core/types.js'
@@ -177,7 +178,7 @@ export function createHonoTollBooth(config: HonoTollBoothConfig): HonoTollBooth 
       c.header('Cache-Control', 'no-store')
       c.header('Pragma', 'no-cache')
       c.header('X-Content-Type-Options', 'nosniff')
-      return c.json(result.body, result.status as 402, result.headers)
+      return c.json(result.body, result.status as ContentfulStatusCode, result.headers)
     }
 
     if (result.action === 'blocked') {

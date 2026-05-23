@@ -237,7 +237,7 @@ export function createExpressMiddleware(
       for (const [key, value] of Object.entries(extraHeaders)) {
         challengeHeaders.set(key, value)
       }
-      jsonWithSensitiveHeaders(res, result.body, 402, challengeHeaders)
+      jsonWithSensitiveHeaders(res, result.body, result.status, challengeHeaders)
     } catch (err) {
       // Distinguish upstream network errors from programming errors
       setSensitiveHeaders(res)
