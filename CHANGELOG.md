@@ -59,6 +59,21 @@
 
 # [4.5.0](https://github.com/forgesworn/toll-booth/compare/v4.4.2...v4.5.0) (2026-03-28)
 
+## 4.8.0 (2026-05-23)
+
+### Features
+
+- enforce invoiceRateLimit on 402 challenge path
+- expose INVOICE_MAX_AGE_MS for valhalla-proxy (example)
+- forward invoiceRateLimit from Booth to engine
+- add invoiceRateLimit to TollBoothCoreConfig
+
+### Bug Fixes
+
+- forward engine status (429 vs 402) instead of hard-coding 402 (adapters)
+
+
+
 ## 4.6.1 (2026-05-10)
 
 ### Bug Fixes
