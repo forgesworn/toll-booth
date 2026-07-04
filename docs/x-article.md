@@ -93,4 +93,4 @@ Express, Deno, Bun, and Cloudflare Workers. MIT licence.
 
 **GitHub:** github.com/forgesworn/toll-booth
 
-If you find it useful, zap me: thedonkey@strike.me
+If you find it useful, zap me: profusemeat89@walletofsatoshi.com

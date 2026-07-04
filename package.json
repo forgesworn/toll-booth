@@ -47,7 +47,7 @@
   "homepage": "https://github.com/forgesworn/toll-booth#readme",
   "funding": {
     "type": "lightning",
-    "url": "lightning:thedonkey@strike.me"
+    "url": "lightning:profusemeat89@walletofsatoshi.com"
   },
   "bin": {
     "toll-booth": "dist/cli.js"
