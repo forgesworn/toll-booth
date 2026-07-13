@@ -116,7 +116,7 @@
     "prepare": "patch-package"
   },
   "dependencies": {
-    "@cashu/cashu-ts": "^3.6.1",
+    "@cashu/cashu-ts": "^4.7.0",
     "better-sqlite3": "^12.8.0",
     "macaroon": "^3.0.4",
     "nostr-core": "^0.8.0",
