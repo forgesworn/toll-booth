@@ -135,7 +135,7 @@
     }
   },
   "devDependencies": {
-    "@hono/node-server": "^1.19.11",
+    "@hono/node-server": "^2.0.12",
     "@types/better-sqlite3": "^7.6.0",
     "@types/express": "^5.0.6",
     "@types/qrcode": "^1.5.6",
