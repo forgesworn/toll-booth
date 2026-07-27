@@ -117,7 +117,7 @@
   },
   "dependencies": {
     "@cashu/cashu-ts": "^3.6.1",
-    "better-sqlite3": "^12.8.0",
+    "better-sqlite3": "^13.0.1",
     "macaroon": "^3.0.4",
     "nostr-core": "^0.8.0",
     "qrcode": "^1.5.4"
