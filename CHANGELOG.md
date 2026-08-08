@@ -78,6 +78,14 @@ Security-hardening release following a full review of the payment flow. Every fi
 
 # [4.5.0](https://github.com/forgesworn/toll-booth/compare/v4.4.2...v4.5.0) (2026-03-28)
 
+## 5.0.4 (2026-08-08)
+
+### Bug Fixes
+
+- add native build toolchain to sats-for-laughs Docker build
+
+
+
 ## 5.0.3 (2026-08-08)
 
 ### Bug Fixes
