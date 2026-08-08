@@ -4,7 +4,7 @@
 // Skipped by default — run via: npm run test:integration --cashu-only
 //
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { Mint, Wallet, MintQuoteState, getEncodedTokenV4, type Proof } from '@cashu/cashu-ts'
+import { Mint, Wallet, MintQuoteState, getEncodedToken, sumProofs, type Proof } from '@cashu/cashu-ts'
 import { Booth } from '../booth.js'
 import { memoryStorage } from '../storage/memory.js'
 import type { LightningBackend } from '../types.js'
@@ -32,7 +32,7 @@ async function mintProofs(wallet: Wallet, amount: number): Promise<Proof[]> {
     await new Promise((r) => setTimeout(r, 250))
   }
 
-  return wallet.mintProofs(amount, quote.quote)
+  return wallet.mintProofsBolt11(amount, quote.quote)
 }
 
 describe.skipIf(!RUN_INTEGRATION)('Cashu redemption integration (requires Nutshell)', () => {
@@ -63,7 +63,7 @@ describe.skipIf(!RUN_INTEGRATION)('Cashu redemption integration (requires Nutshe
     // Create Booth with real Cashu redemption
     const redeemCashu = async (token: string, _paymentHash: string): Promise<number> => {
       const proofs = await wallet.receive(token)
-      return proofs.reduce((sum, p) => sum + p.amount, 0)
+      return sumProofs(proofs).toNumber()
     }
 
     booth = new Booth({
@@ -115,11 +115,11 @@ describe.skipIf(!RUN_INTEGRATION)('Cashu redemption integration (requires Nutshe
 
     // 2. Mint Cashu proofs for the invoice amount
     const proofs = await mintProofs(wallet, challenge.amount_sats)
-    const totalMinted = proofs.reduce((sum, p) => sum + p.amount, 0)
+    const totalMinted = sumProofs(proofs).toNumber()
     expect(totalMinted).toBe(challenge.amount_sats)
 
     // 3. Encode as Cashu token
-    const token = getEncodedTokenV4({ proofs, mint: MINT_URL })
+    const token = getEncodedToken({ proofs, mint: MINT_URL })
 
     // 4. Redeem through the Booth's handler
     const redeemRes = await request('/cashu-redeem', {
@@ -151,7 +151,7 @@ describe.skipIf(!RUN_INTEGRATION)('Cashu redemption integration (requires Nutshe
 
     // Mint and redeem
     const proofs = await mintProofs(wallet, challenge.amount_sats)
-    const token = getEncodedTokenV4({ proofs, mint: MINT_URL })
+    const token = getEncodedToken({ proofs, mint: MINT_URL })
 
     await request('/cashu-redeem', {
       method: 'POST',
@@ -187,7 +187,7 @@ describe.skipIf(!RUN_INTEGRATION)('Cashu redemption integration (requires Nutshe
 
     // Mint + redeem
     const proofs = await mintProofs(wallet, challenge.amount_sats)
-    const token = getEncodedTokenV4({ proofs, mint: MINT_URL })
+    const token = getEncodedToken({ proofs, mint: MINT_URL })
 
     const redeemRes = await request('/cashu-redeem', {
       method: 'POST',

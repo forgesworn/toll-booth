@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto'
-import { Wallet, getDecodedToken } from '@cashu/cashu-ts'
+import { Wallet, getTokenMetadata, sumProofs } from '@cashu/cashu-ts'
 import type { TollBoothRequest } from './types.js'
 import type { PaymentRail, PriceInfo, ChallengeFragment, RailVerifyResult, Currency } from './payment-rail.js'
 import type { XCashuConfig } from '../types.js'
@@ -71,7 +71,7 @@ export function createXCashuRail(config: XCashuConfig, storage?: StorageBackend)
 
       let decoded
       try {
-        decoded = getDecodedToken(header)
+        decoded = getTokenMetadata(header)
       } catch {
         return FAIL
       }
@@ -104,7 +104,7 @@ export function createXCashuRail(config: XCashuConfig, storage?: StorageBackend)
         return FAIL
       }
 
-      const creditedAmount = receivedProofs.reduce((sum, p) => sum + p.amount, 0)
+      const creditedAmount = sumProofs(receivedProofs).toNumber()
       if (creditedAmount <= 0) {
         return FAIL
       }

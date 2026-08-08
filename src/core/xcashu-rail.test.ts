@@ -108,13 +108,14 @@ describe('xcashu-rail', () => {
 
 // ── Mocked verify tests ────────────────────────────────────────────────
 
-vi.mock('@cashu/cashu-ts', () => {
-  const getDecodedToken = vi.fn().mockImplementation(() => {
+vi.mock('@cashu/cashu-ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@cashu/cashu-ts')>()
+  const getTokenMetadata = vi.fn().mockImplementation(() => {
     throw new Error('Invalid token')
   })
   const Wallet = vi.fn(function () {})
   const Mint = vi.fn(function () {})
-  return { getDecodedToken, Wallet, Mint }
+  return { ...actual, getTokenMetadata, Wallet, Mint }
 })
 
 describe('xcashu-rail verify (mocked)', () => {
@@ -123,18 +124,18 @@ describe('xcashu-rail verify (mocked)', () => {
     unit: 'sat' as const,
   }
 
-  let mockGetDecodedToken: ReturnType<typeof vi.fn>
+  let mockGetTokenMetadata: ReturnType<typeof vi.fn>
   let MockWallet: ReturnType<typeof vi.fn>
 
   beforeEach(async () => {
     vi.clearAllMocks()
 
     const cashuTs = await import('@cashu/cashu-ts')
-    mockGetDecodedToken = vi.mocked(cashuTs.getDecodedToken)
+    mockGetTokenMetadata = vi.mocked(cashuTs.getTokenMetadata)
     MockWallet = vi.mocked(cashuTs.Wallet)
 
     // Default: valid decoded token from accepted mint
-    mockGetDecodedToken.mockReturnValue({
+    mockGetTokenMetadata.mockReturnValue({
       mint: 'https://mint.example.com',
       unit: 'sat',
       proofs: [{ amount: 10, id: 'key1', C: 'sig1', secret: 's1' }],
@@ -183,7 +184,7 @@ describe('xcashu-rail verify (mocked)', () => {
   })
 
   it('rejects wrong mint in decoded token', async () => {
-    mockGetDecodedToken.mockReturnValue({
+    mockGetTokenMetadata.mockReturnValue({
       mint: 'https://wrong.mint',
       unit: 'sat',
       proofs: [{ amount: 10, id: 'key1', C: 'sig1', secret: 's1' }],
@@ -197,7 +198,7 @@ describe('xcashu-rail verify (mocked)', () => {
   })
 
   it('rejects unit mismatch in decoded token', async () => {
-    mockGetDecodedToken.mockReturnValue({
+    mockGetTokenMetadata.mockReturnValue({
       mint: 'https://mint.example.com',
       unit: 'usd',
       proofs: [{ amount: 100, id: 'key1', C: 'sig1', secret: 's1' }],
@@ -227,7 +228,7 @@ describe('xcashu-rail verify (mocked)', () => {
   })
 
   it('does not fire onProofsReceived on verify failure', async () => {
-    mockGetDecodedToken.mockReturnValue({
+    mockGetTokenMetadata.mockReturnValue({
       mint: 'https://wrong.mint',
       unit: 'sat',
       proofs: [{ amount: 10, id: 'key1', C: 'sig1', secret: 's1' }],

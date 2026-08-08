@@ -4,7 +4,7 @@
 // Skipped by default — run via: npm run test:integration --cashu-only
 //
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { Mint, Wallet, MintQuoteState, getEncodedTokenV4, type Proof } from '@cashu/cashu-ts'
+import { Mint, Wallet, MintQuoteState, getEncodedToken, sumProofs, type Proof } from '@cashu/cashu-ts'
 import { Booth } from '../booth.js'
 import { memoryStorage } from '../storage/memory.js'
 import type { WebStandardHandler } from '../adapters/web-standard.js'
@@ -30,7 +30,7 @@ async function mintProofs(wallet: Wallet, amount: number): Promise<Proof[]> {
     await new Promise((r) => setTimeout(r, 250))
   }
 
-  return wallet.mintProofs(amount, quote.quote)
+  return wallet.mintProofsBolt11(amount, quote.quote)
 }
 
 describe.skipIf(!RUN_INTEGRATION)('Cashu-only mode integration (requires Nutshell)', () => {
@@ -47,7 +47,7 @@ describe.skipIf(!RUN_INTEGRATION)('Cashu-only mode integration (requires Nutshel
     // Create Booth with NO Lightning backend — Cashu only
     const redeemCashu = async (token: string, _paymentHash: string): Promise<number> => {
       const proofs = await wallet.receive(token)
-      return proofs.reduce((sum, p) => sum + p.amount, 0)
+      return sumProofs(proofs).toNumber()
     }
 
     booth = new Booth({
@@ -110,11 +110,11 @@ describe.skipIf(!RUN_INTEGRATION)('Cashu-only mode integration (requires Nutshel
 
     // 2. Mint Cashu proofs for the invoice amount
     const proofs = await mintProofs(wallet, challenge.amount_sats)
-    const totalMinted = proofs.reduce((sum, p) => sum + p.amount, 0)
+    const totalMinted = sumProofs(proofs).toNumber()
     expect(totalMinted).toBe(challenge.amount_sats)
 
     // 3. Encode as Cashu token and redeem
-    const token = getEncodedTokenV4({ proofs, mint: MINT_URL })
+    const token = getEncodedToken({ proofs, mint: MINT_URL })
     const redeemRes = await request('/cashu-redeem', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -157,7 +157,7 @@ describe.skipIf(!RUN_INTEGRATION)('Cashu-only mode integration (requires Nutshel
 
     // 3. Pay via Cashu
     const proofs = await mintProofs(wallet, challenge.amount_sats)
-    const token = getEncodedTokenV4({ proofs, mint: MINT_URL })
+    const token = getEncodedToken({ proofs, mint: MINT_URL })
     await request('/cashu-redeem', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

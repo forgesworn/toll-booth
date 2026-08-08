@@ -1,0 +1,22 @@
+diff --git a/node_modules/@cashu/cashu-ts/lib/cashu-ts.es.js b/node_modules/@cashu/cashu-ts/lib/cashu-ts.es.js
+index 4c0890e..148169f 100644
+--- a/node_modules/@cashu/cashu-ts/lib/cashu-ts.es.js
++++ b/node_modules/@cashu/cashu-ts/lib/cashu-ts.es.js
+@@ -3601,7 +3601,7 @@ var zi = class {
+ 		return e === "bolt11" ? this.normalizeMintQuoteBolt11Fields(r) : e === "bolt12" ? this.normalizeMintQuoteBolt12Fields(r) : e === "onchain" && this.normalizeMintQuoteOnchainFields(r), n ? n(r) : r;
+ 	}
+ 	normalizeMintQuoteBolt11Fields(e) {
+-		e.amount = k.from(e.amount), e.expiry = Y(e.expiry, "mintQuoteBolt11.expiry", null);
++		e.amount = e.amount === void 0 ? void 0 : k.from(e.amount), e.expiry = Y(e.expiry, "mintQuoteBolt11.expiry", null);
+ 	}
+ 	normalizeMintQuoteBolt12Fields(e) {
+ 		Zr(e, "amount"), e.amount = e.amount === null ? null : k.from(e.amount), e.expiry = Y(e.expiry, "mintQuoteBolt12.expiry", null), e.amount_paid = k.from(e.amount_paid), e.amount_issued = k.from(e.amount_issued);
+@@ -3614,7 +3614,7 @@ var zi = class {
+ 		return this.normalizeMeltBaseFields(i, r), e === "bolt11" || e === "bolt12" ? this.normalizeMeltBoltFields(i, r) : e === "onchain" && this.normalizeMeltOnchainFields(i), n ? n(i) : i;
+ 	}
+ 	normalizeMeltBaseFields(e, t) {
+-		if (e.amount = k.from(e.amount), e.expiry = Y(e.expiry, "meltQuote.expiry", void 0), e.change && (e.change = this.normalizeSignatureAmounts(e.change)), !G(e) || typeof e.quote != "string" || !(e.amount instanceof k) || typeof e.unit != "string" || typeof e.state != "string" || typeof e.expiry != "number" || !Object.values(mi).includes(e.state)) throw this._logger.error("Invalid response from mint...", {
++		if (e.amount = e.amount === void 0 ? void 0 : k.from(e.amount), e.expiry = Y(e.expiry, "meltQuote.expiry", void 0), e.change && (e.change = this.normalizeSignatureAmounts(e.change)), !G(e) || typeof e.quote != "string" || e.amount !== void 0 && !(e.amount instanceof k) || typeof e.unit != "string" || typeof e.state != "string" || typeof e.expiry != "number" || !Object.values(mi).includes(e.state)) throw this._logger.error("Invalid response from mint...", {
+ 			data: e,
+ 			op: t
+ 		}), new v("Invalid response from mint");

@@ -5,14 +5,19 @@ const mockCreateMeltQuoteBolt11 = vi.fn()
 const mockSend = vi.fn()
 const mockMeltProofsBolt11 = vi.fn()
 
-vi.mock('@cashu/cashu-ts', () => ({
-  Wallet: vi.fn(function (this: any) {
-    this.createMeltQuoteBolt11 = mockCreateMeltQuoteBolt11
-    this.send = mockSend
-    this.meltProofsBolt11 = mockMeltProofsBolt11
-  }),
-}))
+vi.mock('@cashu/cashu-ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@cashu/cashu-ts')>()
+  return {
+    ...actual,
+    Wallet: vi.fn(function (this: any) {
+      this.createMeltQuoteBolt11 = mockCreateMeltQuoteBolt11
+      this.send = mockSend
+      this.meltProofsBolt11 = mockMeltProofsBolt11
+    }),
+  }
+})
 
+import { Amount } from '@cashu/cashu-ts'
 import { meltToLightning } from './melt-to-lightning.js'
 
 describe('meltToLightning', () => {
@@ -20,8 +25,8 @@ describe('meltToLightning', () => {
     vi.clearAllMocks()
 
     mockCreateMeltQuoteBolt11.mockResolvedValue({
-      amount: 10,
-      fee_reserve: 1,
+      amount: Amount.from(10),
+      fee_reserve: Amount.from(1),
       quote: 'q1',
       state: 'UNPAID',
     })
@@ -61,8 +66,8 @@ describe('meltToLightning', () => {
 
   it('returns error when fee_reserve exceeds proof amount', async () => {
     mockCreateMeltQuoteBolt11.mockResolvedValue({
-      amount: 10,
-      fee_reserve: 50,
+      amount: Amount.from(10),
+      fee_reserve: Amount.from(50),
       quote: 'q1',
       state: 'UNPAID',
     })

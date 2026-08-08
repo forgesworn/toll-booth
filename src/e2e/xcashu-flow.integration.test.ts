@@ -6,7 +6,7 @@
 //   RUN_INTEGRATION=true CASHU_MINT_URL=http://localhost:13338 npm test -- src/e2e/xcashu-flow.integration.test.ts
 //
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { Mint, Wallet, MintQuoteState, getEncodedTokenV4, type Proof } from '@cashu/cashu-ts'
+import { Mint, Wallet, MintQuoteState, getEncodedToken, type Proof } from '@cashu/cashu-ts'
 import { Booth } from '../booth.js'
 import { memoryStorage } from '../storage/memory.js'
 import type { LightningBackend } from '../types.js'
@@ -63,7 +63,7 @@ async function mintProofs(wallet: Wallet, amount: number): Promise<Proof[]> {
     await new Promise((r) => setTimeout(r, 250))
   }
 
-  return wallet.mintProofs(amount, quote.quote)
+  return wallet.mintProofsBolt11(amount, quote.quote)
 }
 
 // ---------------------------------------------------------------------------
@@ -212,7 +212,7 @@ describe.skipIf(!RUN_INTEGRATION)('xcashu full payment flow (requires Nutshell m
 
     // 2. Mint proofs for the route cost
     const proofs = await mintProofs(wallet, 5)
-    const token = getEncodedTokenV4({ proofs, mint: MINT_URL })
+    const token = getEncodedToken({ proofs, mint: MINT_URL })
 
     // 3. Send token via X-Cashu request header
     const authedRes = await request('/api/data', {
@@ -225,7 +225,7 @@ describe.skipIf(!RUN_INTEGRATION)('xcashu full payment flow (requires Nutshell m
 
   it('X-Credit-Balance is present on successful xcashu payment', async () => {
     const proofs = await mintProofs(wallet, 10)
-    const token = getEncodedTokenV4({ proofs, mint: MINT_URL })
+    const token = getEncodedToken({ proofs, mint: MINT_URL })
 
     const res = await request('/api/data', {
       headers: { 'X-Cashu': token },
@@ -240,7 +240,7 @@ describe.skipIf(!RUN_INTEGRATION)('xcashu full payment flow (requires Nutshell m
 
   it('rejects a spent token (double-spend prevention)', async () => {
     const proofs = await mintProofs(wallet, 5)
-    const token = getEncodedTokenV4({ proofs, mint: MINT_URL })
+    const token = getEncodedToken({ proofs, mint: MINT_URL })
 
     // First use — should succeed
     const first = await request('/api/data', {
@@ -258,7 +258,7 @@ describe.skipIf(!RUN_INTEGRATION)('xcashu full payment flow (requires Nutshell m
   it('rejects a token with insufficient amount', async () => {
     // Route costs 5 sats — mint only 3
     const proofs = await mintProofs(wallet, 3)
-    const token = getEncodedTokenV4({ proofs, mint: MINT_URL })
+    const token = getEncodedToken({ proofs, mint: MINT_URL })
 
     const res = await request('/api/data', {
       headers: { 'X-Cashu': token },
@@ -269,7 +269,7 @@ describe.skipIf(!RUN_INTEGRATION)('xcashu full payment flow (requires Nutshell m
   it('credits overpayment correctly', async () => {
     // Route costs 5 sats — pay 50
     const proofs = await mintProofs(wallet, 50)
-    const token = getEncodedTokenV4({ proofs, mint: MINT_URL })
+    const token = getEncodedToken({ proofs, mint: MINT_URL })
 
     const res = await request('/api/data', {
       headers: { 'X-Cashu': token },
@@ -301,7 +301,7 @@ describe.skipIf(!RUN_INTEGRATION)('xcashu full payment flow (requires Nutshell m
 
       // Mint a valid token from the real Nutshell mint
       const proofs = await mintProofs(wallet, 5)
-      const token = getEncodedTokenV4({ proofs, mint: MINT_URL })
+      const token = getEncodedToken({ proofs, mint: MINT_URL })
 
       // Send to the Booth that doesn't accept this mint
       const res = await wrongMintRequest('/api/data', {
@@ -324,7 +324,7 @@ describe.skipIf(!RUN_INTEGRATION)('xcashu full payment flow (requires Nutshell m
   it('handles sequential payments after credit is exhausted', async () => {
     // 1. First payment: 10 sats for a 5-sat route → 5 credit
     const proofs1 = await mintProofs(wallet, 10)
-    const token1 = getEncodedTokenV4({ proofs: proofs1, mint: MINT_URL })
+    const token1 = getEncodedToken({ proofs: proofs1, mint: MINT_URL })
 
     const res1 = await request('/api/data', {
       headers: { 'X-Cashu': token1 },
@@ -348,7 +348,7 @@ describe.skipIf(!RUN_INTEGRATION)('xcashu full payment flow (requires Nutshell m
 
     // 3. Third payment: mint fresh token after credit exhausted
     const proofs3 = await mintProofs(wallet, 10)
-    const token3 = getEncodedTokenV4({ proofs: proofs3, mint: MINT_URL })
+    const token3 = getEncodedToken({ proofs: proofs3, mint: MINT_URL })
 
     const res3 = await request('/api/data', {
       headers: { 'X-Cashu': token3 },
@@ -359,7 +359,7 @@ describe.skipIf(!RUN_INTEGRATION)('xcashu full payment flow (requires Nutshell m
 
   it('rejects one of two concurrent requests with the same token', async () => {
     const proofs = await mintProofs(wallet, 5)
-    const token = getEncodedTokenV4({ proofs, mint: MINT_URL })
+    const token = getEncodedToken({ proofs, mint: MINT_URL })
 
     const [resA, resB] = await Promise.all([
       request('/api/data', { headers: { 'X-Cashu': token } }),

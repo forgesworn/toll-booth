@@ -1,4 +1,4 @@
-import { Wallet } from '@cashu/cashu-ts'
+import { Wallet, sumProofs } from '@cashu/cashu-ts'
 import type { Proof } from '@cashu/cashu-ts'
 
 export type MeltResult =
@@ -21,7 +21,7 @@ export async function meltToLightning(opts: {
 }): Promise<MeltResult> {
   const { mintUrl, proofs, createInvoice } = opts
 
-  const totalSats = proofs.reduce((sum, p) => sum + p.amount, 0)
+  const totalSats = sumProofs(proofs).toNumber()
   if (totalSats <= 0) {
     return { paid: false, error: 'No proofs to melt' }
   }
@@ -33,7 +33,7 @@ export async function meltToLightning(opts: {
 
   // Get melt quote to learn fee_reserve
   const meltQuote = await wallet.createMeltQuoteBolt11(invoice)
-  const needed = meltQuote.amount + meltQuote.fee_reserve
+  const needed = meltQuote.amount.add(meltQuote.fee_reserve).toNumber()
 
   if (needed > totalSats) {
     return {
@@ -52,7 +52,7 @@ export async function meltToLightning(opts: {
     // Discard change proofs (keep + change) — bearer instruments not retained
     return {
       paid: true,
-      amountSats: meltQuote.amount,
+      amountSats: meltQuote.amount.toNumber(),
       preimage: meltResponse.quote.payment_preimage ?? undefined,
     }
   }
