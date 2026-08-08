@@ -1,4 +1,5 @@
 import type { LightningBackend, Invoice, InvoiceStatus } from '../types.js'
+import type { NWCClient } from './nwc-client.js'
 
 export interface NwcConfig {
   /** NWC connection URI: nostr+walletconnect://pubkey?relay=wss://...&secret=... */
@@ -14,15 +15,16 @@ export interface NwcConfig {
  * Phoenix, and others). Communication is end-to-end encrypted over
  * Nostr relays using NIP-44 (or NIP-04 for older wallets).
  *
- * The `nostr-core` package is imported dynamically so it only needs
- * to be installed when this backend is actually used.
+ * The NWC client (`nwc-client.ts`, built on nostr-tools) is imported
+ * dynamically so the Nostr stack is only loaded when this backend is
+ * actually used.
  *
  * Security: wallet response events are signature-verified and matched to
  * the wallet pubkey and request ID before being trusted (relay author
- * filters are not authentication). nostr-core's Relay layer already
- * verifies event signatures; patches/nostr-core+0.8.0.patch adds the same
- * check inside the NWC client as defence-in-depth, plus a one-time stderr
- * warning when the wallet only supports NIP-04 (AES-CBC, no MAC).
+ * filters are not authentication). nostr-tools' relay layer already
+ * verifies event signatures; the NWC client re-checks the author, request
+ * reference and signature as defence-in-depth, plus emits a one-time
+ * stderr warning when the wallet only supports NIP-04 (AES-CBC, no MAC).
  *
  * @see https://nwc.dev/
  * @see https://github.com/nostr-protocol/nips/blob/master/47.md
@@ -36,13 +38,13 @@ export function nwcBackend(config: NwcConfig): LightningBackend {
   }
 
   // Lazy-initialised client — connects on first use
-  let clientPromise: Promise<InstanceType<typeof import('nostr-core').NWC>> | undefined
+  let clientPromise: Promise<NWCClient> | undefined
 
   async function getClient() {
     if (!clientPromise) {
       clientPromise = (async () => {
-        const { NWC } = await import('nostr-core')
-        const nwc = new NWC(nwcUrl)
+        const { NWCClient } = await import('./nwc-client.js')
+        const nwc = new NWCClient(nwcUrl)
         if (timeout !== undefined) {
           nwc.replyTimeout = timeout
         }

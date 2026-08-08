@@ -89,7 +89,7 @@ npm run test:integration:cashu        # Cashu only
 - **ESM-only** — `"type": "module"`, target ES2022, module Node16
 - **Commits** — `type: description` format (e.g. `feat:`, `fix:`, `refactor:`, `docs:`)
 - **Tests** — co-located with source (`src/foo.test.ts` alongside `src/foo.ts`)
-- **Zero TROTT deps** — standalone library (better-sqlite3, macaroon, qrcode, nostr-core, cashu-ts)
+- **Zero TROTT deps** — standalone library (better-sqlite3, macaroon, qrcode, nostr-tools, cashu-ts)
 
 ## Key patterns
 

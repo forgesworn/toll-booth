@@ -1,19 +1,21 @@
 // src/backends/nwc-signature.test.ts
 //
 // Regression tests for NWC response signature verification.
-// The nostr-core NWC client previously trusted relay-supplied response
-// events without verifying their Schnorr signatures — a malicious relay
-// could forge a "wallet" response (the authors filter is not
-// authentication) and fabricate invoices/preimages. These tests run the
-// REAL nostr-core client against an in-process fake relay that serves
-// forged events.
+// A naive NWC client would trust relay-supplied response events without
+// verifying their Schnorr signatures — a malicious relay could forge a
+// "wallet" response (the authors filter is not authentication) and
+// fabricate invoices/preimages. These tests run the REAL client
+// (nwc-client.ts, built on nostr-tools) against an in-process fake relay
+// that serves forged events.
 
 import { describe, it, expect, afterEach, vi } from 'vitest'
 import { createServer, type Server } from 'node:http'
 import { createHash, randomBytes } from 'node:crypto'
 import type { Socket } from 'node:net'
-import { NWC, finalizeEvent, getPublicKey, nip04, verifyEvent } from 'nostr-core'
-import type { NostrEvent } from 'nostr-core'
+import { finalizeEvent, getPublicKey, verifyEvent } from 'nostr-tools'
+import * as nip04 from 'nostr-tools/nip04'
+import type { NostrEvent } from 'nostr-tools'
+import { NWCClient } from './nwc-client.js'
 
 const WS_GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11'
 const NWC_RESPONSE_KIND = 23195
@@ -172,9 +174,9 @@ const attackerSecret = randomBytes(32)
 
 let relay: FakeRelay
 
-async function makeClient(replyTimeout = 800): Promise<NWC> {
+async function makeClient(replyTimeout = 800): Promise<NWCClient> {
   relay = await startFakeRelay()
-  const nwc = new NWC(
+  const nwc = new NWCClient(
     `nostr+walletconnect://${walletPubkey}?relay=${relay.url}&secret=${clientSecret.toString('hex')}`,
   )
   nwc.replyTimeout = replyTimeout
@@ -200,10 +202,11 @@ afterEach(async () => {
 })
 
 describe('NWC response signature verification (fake relay)', () => {
-  // NOTE: verification is layered — Relay._onmessage already verifies event
-  // signatures before dispatch, and the patched NWC client re-checks the
-  // author, request reference and signature before trusting a response.
-  // These tests guard the whole stack against forged relay responses.
+  // NOTE: verification is layered — nostr-tools' relay layer already
+  // verifies event signatures before dispatch, and the NWC client
+  // re-checks the author, request reference and signature before trusting
+  // a response. These tests guard the whole stack against forged relay
+  // responses.
 
   it('warns once on NIP-04 fallback (no NIP-44 support advertised)', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
@@ -214,7 +217,7 @@ describe('NWC response signature verification (fake relay)', () => {
 
       // A second client in the same process must NOT warn again
       const relay2 = relay
-      const nwc2 = new NWC(
+      const nwc2 = new NWCClient(
         `nostr+walletconnect://${walletPubkey}?relay=${relay2.url}&secret=${randomBytes(32).toString('hex')}`,
       )
       await nwc2.connect()

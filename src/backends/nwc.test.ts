@@ -6,8 +6,8 @@ const mockLookupInvoice = vi.fn()
 const mockConnect = vi.fn()
 const mockClose = vi.fn()
 
-vi.mock('nostr-core', () => ({
-  NWC: class MockNWC {
+vi.mock('./nwc-client.js', () => ({
+  NWCClient: class MockNWCClient {
     replyTimeout = 60_000
     constructor(_url: string) {}
     connect = mockConnect
