@@ -180,7 +180,7 @@ describe('IETF Session Rail', () => {
 
       const auth = encodeCredential(credential)
       const result = await rail.verify(makeRequest(auth))
-      return { result, paymentHash, sessionRequest }
+      return { result, paymentHash, sessionRequest, credential }
     }
 
     it('opens a session with valid preimage', async () => {
@@ -496,6 +496,73 @@ describe('IETF Session Rail', () => {
       expect(topupResult.authenticated).toBe(true)
       // Original deposit was 500, top-up is 200
       expect(topupResult.creditBalance).toBe(700)
+    })
+
+    it('rejects a replayed top-up (same challenge + preimage)', async () => {
+      const rail = createRail()
+      const { result } = await openSession(rail)
+      const bearerToken = result.customCaveats!['X-Session-Token']
+      const sessionId = result.customCaveats!['X-Session-Id']
+
+      // Get a new challenge for the top-up
+      const topupFragment = await rail.challenge('/api/test', { sats: 200 })
+      const topupWwwAuth = topupFragment.headers['WWW-Authenticate']
+      const topupIdMatch = topupWwwAuth.match(/id="([^"]+)"/)!
+      const topupRequestMatch = topupWwwAuth.match(/request="([^"]+)"/)!
+      const topupExpiresMatch = topupWwwAuth.match(/expires="([^"]+)"/)!
+
+      const topupSessionRequest: SessionChallengeRequest = JSON.parse(
+        Buffer.from(topupRequestMatch[1], 'base64url').toString()
+      )
+      const topupEntry = invoiceMap.get(topupSessionRequest.deposit.paymentHash)!
+
+      const topupCredential: IETFCredential = {
+        challenge: {
+          id: topupIdMatch[1],
+          realm: REALM,
+          method: 'lightning',
+          intent: 'session',
+          request: topupRequestMatch[1],
+          expires: topupExpiresMatch[1],
+        },
+        payload: {
+          action: 'topup',
+          sessionToken: bearerToken,
+          preimage: topupEntry.preimage,
+        } satisfies SessionTopUpPayload,
+      }
+
+      const first = await rail.verify(makeRequest(encodeCredential(topupCredential)))
+      expect(first.authenticated).toBe(true)
+      expect(first.creditBalance).toBe(700)
+
+      // Replay the identical credential — must be rejected and must not credit again
+      const replay = await rail.verify(makeRequest(encodeCredential(topupCredential)))
+      expect(replay.authenticated).toBe(false)
+      expect(storage.getSession(sessionId)!.balanceSats).toBe(700)
+    })
+
+    it('rejects the open challenge replayed as a top-up', async () => {
+      const rail = createRail()
+      const { result, credential } = await openSession(rail)
+      expect(result.authenticated).toBe(true)
+      const bearerToken = result.customCaveats!['X-Session-Token']
+      const sessionId = result.customCaveats!['X-Session-Id']
+
+      // Reuse the ORIGINAL open challenge with a topup payload — the deposit
+      // payment hash was consumed at open, so this must be rejected.
+      const replayCredential: IETFCredential = {
+        challenge: credential.challenge,
+        payload: {
+          action: 'topup',
+          sessionToken: bearerToken,
+          preimage: (credential.payload as unknown as SessionOpenPayload).preimage,
+        } satisfies SessionTopUpPayload,
+      }
+
+      const replay = await rail.verify(makeRequest(encodeCredential(replayCredential)))
+      expect(replay.authenticated).toBe(false)
+      expect(storage.getSession(sessionId)!.balanceSats).toBe(500)
     })
 
     it('rejects bearer token after close', async () => {

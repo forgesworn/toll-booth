@@ -416,3 +416,45 @@ describe('memoryStorage', () => {
     })
   })
 })
+
+describe('memoryStorage session settlement', () => {
+  const session = {
+    sessionId: 's1',
+    paymentHash: 'ph1',
+    balanceSats: 500,
+    depositSats: 500,
+    bearerToken: 'tok',
+    expiresAt: new Date(Date.now() + 60_000).toISOString(),
+  }
+
+  it('createSessionWithSettlement marks the deposit hash settled', () => {
+    const storage = memoryStorage()
+    expect(storage.createSessionWithSettlement(session)).toBe(true)
+    expect(storage.isSettled('ph1')).toBe(true)
+    expect(storage.getSession('s1')?.balanceSats).toBe(500)
+  })
+
+  it('createSessionWithSettlement rejects duplicate session or settled hash', () => {
+    const storage = memoryStorage()
+    expect(storage.createSessionWithSettlement(session)).toBe(true)
+    expect(storage.createSessionWithSettlement(session)).toBe(false)
+    expect(storage.createSessionWithSettlement({ ...session, sessionId: 's2' })).toBe(false)
+    expect(storage.getSession('s2')).toBeNull()
+  })
+
+  it('topUpSessionWithSettlement credits once and rejects replay', () => {
+    const storage = memoryStorage()
+    storage.createSessionWithSettlement(session)
+    expect(storage.topUpSessionWithSettlement('s1', 200, 'ph2')).toEqual({ newBalance: 700 })
+    expect(storage.topUpSessionWithSettlement('s1', 200, 'ph2')).toBeNull()
+    expect(storage.getSession('s1')?.balanceSats).toBe(700)
+  })
+
+  it('topUpSessionWithSettlement leaves no settlement marker when the session is closed', () => {
+    const storage = memoryStorage()
+    storage.createSessionWithSettlement(session)
+    storage.closeSession('s1')
+    expect(() => storage.topUpSessionWithSettlement('s1', 200, 'ph3')).toThrow()
+    expect(storage.isSettled('ph3')).toBe(false)
+  })
+})

@@ -241,6 +241,35 @@ export function memoryStorage(): StorageBackend {
       return { newBalance: session.balanceSats }
     },
 
+    createSessionWithSettlement(session: { sessionId: string, paymentHash: string, balanceSats: number, depositSats: number, bearerToken: string, expiresAt: string, returnInvoice?: string }): boolean {
+      if (sessions.has(session.sessionId)) return false
+      if (settled.has(session.paymentHash)) return false
+      settled.set(session.paymentHash, undefined)
+      sessions.set(session.sessionId, {
+        sessionId: session.sessionId,
+        paymentHash: session.paymentHash,
+        balanceSats: session.balanceSats,
+        depositSats: session.depositSats,
+        returnInvoice: session.returnInvoice ?? null,
+        bearerToken: session.bearerToken,
+        createdAt: new Date().toISOString(),
+        expiresAt: session.expiresAt,
+        closedAt: null,
+        refundPreimage: null,
+      })
+      return true
+    },
+
+    topUpSessionWithSettlement(sessionId: string, amount: number, paymentHash: string): { newBalance: number } | null {
+      if (settled.has(paymentHash)) return null
+      const session = sessions.get(sessionId)
+      if (!session || session.closedAt !== null) throw new Error(`Session not found or closed: ${sessionId}`)
+      settled.set(paymentHash, undefined)
+      session.balanceSats += amount
+      session.depositSats += amount
+      return { newBalance: session.balanceSats }
+    },
+
     closeSession(sessionId: string, refundPreimage?: string): void {
       const session = sessions.get(sessionId)
       if (session && session.closedAt === null) {

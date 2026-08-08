@@ -165,7 +165,7 @@ describe('X402Rail', () => {
 
       const result = await rail.verify(makeRequest({
         'payment-signature': encodeV2Payment(),
-      }))
+      }), { usd: 500 })
 
       expect(result.authenticated).toBe(true)
       expect(result.paymentId).toBe('0xabc123')
@@ -173,13 +173,18 @@ describe('X402Rail', () => {
       expect(result.creditBalance).toBe(500)
       expect(result.currency).toBe('usd')
 
-      // Facilitator received normalised flat payload
+      // Facilitator received normalised flat payload plus the advertised requirements
       expect(facilitator.verify).toHaveBeenCalledWith(expect.objectContaining({
         signature: '0xsig',
         sender: '0xsender',
         amount: 500,
         network: 'base',
         nonce: '0xnonce1',
+      }), expect.objectContaining({
+        scheme: 'exact',
+        network: 'base',
+        amount: '500',
+        payTo: '0xreceiver',
       }))
     })
 
@@ -189,7 +194,7 @@ describe('X402Rail', () => {
         network: 'base',
         facilitator: mockFacilitator(),
       })
-      const result = await rail.verify(makeRequest({ 'payment-signature': 'not-valid-base64!!!' }))
+      const result = await rail.verify(makeRequest({ 'payment-signature': 'not-valid-base64!!!' }), { usd: 500 })
       expect(result.authenticated).toBe(false)
     })
 
@@ -201,7 +206,7 @@ describe('X402Rail', () => {
       })
       const wire = { x402Version: 2, payload: { signature: 'sig' } }
       const encoded = Buffer.from(JSON.stringify(wire)).toString('base64')
-      const result = await rail.verify(makeRequest({ 'payment-signature': encoded }))
+      const result = await rail.verify(makeRequest({ 'payment-signature': encoded }), { usd: 500 })
       expect(result.authenticated).toBe(false)
     })
   })
@@ -221,7 +226,7 @@ describe('X402Rail', () => {
       const payload = JSON.stringify({
         signature: 'sig', sender: '0xs', amount: 500, network: 'base', nonce: 'n1',
       })
-      const result = await rail.verify(makeRequest({ 'x-payment': payload }))
+      const result = await rail.verify(makeRequest({ 'x-payment': payload }), { usd: 500 })
 
       expect(result.authenticated).toBe(true)
       expect(result.paymentId).toBe('0xabc123')
@@ -243,7 +248,7 @@ describe('X402Rail', () => {
       const payload = JSON.stringify({
         signature: 'sig', sender: '0xs', amount: 500, network: 'base', nonce: 'n1',
       })
-      const result = await rail.verify(makeRequest({ 'x-payment': payload }))
+      const result = await rail.verify(makeRequest({ 'x-payment': payload }), { usd: 500 })
 
       expect(result.authenticated).toBe(true)
       expect(result.creditBalance).toBe(500)
@@ -260,7 +265,7 @@ describe('X402Rail', () => {
       const payload = JSON.stringify({
         signature: 'sig', sender: '0xs', amount: 500, network: 'base', nonce: 'n1',
       })
-      const result = await rail.verify(makeRequest({ 'x-payment': payload }))
+      const result = await rail.verify(makeRequest({ 'x-payment': payload }), { usd: 500 })
       expect(result.mode).toBe('per-request')
       expect(result.creditBalance).toBeUndefined()
     })
@@ -276,7 +281,7 @@ describe('X402Rail', () => {
       const payload = JSON.stringify({
         signature: 'bad', sender: '0xs', amount: 500, network: 'base', nonce: 'n1',
       })
-      const result = await rail.verify(makeRequest({ 'x-payment': payload }))
+      const result = await rail.verify(makeRequest({ 'x-payment': payload }), { usd: 500 })
       expect(result.authenticated).toBe(false)
     })
 
@@ -291,7 +296,7 @@ describe('X402Rail', () => {
       const payload = JSON.stringify({
         signature: 'sig', sender: '0xs', amount: 500, network: 'base', nonce: 'n1',
       })
-      const result = await rail.verify(makeRequest({ 'x-payment': payload }))
+      const result = await rail.verify(makeRequest({ 'x-payment': payload }), { usd: 500 })
       expect(result.authenticated).toBe(false)
     })
 
@@ -299,7 +304,7 @@ describe('X402Rail', () => {
       const rail = createX402Rail({
         receiverAddress: '0xreceiver', network: 'base', facilitator: mockFacilitator(),
       })
-      const result = await rail.verify(makeRequest({ 'x-payment': 'not-json' }))
+      const result = await rail.verify(makeRequest({ 'x-payment': 'not-json' }), { usd: 500 })
       expect(result.authenticated).toBe(false)
     })
 
@@ -310,7 +315,7 @@ describe('X402Rail', () => {
       })
 
       const incomplete = JSON.stringify({ sender: '0xs', amount: 500, network: 'base', nonce: 'n1' })
-      const result = await rail.verify(makeRequest({ 'x-payment': incomplete }))
+      const result = await rail.verify(makeRequest({ 'x-payment': incomplete }), { usd: 500 })
       expect(result.authenticated).toBe(false)
       expect(facilitator.verify).not.toHaveBeenCalled()
     })
@@ -324,7 +329,7 @@ describe('X402Rail', () => {
       const negativeAmount = JSON.stringify({
         signature: 'sig', sender: '0xs', amount: -100, network: 'base', nonce: 'n1',
       })
-      const result = await rail.verify(makeRequest({ 'x-payment': negativeAmount }))
+      const result = await rail.verify(makeRequest({ 'x-payment': negativeAmount }), { usd: 500 })
       expect(result.authenticated).toBe(false)
       expect(facilitator.verify).not.toHaveBeenCalled()
     })
@@ -337,7 +342,7 @@ describe('X402Rail', () => {
 
       const result = await rail.verify(makeRequest({
         'x-payment': '{"signature":"sig","sender":"0xs","amount":"NaN","network":"base","nonce":"n1"}',
-      }))
+      }), { usd: 500 })
       expect(result.authenticated).toBe(false)
       expect(facilitator.verify).not.toHaveBeenCalled()
     })
@@ -361,12 +366,105 @@ describe('X402Rail', () => {
       await rail.verify(makeRequest({
         'payment-signature': v2Header,
         'x-payment': legacyHeader,
-      }))
+      }), { usd: 500 })
 
       // Should have used the v2 sender, not the legacy one
       expect(facilitator.verify).toHaveBeenCalledWith(expect.objectContaining({
         sender: '0xv2sender',
+      }), expect.anything())
+    })
+  })
+
+  describe('payment requirements enforcement', () => {
+    const makeRail = (facilitator: X402Facilitator) => createX402Rail({
+      receiverAddress: '0xreceiver', network: 'base', facilitator,
+    })
+
+    it('rejects a validly signed underpayment (1-cent transfer on a $10 route)', async () => {
+      const facilitator = mockFacilitator({ amount: 1 })
+      const rail = makeRail(facilitator)
+
+      const payload = JSON.stringify({
+        signature: 'sig', sender: '0xs', amount: 1, network: 'base', nonce: 'n1',
+      })
+      const result = await rail.verify(makeRequest({ 'x-payment': payload }), { usd: 1000 })
+      expect(result.authenticated).toBe(false)
+      // Underpayment must never reach the facilitator
+      expect(facilitator.verify).not.toHaveBeenCalled()
+    })
+
+    it('rejects an attacker-controlled network that does not match requirements', async () => {
+      const facilitator = mockFacilitator()
+      const rail = makeRail(facilitator)
+
+      const result = await rail.verify(makeRequest({
+        'payment-signature': encodeV2Payment({ network: 'base-sepolia' }),
+      }), { usd: 500 })
+      expect(result.authenticated).toBe(false)
+      expect(facilitator.verify).not.toHaveBeenCalled()
+    })
+
+    it('rejects when the facilitator reports a settled amount below the price', async () => {
+      const facilitator = mockFacilitator({ amount: 1 })
+      const rail = makeRail(facilitator)
+
+      // Payload claims the full price, but the facilitator settled less
+      const result = await rail.verify(makeRequest({
+        'payment-signature': encodeV2Payment(),
+      }), { usd: 1000 })
+      // Payload amount (500) is also below price — rejected before facilitator
+      expect(result.authenticated).toBe(false)
+    })
+
+    it('rejects when the facilitator verifies but settles less than the price', async () => {
+      const facilitator = mockFacilitator({ amount: 400 })
+      const rail = makeRail(facilitator)
+
+      const result = await rail.verify(makeRequest({
+        'payment-signature': encodeV2Payment(),
+      }), { usd: 500 })
+      expect(result.authenticated).toBe(false)
+      expect(facilitator.verify).toHaveBeenCalled()
+    })
+
+    it('rejects a payTo that does not match the receiver', async () => {
+      const facilitator = mockFacilitator()
+      const rail = makeRail(facilitator)
+
+      const wire: X402PaymentWire = {
+        x402Version: X402_VERSION,
+        accepted: {
+          scheme: 'exact',
+          network: 'base',
+          amount: '500',
+          asset: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+          payTo: '0xattacker',
+          maxTimeoutSeconds: 3600,
+          extra: {},
+        },
+        payload: {
+          signature: '0xsig',
+          authorization: {
+            from: '0xsender', to: '0xattacker', value: '500',
+            validAfter: '0', validBefore: '9999999999', nonce: '0xnonce1',
+          },
+        },
+      }
+      const header = Buffer.from(JSON.stringify(wire)).toString('base64')
+      const result = await rail.verify(makeRequest({ 'payment-signature': header }), { usd: 500 })
+      expect(result.authenticated).toBe(false)
+      expect(facilitator.verify).not.toHaveBeenCalled()
+    })
+
+    it('fails closed when no price is provided', async () => {
+      const facilitator = mockFacilitator()
+      const rail = makeRail(facilitator)
+
+      const result = await rail.verify(makeRequest({
+        'payment-signature': encodeV2Payment(),
       }))
+      expect(result.authenticated).toBe(false)
+      expect(facilitator.verify).not.toHaveBeenCalled()
     })
   })
 

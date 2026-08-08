@@ -394,6 +394,84 @@ describe('IETF Payment rail — verify', () => {
 
     expect(result.authenticated).toBe(false)
   })
+
+  it('rejects a credential presented at a different route (cross-route replay)', async () => {
+    const { backend, preimage } = knownHashBackend()
+    const rail = createIETFPaymentRail({
+      hmacSecret,
+      realm: 'api.example.com',
+      backend,
+      storage: memoryStorage(),
+    })
+
+    // Pay a 10-sat invoice for the cheap route…
+    const fragment = await rail.challenge('/api/cheap', { sats: 10 })
+    const encoded = buildCredential(fragment.headers['WWW-Authenticate'], preimage)
+
+    // …then present the credential at the expensive route
+    const result = await Promise.resolve(rail.verify({
+      method: 'GET', path: '/api/expensive',
+      headers: { authorization: `Payment ${encoded}` },
+      ip: '127.0.0.1',
+    }))
+
+    expect(result.authenticated).toBe(false)
+  })
+
+  it('accepts a credential at the route it was issued for and reports amountPaid', async () => {
+    const { backend, preimage } = knownHashBackend()
+    const rail = createIETFPaymentRail({
+      hmacSecret,
+      realm: 'api.example.com',
+      backend,
+      storage: memoryStorage(),
+    })
+
+    const fragment = await rail.challenge('/api/route', { sats: 100 })
+    const encoded = buildCredential(fragment.headers['WWW-Authenticate'], preimage)
+
+    const result = await Promise.resolve(rail.verify({
+      method: 'GET', path: '/api/route',
+      headers: { authorization: `Payment ${encoded}` },
+      ip: '127.0.0.1',
+    }))
+
+    expect(result.authenticated).toBe(true)
+    expect(result.amountPaid).toBe(100)
+  })
+
+  it('rejects a pre-binding credential with no resource in the charge request', async () => {
+    const { backend, preimage, paymentHash } = knownHashBackend()
+    const hmac = hmacSecret
+    const rail = createIETFPaymentRail({
+      hmacSecret: hmac,
+      realm: 'api.example.com',
+      backend,
+      storage: memoryStorage(),
+    })
+
+    // Build a legacy-format charge request (no resource field) with a valid HMAC
+    const request = encodeJCS({
+      amount: '100',
+      currency: 'sat',
+      methodDetails: { invoice: 'lnbc100n1mock', paymentHash, network: 'mainnet' },
+    })
+    const expires = new Date(Date.now() + 60_000).toISOString()
+    const params: IETFChallengeParams = {
+      realm: 'api.example.com', method: 'lightning', intent: 'charge', request, expires,
+    }
+    const id = computeChallengeId(hmac, params)
+    const header = `Payment id="${id}", realm="api.example.com", method="lightning", intent="charge", request="${request}", expires="${expires}"`
+    const encoded = buildCredential(header, preimage)
+
+    const result = await Promise.resolve(rail.verify({
+      method: 'GET', path: '/api/route',
+      headers: { authorization: `Payment ${encoded}` },
+      ip: '127.0.0.1',
+    }))
+
+    expect(result.authenticated).toBe(false)
+  })
 })
 
 // --- Payment-Receipt tests ---

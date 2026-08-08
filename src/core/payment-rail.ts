@@ -45,6 +45,21 @@ export function normalisePricingTable(table: PricingTable): Record<string, Price
   return result
 }
 
+/**
+ * Normalise a request path for pricing lookups: collapse duplicate slashes
+ * and strip trailing slashes (except the root '/'). Applied once in the
+ * engine so all adapters behave identically, preventing path-variant
+ * paywall bypasses such as '/api/joke/' or '/api//joke'.
+ *
+ * Matching stays case-sensitive on purpose: HTTP paths are case-sensitive
+ * (RFC 9110 §4.2.3), so '/API/joke' is a different resource from
+ * '/api/joke' and is NOT silently mapped onto it.
+ */
+export function normalisePath(path: string): string {
+  const collapsed = path.replace(/\/{2,}/g, '/').replace(/\/+$/, '')
+  return collapsed === '' ? '/' : collapsed
+}
+
 export interface ChallengeFragment {
   headers: Record<string, string>
   body: Record<string, unknown>
@@ -56,6 +71,12 @@ export interface RailVerifyResult {
   mode: 'per-request' | 'credit' | 'session'
   creditBalance?: number
   currency: Currency
+  /**
+   * Amount actually paid, in the result currency's smallest unit (sats/cents).
+   * Set by rails that bind a payment amount into the credential; the engine
+   * rejects per-request settlements where amountPaid is below the route price.
+   */
+  amountPaid?: number
   customCaveats?: Record<string, string>
 }
 
@@ -71,6 +92,11 @@ export interface PaymentRail {
   canChallenge?(price: PriceInfo): boolean
   challenge(route: string, price: PriceInfo): Promise<ChallengeFragment>
   detect(req: TollBoothRequest): boolean
-  verify(req: TollBoothRequest): Promise<RailVerifyResult> | RailVerifyResult
+  /**
+   * Verify a credential. `price` is the resolved route price; rails that
+   * settle external payments (e.g. x402) MUST validate the payment against
+   * it and reject when the route has no price in the rail's currency.
+   */
+  verify(req: TollBoothRequest, price?: PriceInfo): Promise<RailVerifyResult> | RailVerifyResult
   settle?(paymentId: string, amount: number): Promise<SettleResult>
 }

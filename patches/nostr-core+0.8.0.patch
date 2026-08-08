@@ -1,0 +1,100 @@
+diff --git a/node_modules/nostr-core/dist/nwc.js b/node_modules/nostr-core/dist/nwc.js
+index 8422604..128f151 100644
+--- a/node_modules/nostr-core/dist/nwc.js
++++ b/node_modules/nostr-core/dist/nwc.js
+@@ -1,6 +1,6 @@
+ import { bytesToHex, hexToBytes } from '@noble/hashes/utils';
+ import { getPublicKey } from './crypto.js';
+-import { finalizeEvent } from './event.js';
++import { finalizeEvent, verifyEvent } from './event.js';
+ import * as nip04 from './nip04.js';
+ import * as nip44 from './nip44.js';
+ import { decode as nip19decode } from './nip19.js';
+@@ -14,6 +14,16 @@ const NWC_REQUEST_KIND = 23194;
+ const NWC_RESPONSE_KIND = 23195;
+ const NWC_NOTIFICATION_NIP04_KIND = 23196;
+ const NWC_NOTIFICATION_NIP44_KIND = 23197;
++// NIP-04 fallback warning — emitted once per process. NIP-04 is AES-CBC
++// without authentication; NIP-44 is strongly preferred when the wallet
++// supports it.
++let warnedNip04 = false;
++function warnNip04Once() {
++    if (warnedNip04)
++        return;
++    warnedNip04 = true;
++    console.warn('[nostr-core] NWC wallet did not advertise NIP-44 support — falling back to NIP-04 (AES-CBC, no message authentication). Responses are signature-verified, but upgrade the wallet for NIP-44 where possible.');
++}
+ export class NWC {
+     walletPubkey;
+     relayUrls;
+@@ -163,6 +173,9 @@ export class NWC {
+                 '#p': [this.publicKey],
+             }, {
+                 onevent: async (event) => {
++                    // Ignore forged notifications: relay filters are not authentication
++                    if (event.pubkey !== this.walletPubkey || !verifyEvent(event))
++                        return;
+                     try {
+                         const decryptedContent = await this._decrypt(event.content);
+                         const notification = JSON.parse(decryptedContent);
+@@ -205,12 +218,15 @@ export class NWC {
+             return;
+         // Query the wallet service info event (kind 13194)
+         const events = await this.pool.querySync(this.relayUrls, { kinds: [NWC_INFO_KIND], authors: [this.walletPubkey], limit: 1 }, { maxWait: 10000 });
+-        if (!events.length) {
+-            // Default to nip04 if no info event found
++        // The relay supplies the author filter — do not trust it. Only accept
++        // an info event verifiably signed by the wallet pubkey.
++        const infoEvent = events.find(e => e.pubkey === this.walletPubkey && verifyEvent(e));
++        if (!infoEvent) {
++            // Default to nip04 if no verifiable info event found
+             this.encryptionType = 'nip04';
++            warnNip04Once();
+             return;
+         }
+-        const infoEvent = events[0];
+         const encryptionTag = infoEvent.tags.find(t => t[0] === 'encryption');
+         const versionTag = infoEvent.tags.find(t => t[0] === 'v');
+         if (encryptionTag) {
+@@ -220,6 +236,7 @@ export class NWC {
+             }
+             else {
+                 this.encryptionType = 'nip04';
++                warnNip04Once();
+             }
+         }
+         else if (versionTag && versionTag[1].includes('1.0')) {
+@@ -227,6 +244,7 @@ export class NWC {
+         }
+         else {
+             this.encryptionType = 'nip04';
++            warnNip04Once();
+         }
+         // Pre-compute conversation key for nip44
+         if (this.encryptionType === 'nip44') {
+@@ -287,6 +305,15 @@ export class NWC {
+                     onevent: async (responseEvent) => {
+                         if (responded)
+                             return; // Deduplicate across relays
++                        // The relay's author/e-tag filters are not authentication.
++                        // Ignore forged events: wrong author, wrong request
++                        // reference, or invalid Schnorr signature. Checked BEFORE
++                        // setting responded so a forged event cannot suppress the
++                        // genuine wallet response.
++                        if (responseEvent.pubkey !== this.walletPubkey
++                            || !responseEvent.tags.some(t => t[0] === 'e' && t[1] === event.id)
++                            || !verifyEvent(responseEvent))
++                            return;
+                         responded = true;
+                         clearTimeout(replyTimer);
+                         sub.close();
+@@ -355,6 +382,9 @@ export class NWC {
+             '#p': [this.publicKey],
+         }, {
+             onevent: async (event) => {
++                // Ignore forged notifications: relay filters are not authentication
++                if (event.pubkey !== this.walletPubkey || !verifyEvent(event))
++                    return;
+                 try {
+                     const decryptedContent = await this._decrypt(event.content);
+                     const notification = JSON.parse(decryptedContent);

@@ -3,8 +3,8 @@ import { randomBytes } from 'node:crypto'
 import { FreeTier, CreditFreeTier, type IFreeTier } from '../free-tier.js'
 import { isBlockedCountry } from '../geo-fence.js'
 import { createL402Rail } from './l402-rail.js'
-import { normalisePricing, normalisePricingTable, isTieredPricing } from './payment-rail.js'
-import type { Currency, PriceInfo, TieredPricing } from './payment-rail.js'
+import { normalisePricing, normalisePricingTable, normalisePath, isTieredPricing } from './payment-rail.js'
+import type { Currency, PriceInfo, PricingEntry, TieredPricing } from './payment-rail.js'
 import { hashIp } from './types.js'
 import type { TollBoothRequest, TollBoothResult, TollBoothCoreConfig, ReconcileResult } from './types.js'
 
@@ -66,7 +66,32 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
       serviceName: config.serviceName,
     }),
   ]
-  const normalisedPricing = config.normalisedPricing ?? normalisePricingTable(config.pricing ?? {})
+  // Normalise pricing keys so path variants (trailing/duplicate slashes)
+  // resolve to the configured route. Keys that collide after normalisation
+  // are ambiguous configuration and rejected at startup.
+  const pricingByPath: Record<string, PricingEntry> = {}
+  const pricingKeySources = new Map<string, string>()
+  for (const [route, entry] of Object.entries(config.pricing ?? {})) {
+    const key = normalisePath(route)
+    const existing = pricingKeySources.get(key)
+    if (existing !== undefined) {
+      throw new Error(`Pricing routes "${existing}" and "${route}" collide after path normalisation — configure only one.`)
+    }
+    pricingKeySources.set(key, route)
+    pricingByPath[key] = entry
+  }
+
+  const rawNormalised = config.normalisedPricing ?? normalisePricingTable(pricingByPath)
+  const normalisedPricing: Record<string, PriceInfo> = {}
+  for (const [route, price] of Object.entries(rawNormalised)) {
+    normalisedPricing[normalisePath(route)] = price
+  }
+
+  // One-time startup warning: with strictPricing off (the default), requests
+  // to paths not present in the pricing table are proxied upstream for free.
+  if (Object.keys(pricingByPath).length > 0 && !config.strictPricing) {
+    console.warn('[toll-booth] pricing is configured but strictPricing is disabled — requests to unpriced paths are proxied for free. Set strictPricing: true to charge the default amount on unmatched paths.')
+  }
 
   const MAX_ESTIMATED_COSTS = 10_000
   const MAX_AGE_MS = 60_000
@@ -78,7 +103,11 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
 
     async handle(req: TollBoothRequest): Promise<TollBoothResult> {
       const start = Date.now()
-      const path = req.path
+      // Normalise the path once so pricing lookups, challenge issuance and
+      // credential verification all see the same canonical path regardless
+      // of adapter (Express strips one trailing slash; others don't).
+      const path = normalisePath(req.path)
+      const normReq = path === req.path ? req : { ...req, path }
 
       // Geo-fence: block requests from sanctioned/restricted countries
       if (config.blockedCountries?.length) {
@@ -88,7 +117,7 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
         }
       }
 
-      const pricedEntry = config.pricing[path]
+      const pricedEntry = pricingByPath[path]
 
       // Inner helper: issue a multi-rail 402 challenge for this route
       async function issueChallenge(): Promise<TollBoothResult> {
@@ -112,7 +141,7 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
         const challengeHeaders: Record<string, string> = {}
         const challengeBody: Record<string, unknown> = {}
 
-        const normalisedPrice = normalisedPricing[req.path] ?? { sats: defaultAmount }
+        const normalisedPrice = normalisedPricing[path] ?? { sats: defaultAmount }
 
         // HEAD requests return a lightweight price probe without creating
         // invoices or storing state. Useful for lnget --dry-run and indexers.
@@ -130,7 +159,7 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
 
         for (const rail of rails) {
           if (rail.canChallenge && !rail.canChallenge(normalisedPrice)) continue
-          const fragment = await rail.challenge(req.path, normalisedPrice)
+          const fragment = await rail.challenge(path, normalisedPrice)
           // Multi-value merge: concatenate WWW-Authenticate values (RFC 9110 §11.6.1)
           for (const [key, value] of Object.entries(fragment.headers)) {
             if (key === 'WWW-Authenticate' && challengeHeaders[key]) {
@@ -242,17 +271,28 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
 
       // Try each rail
       for (const rail of rails) {
-        if (rail.detect(req)) {
-          const result = await Promise.resolve(rail.verify(req))
+        if (rail.detect(normReq)) {
+          const result = await Promise.resolve(rail.verify(normReq, priceInfo))
 
           if (result.authenticated) {
-            // Pick cost in the rail's currency
+            // Pick cost in the rail's currency. If the route has no price in
+            // the authenticating rail's currency, reject with a fresh
+            // challenge — never default to zero, which would proxy the
+            // request for free and allow indefinite credential replay.
             const cost = result.currency === 'usd'
-              ? (priceInfo.usd ?? 0)
-              : (priceInfo.sats ?? defaultAmount)
+              ? priceInfo.usd
+              : priceInfo.sats
+            if (cost === undefined) {
+              break  // fall through to challenge
+            }
 
             // Per-request replay protection: reject if already settled
             if (result.mode === 'per-request') {
+              // Underpayment check: the amount bound into the credential
+              // must cover the route price (e.g. IETF charge credentials).
+              if (result.amountPaid !== undefined && result.amountPaid < cost) {
+                break  // fall through to challenge
+              }
               if (storage.isSettled(result.paymentId)) {
                 break  // fall through to challenge
               }
@@ -385,7 +425,7 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
 
       // No rail authenticated — check free tier
       if (freeTier) {
-        const routeCost = normalisedPricing[req.path]?.sats ?? defaultAmount
+        const routeCost = normalisedPricing[path]?.sats ?? defaultAmount
 
         // NOTE: Credit-based free tier does not reconcile. The route cost
         // is debited upfront. If actual usage is lower, the difference is

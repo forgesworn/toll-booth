@@ -5,6 +5,10 @@ export interface X402Payment {
   amount: number        // cents
   network: string       // CAIP-2 network ID
   nonce: string
+  /** Asset contract the payer claims to have used (v2 `accepted` block). */
+  asset?: string
+  /** Recipient the payer claims to have paid (v2 `accepted` block). */
+  payTo?: string
 }
 
 export interface X402VerifyResult {
@@ -15,7 +19,14 @@ export interface X402VerifyResult {
 }
 
 export interface X402Facilitator {
-  verify(payload: X402Payment): Promise<X402VerifyResult>
+  /**
+   * Verify a payment payload. `requirements` carries the full advertised
+   * payment requirements (amount, network, asset, payTo) so the facilitator
+   * can validate the signed authorisation against them — a validly signed
+   * underpayment or a payment on the wrong network/asset/recipient must
+   * not verify.
+   */
+  verify(payload: X402Payment, requirements: X402PaymentRequirements): Promise<X402VerifyResult>
 }
 
 export interface X402RailConfig {

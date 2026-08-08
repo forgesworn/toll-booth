@@ -387,6 +387,31 @@ export function sqliteStorage(config?: SqliteStorageConfig): StorageBackend {
     return { newBalance: row.balance_sats + amount }
   })
 
+  type SessionInsert = { sessionId: string, paymentHash: string, balanceSats: number, depositSats: number, bearerToken: string, expiresAt: string, returnInvoice?: string }
+
+  // Atomically create a session and consume its deposit payment hash.
+  // Returns false if the session exists or the deposit hash was already
+  // settled (replay) — nothing is written in either case.
+  const txnCreateSessionWithSettlement = db.transaction((session: SessionInsert): boolean => {
+    if (stmtGetSession.get(session.sessionId)) return false
+    const r = stmtSettle.run(session.paymentHash, null)
+    if (r.changes === 0) return false
+    stmtCreateSession.run(session.sessionId, session.paymentHash, session.balanceSats, session.depositSats, session.bearerToken, session.expiresAt, session.returnInvoice ?? null)
+    return true
+  })
+
+  // Atomically consume a top-up payment hash and credit the session.
+  // Returns null if the hash was already settled (replay). Throws (rolling
+  // back the settlement marker) if the session is missing or closed.
+  const txnTopUpSessionWithSettlement = db.transaction((sessionId: string, amount: number, paymentHash: string): { newBalance: number } | null => {
+    const r = stmtSettle.run(paymentHash, null)
+    if (r.changes === 0) return null
+    const row = stmtGetSessionBalance.get(sessionId) as { balance_sats: number } | undefined
+    if (!row) throw new Error(`Session not found or closed: ${sessionId}`)
+    stmtTopUpSession.run(amount, amount, sessionId)
+    return { newBalance: row.balance_sats + amount }
+  })
+
   const txnDebit = db.transaction((paymentHash: string, amount: number, currency: Currency = 'sat'): DebitResult => {
     const stmtBal = balanceFor(currency)
     const row = stmtBal.get(paymentHash) as { balance: number } | undefined
@@ -566,6 +591,14 @@ export function sqliteStorage(config?: SqliteStorageConfig): StorageBackend {
 
     topUpSession(sessionId: string, amount: number): { newBalance: number } {
       return txnTopUpSession(sessionId, amount)
+    },
+
+    createSessionWithSettlement(session: SessionInsert): boolean {
+      return txnCreateSessionWithSettlement(session)
+    },
+
+    topUpSessionWithSettlement(sessionId: string, amount: number, paymentHash: string): { newBalance: number } | null {
+      return txnTopUpSessionWithSettlement(sessionId, amount, paymentHash)
     },
 
     closeSession(sessionId: string, refundPreimage?: string): void {

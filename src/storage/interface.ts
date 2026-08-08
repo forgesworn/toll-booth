@@ -77,10 +77,24 @@ export interface StorageBackend {
   /** Delete zero-balance credits and aged settlements/claims. Returns total deleted rows. */
   pruneStaleRecords(maxAgeMs: number): number
   createSession(session: { sessionId: string, paymentHash: string, balanceSats: number, depositSats: number, bearerToken: string, expiresAt: string, returnInvoice?: string }): void
+  /**
+   * Atomically create a session and mark its deposit payment hash as settled.
+   * Returns false (and writes nothing) if the session already exists or the
+   * payment hash was already settled — this prevents a deposit preimage from
+   * being replayed as a top-up after the session is open.
+   */
+  createSessionWithSettlement(session: { sessionId: string, paymentHash: string, balanceSats: number, depositSats: number, bearerToken: string, expiresAt: string, returnInvoice?: string }): boolean
   getSession(sessionId: string): Session | null
   getSessionByBearer(bearerToken: string): Session | null
   deductSession(sessionId: string, amount: number): { newBalance: number }
   topUpSession(sessionId: string, amount: number): { newBalance: number }
+  /**
+   * Atomically mark a top-up payment hash as settled and credit the session.
+   * Returns the new balance, or null if the payment hash was already settled
+   * (replay). Throws if the session is missing or closed. The settlement
+   * marker and balance update commit or roll back together.
+   */
+  topUpSessionWithSettlement(sessionId: string, amount: number, paymentHash: string): { newBalance: number } | null
   closeSession(sessionId: string, refundPreimage?: string): void
   getExpiredSessions(): Session[]
   pruneClosedSessions(maxAgeMs: number): number

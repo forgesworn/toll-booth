@@ -40,6 +40,8 @@ export interface IETFReceipt {
 export interface LightningChargeRequest {
   amount: string
   currency: string
+  /** Route this charge is valid for. Bound into the HMAC challenge ID. */
+  resource: string
   methodDetails: {
     invoice: string
     paymentHash: string
@@ -188,6 +190,7 @@ export function createIETFPaymentRail(config: IETFPaymentRailConfig): PaymentRai
       const chargeRequest: LightningChargeRequest = {
         amount: String(amountSats),
         currency: 'sat',
+        resource: route,
         methodDetails: {
           invoice: invoice.bolt11,
           paymentHash: invoice.paymentHash,
@@ -284,6 +287,13 @@ export function createIETFPaymentRail(config: IETFPaymentRailConfig): PaymentRai
         return { authenticated: false, paymentId: '', mode: 'per-request', currency: 'sat' }
       }
 
+      // Route binding: the credential is only valid for the route it was
+      // issued for. The resource is HMAC-bound at challenge time, so a
+      // credential paid on a cheap route cannot be replayed on a dearer one.
+      if (!chargeRequest.resource || chargeRequest.resource !== req.path) {
+        return { authenticated: false, paymentId: '', mode: 'per-request', currency: 'sat' }
+      }
+
       const paymentHash = chargeRequest.methodDetails?.paymentHash
       if (!paymentHash || !/^[0-9a-f]{64}$/i.test(paymentHash)) {
         return { authenticated: false, paymentId: '', mode: 'per-request', currency: 'sat' }
@@ -303,11 +313,19 @@ export function createIETFPaymentRail(config: IETFPaymentRailConfig): PaymentRai
         return { authenticated: false, paymentId: paymentHash, mode: 'per-request', currency: 'sat' }
       }
 
+      // Amount paid (HMAC-bound in the charge request). The engine enforces
+      // this against the route price before settling.
+      const amountPaid = Number(chargeRequest.amount)
+      if (!Number.isSafeInteger(amountPaid) || amountPaid < 0) {
+        return { authenticated: false, paymentId: paymentHash, mode: 'per-request', currency: 'sat' }
+      }
+
       return {
         authenticated: true,
         paymentId: paymentHash,
         mode: 'per-request',
         currency: 'sat',
+        amountPaid,
       }
     },
   }

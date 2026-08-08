@@ -17,6 +17,13 @@ export interface NwcConfig {
  * The `nostr-core` package is imported dynamically so it only needs
  * to be installed when this backend is actually used.
  *
+ * Security: wallet response events are signature-verified and matched to
+ * the wallet pubkey and request ID before being trusted (relay author
+ * filters are not authentication). nostr-core's Relay layer already
+ * verifies event signatures; patches/nostr-core+0.8.0.patch adds the same
+ * check inside the NWC client as defence-in-depth, plus a one-time stderr
+ * warning when the wallet only supports NIP-04 (AES-CBC, no MAC).
+ *
  * @see https://nwc.dev/
  * @see https://github.com/nostr-protocol/nips/blob/master/47.md
  */

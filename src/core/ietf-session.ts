@@ -408,17 +408,16 @@ export function createIETFSessionRail(config: IETFSessionRailConfig): PaymentRai
           return { authenticated: false, paymentId: paymentHash, mode: 'credit', currency: 'sat' }
         }
 
-        // Create session — reject replay of same deposit
+        // Create session — reject replay of same deposit.
+        // The deposit payment hash is atomically marked settled in the same
+        // operation, so the same challenge+preimage cannot later be replayed
+        // as a top-up on this session.
         const sessionId = paymentHash // Deterministic: one session per deposit
-        const existing = storage.getSession(sessionId)
-        if (existing) {
-          return { authenticated: false, paymentId: paymentHash, mode: 'credit', currency: 'sat' }
-        }
 
         const bearerToken = randomBytes(32).toString('hex')
         const expiresAt = new Date(Date.now() + maxDurationMs).toISOString()
 
-        storage.createSession({
+        const created = storage.createSessionWithSettlement({
           sessionId,
           paymentHash,
           balanceSats: depositSats,
@@ -427,6 +426,9 @@ export function createIETFSessionRail(config: IETFSessionRailConfig): PaymentRai
           expiresAt,
           returnInvoice: open.returnInvoice,
         })
+        if (!created) {
+          return { authenticated: false, paymentId: paymentHash, mode: 'credit', currency: 'sat' }
+        }
 
         emitEvent({
           type: 'open',
@@ -476,7 +478,14 @@ export function createIETFSessionRail(config: IETFSessionRailConfig): PaymentRai
           return { authenticated: false, paymentId: session.sessionId, mode: 'credit', currency: 'sat' }
         }
 
-        const { newBalance } = storage.topUpSession(session.sessionId, topupAmount)
+        // Atomically consume the top-up payment hash and credit the session.
+        // A replayed top-up (same challenge+preimage) is rejected because its
+        // payment hash is already settled.
+        const topupResult = storage.topUpSessionWithSettlement(session.sessionId, topupAmount, paymentHash)
+        if (!topupResult) {
+          return { authenticated: false, paymentId: session.sessionId, mode: 'credit', currency: 'sat' }
+        }
+        const { newBalance } = topupResult
 
         emitEvent({
           type: 'topup',

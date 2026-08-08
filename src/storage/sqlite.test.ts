@@ -324,3 +324,55 @@ describe('sqliteStorage', () => {
     expect(storage.getInvoice('h2')).toBeUndefined()
   })
 })
+
+describe('sqliteStorage session settlement', () => {
+  let storage: ReturnType<typeof sqliteStorage>
+
+  afterEach(() => {
+    storage?.close()
+  })
+
+  const session = {
+    sessionId: 's1',
+    paymentHash: 'ph1',
+    balanceSats: 500,
+    depositSats: 500,
+    bearerToken: 'tok',
+    expiresAt: new Date(Date.now() + 60_000).toISOString(),
+  }
+
+  it('createSessionWithSettlement marks the deposit hash settled', () => {
+    storage = sqliteStorage()
+    expect(storage.createSessionWithSettlement(session)).toBe(true)
+    expect(storage.isSettled('ph1')).toBe(true)
+    expect(storage.getSession('s1')?.balanceSats).toBe(500)
+  })
+
+  it('createSessionWithSettlement rejects duplicate session or settled hash', () => {
+    storage = sqliteStorage()
+    expect(storage.createSessionWithSettlement(session)).toBe(true)
+    // Same session again
+    expect(storage.createSessionWithSettlement(session)).toBe(false)
+    // Different session id but already-settled deposit hash
+    expect(storage.createSessionWithSettlement({ ...session, sessionId: 's2' })).toBe(false)
+    expect(storage.getSession('s2')).toBeNull()
+  })
+
+  it('topUpSessionWithSettlement credits once and rejects replay', () => {
+    storage = sqliteStorage()
+    storage.createSessionWithSettlement(session)
+    expect(storage.topUpSessionWithSettlement('s1', 200, 'ph2')).toEqual({ newBalance: 700 })
+    // Replay of the same top-up hash is rejected without crediting
+    expect(storage.topUpSessionWithSettlement('s1', 200, 'ph2')).toBeNull()
+    expect(storage.getSession('s1')?.balanceSats).toBe(700)
+  })
+
+  it('topUpSessionWithSettlement rolls back the settlement marker when the session is closed', () => {
+    storage = sqliteStorage()
+    storage.createSessionWithSettlement(session)
+    storage.closeSession('s1')
+    expect(() => storage.topUpSessionWithSettlement('s1', 200, 'ph3')).toThrow()
+    // The marker must not be left behind by the failed transaction
+    expect(storage.isSettled('ph3')).toBe(false)
+  })
+})

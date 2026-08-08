@@ -35,7 +35,7 @@ export type { HonoTollBoothConfig, HonoTollBooth, PaymentAppConfig, TollBoothEnv
 
 // Payment rails
 export type { PaymentRail, PriceInfo, PricingEntry, TieredPricing, ChallengeFragment, RailVerifyResult, SettleResult, Currency } from './core/payment-rail.js'
-export { normalisePricing, normalisePricingTable, isTieredPricing } from './core/payment-rail.js'
+export { normalisePricing, normalisePricingTable, normalisePath, isTieredPricing } from './core/payment-rail.js'
 export { createL402Rail } from './core/l402-rail.js'
 export type { L402RailConfig } from './core/l402-rail.js'
 export { createX402Rail } from './core/x402-rail.js'

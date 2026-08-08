@@ -988,3 +988,182 @@ describe('agent-friendly 402 body', () => {
     expect(tiers[1].yields).toBeUndefined()
   })
 })
+
+// --- Security regression tests: path normalisation, currency mismatch, route binding ---
+
+describe('path normalisation (paywall bypass)', () => {
+  it('challenges trailing-slash variants of priced routes', async () => {
+    const engine = createTollBooth(makeConfig())
+    const result = await engine.handle(makeRequest({ path: '/route/' }))
+    expect(result.action).toBe('challenge')
+  })
+
+  it('challenges duplicate-slash variants of priced routes', async () => {
+    const engine = createTollBooth(makeConfig())
+    const result = await engine.handle(makeRequest({ path: '//route' }))
+    expect(result.action).toBe('challenge')
+    const result2 = await engine.handle(makeRequest({ path: '/route//' }))
+    expect(result2.action).toBe('challenge')
+  })
+
+  it('keeps matching case-sensitive (HTTP paths are case-sensitive)', async () => {
+    const engine = createTollBooth(makeConfig())
+    // '/ROUTE' is a different resource — unpriced, so it passes (strictPricing off)
+    const result = await engine.handle(makeRequest({ path: '/ROUTE' }))
+    expect(result.action).toBe('pass')
+    // With strictPricing, it is charged instead
+    const strict = createTollBooth(makeConfig({ strictPricing: true }))
+    const strictResult = await strict.handle(makeRequest({ path: '/ROUTE' }))
+    expect(strictResult.action).toBe('challenge')
+  })
+
+  it('normalises pricing table keys so configured trailing slashes still match', async () => {
+    const engine = createTollBooth(makeConfig({ pricing: { '/route/': 10 } }))
+    const result = await engine.handle(makeRequest({ path: '/route' }))
+    expect(result.action).toBe('challenge')
+  })
+
+  it('throws when pricing keys collide after normalisation', () => {
+    expect(() => createTollBooth(makeConfig({ pricing: { '/a': 1, '/a/': 2 } })))
+      .toThrow(/collide/)
+  })
+
+  it('warns once at startup when pricing is configured and strictPricing is off', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      createTollBooth(makeConfig())
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('strictPricing'))
+      warn.mockClear()
+      createTollBooth(makeConfig({ strictPricing: true }))
+      expect(warn).not.toHaveBeenCalled()
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
+  it('authenticates paid credentials on normalised path variants', async () => {
+    const storage = memoryStorage()
+    const engine = createTollBooth(makeConfig({ storage }))
+    const { preimage, paymentHash } = makePreimageAndHash()
+    const macaroon = mintMacaroon(ROOT_KEY, paymentHash, 100)
+    storage.settleWithCredit(paymentHash, 100, randomBytes(32).toString('hex'))
+
+    const result = await engine.handle(makeRequest({
+      path: '/route/',
+      headers: { authorization: `L402 ${macaroon}:${preimage}` },
+    }))
+    expect(result.action).toBe('proxy')
+  })
+})
+
+describe('x402 credential on sats-only route', () => {
+  async function makeX402Engine() {
+    const { createX402Rail } = await import('./x402-rail.js')
+    const facilitator = {
+      verify: vi.fn().mockResolvedValue({ valid: true, txHash: '0xabc', amount: 100, sender: '0xs' }),
+    }
+    const storage = memoryStorage()
+    const engine = createTollBooth(makeConfig({
+      pricing: { '/route': 21 },  // sats only
+      rails: [createX402Rail({ receiverAddress: '0xreceiver', network: 'base', facilitator, storage })],
+      storage,
+    }))
+    return { engine, facilitator, storage }
+  }
+
+  it('rejects with a fresh challenge instead of proxying for free', async () => {
+    const { engine, facilitator } = await makeX402Engine()
+    const payment = JSON.stringify({ signature: 'sig', sender: '0xs', amount: 100, network: 'base', nonce: 'n1' })
+    const result = await engine.handle(makeRequest({ headers: { 'x-payment': payment } }))
+    expect(result.action).toBe('challenge')
+    expect(facilitator.verify).not.toHaveBeenCalled()
+  })
+
+  it('does not settle the credential, so replay also gets a challenge', async () => {
+    const { engine, storage } = await makeX402Engine()
+    const payment = JSON.stringify({ signature: 'sig', sender: '0xs', amount: 100, network: 'base', nonce: 'n1' })
+    await engine.handle(makeRequest({ headers: { 'x-payment': payment } }))
+    const replay = await engine.handle(makeRequest({ headers: { 'x-payment': payment } }))
+    expect(replay.action).toBe('challenge')
+    expect(storage.isSettled('0xabc')).toBe(false)
+  })
+})
+
+describe('IETF charge credential route binding', () => {
+  async function makeIETFEngine() {
+    const { createIETFPaymentRail } = await import('./ietf-payment.js')
+    const { preimage, paymentHash } = makePreimageAndHash()
+    const storage = memoryStorage()
+    const backend: LightningBackend = {
+      createInvoice: vi.fn().mockImplementation(async (amountSats: number) => ({
+        bolt11: `lnbc${amountSats}n1mock`,
+        paymentHash,
+      })),
+      checkInvoice: vi.fn().mockResolvedValue({ paid: true, preimage }),
+    }
+    const rail = createIETFPaymentRail({
+      hmacSecret: ROOT_KEY,
+      realm: 'api.example.com',
+      backend,
+      storage,
+    })
+    const engine = createTollBooth(makeConfig({
+      pricing: { '/cheap': 10, '/expensive': 1000 },
+      rails: [rail],
+      storage,
+    }))
+    return { engine, rail, storage, preimage, paymentHash }
+  }
+
+  function credentialFromChallenge(wwwAuth: string, preimage: string): string {
+    const params: Record<string, string> = {}
+    for (const match of wwwAuth.matchAll(/(\w+)="([^"]+)"/g)) {
+      params[match[1]] = match[2]
+    }
+    return Buffer.from(JSON.stringify({
+      challenge: {
+        id: params.id, realm: params.realm, method: params.method,
+        intent: params.intent, request: params.request, expires: params.expires,
+      },
+      payload: { preimage },
+    })).toString('base64url')
+  }
+
+  it('rejects a cheap-route credential presented at an expensive route', async () => {
+    const { engine, storage, preimage, paymentHash } = await makeIETFEngine()
+
+    // Pay a 10-sat invoice for /cheap
+    const challenge = await engine.handle(makeRequest({ path: '/cheap' }))
+    expect(challenge.action).toBe('challenge')
+    if (challenge.action !== 'challenge') return
+    const credential = credentialFromChallenge(challenge.headers['WWW-Authenticate'], preimage)
+
+    // Present it at /expensive — must be rejected and NOT settled
+    const result = await engine.handle(makeRequest({
+      path: '/expensive',
+      headers: { authorization: `Payment ${credential}` },
+    }))
+    expect(result.action).toBe('challenge')
+    expect(storage.isSettled(paymentHash)).toBe(false)
+  })
+
+  it('accepts the credential at its own route, then rejects replay', async () => {
+    const { engine, preimage } = await makeIETFEngine()
+
+    const challenge = await engine.handle(makeRequest({ path: '/cheap' }))
+    if (challenge.action !== 'challenge') throw new Error('expected challenge')
+    const credential = credentialFromChallenge(challenge.headers['WWW-Authenticate'], preimage)
+
+    const first = await engine.handle(makeRequest({
+      path: '/cheap',
+      headers: { authorization: `Payment ${credential}` },
+    }))
+    expect(first.action).toBe('proxy')
+
+    const replay = await engine.handle(makeRequest({
+      path: '/cheap',
+      headers: { authorization: `Payment ${credential}` },
+    }))
+    expect(replay.action).toBe('challenge')
+  })
+})

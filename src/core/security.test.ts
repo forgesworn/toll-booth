@@ -509,7 +509,7 @@ describe('x402 settlement secret is not the txHash', () => {
       path: '/api',
       headers: { 'x-payment': JSON.stringify({ signature: 'sig', sender: '0x1', amount: 100, network: 'base-sepolia', nonce: 'n1' }) },
       ip: '1.2.3.4',
-    })
+    }, { usd: 100 })
 
     expect(result.authenticated).toBe(true)
     // The settlement secret stored must NOT be the txHash

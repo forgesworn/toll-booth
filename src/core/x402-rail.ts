@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto'
 import type { TollBoothRequest } from './types.js'
 import type { PaymentRail, PriceInfo, ChallengeFragment, RailVerifyResult } from './payment-rail.js'
-import type { X402RailConfig, X402Payment, X402PaymentWire, X402ChallengeWire } from './x402-types.js'
+import type { X402RailConfig, X402Payment, X402PaymentWire, X402ChallengeWire, X402PaymentRequirements } from './x402-types.js'
 import { DEFAULT_USDC_ASSETS, X402_VERSION } from './x402-types.js'
 
 /**
@@ -19,6 +19,8 @@ function normaliseV2Payload(wire: X402PaymentWire): X402Payment | undefined {
     amount,
     network: wire.accepted?.network ?? '',
     nonce: auth.nonce,
+    asset: wire.accepted?.asset,
+    payTo: wire.accepted?.payTo,
   }
 }
 
@@ -58,6 +60,21 @@ export function createX402Rail(config: X402RailConfig): PaymentRail {
     storage,
   } = config
 
+  /** Build the advertised payment requirements for a USD price (cents). */
+  function buildRequirements(priceUsd: number): X402PaymentRequirements {
+    return {
+      scheme: 'exact',
+      network,
+      amount: String(priceUsd),
+      asset: asset ?? '',
+      payTo: receiverAddress,
+      maxTimeoutSeconds,
+      extra: {
+        ...(facilitatorUrl && { facilitatorUrl }),
+      },
+    }
+  }
+
   return {
     type: 'x402',
     creditSupported: true,
@@ -74,17 +91,7 @@ export function createX402Rail(config: X402RailConfig): PaymentRail {
     async challenge(route: string, price: PriceInfo): Promise<ChallengeFragment> {
       const requirements: X402ChallengeWire = {
         x402Version: X402_VERSION,
-        accepts: [{
-          scheme: 'exact',
-          network,
-          amount: String(price.usd),
-          asset: asset ?? '',
-          payTo: receiverAddress,
-          maxTimeoutSeconds,
-          extra: {
-            ...(facilitatorUrl && { facilitatorUrl }),
-          },
-        }],
+        accepts: [buildRequirements(price.usd!)],
         resource: { url: route },
       }
 
@@ -107,10 +114,19 @@ export function createX402Rail(config: X402RailConfig): PaymentRail {
       }
     },
 
-    async verify(req: TollBoothRequest): Promise<RailVerifyResult> {
+    async verify(req: TollBoothRequest, price?: PriceInfo): Promise<RailVerifyResult> {
+      const unauthenticated: RailVerifyResult = { authenticated: false, paymentId: '', mode: 'per-request', currency: 'usd' }
+
       const payload = parsePayment(req)
       if (!payload) {
-        return { authenticated: false, paymentId: '', mode: 'per-request', currency: 'usd' }
+        return unauthenticated
+      }
+
+      // The route must have a USD price — otherwise there is nothing to
+      // validate the payment against. Fail closed.
+      const requiredUsd = price?.usd
+      if (requiredUsd === undefined) {
+        return unauthenticated
       }
 
       // Validate required fields before passing to facilitator
@@ -121,12 +137,31 @@ export function createX402Rail(config: X402RailConfig): PaymentRail {
         typeof payload.network !== 'string' || !payload.network ||
         typeof payload.nonce !== 'string' || !payload.nonce
       ) {
-        return { authenticated: false, paymentId: '', mode: 'per-request', currency: 'usd' }
+        return unauthenticated
+      }
+
+      // Validate the payload against the advertised requirements BEFORE
+      // calling the facilitator. The network field is attacker-controlled,
+      // and the claimed amount must cover the route price — a validly
+      // signed 1-cent transfer must not satisfy a $10 route.
+      const requirements = buildRequirements(requiredUsd)
+      if (
+        payload.network !== requirements.network ||
+        payload.amount < requiredUsd ||
+        (payload.payTo !== undefined && payload.payTo !== requirements.payTo) ||
+        (payload.asset !== undefined && payload.asset !== requirements.asset)
+      ) {
+        return unauthenticated
       }
 
       try {
-        const result = await facilitator.verify(payload)
+        const result = await facilitator.verify(payload, requirements)
         if (!result.valid) {
+          return { authenticated: false, paymentId: result.txHash || '', mode: 'per-request', currency: 'usd' }
+        }
+
+        // Post-verification: the settled amount must cover the route price.
+        if (!Number.isFinite(result.amount) || result.amount < requiredUsd) {
           return { authenticated: false, paymentId: result.txHash || '', mode: 'per-request', currency: 'usd' }
         }
 
