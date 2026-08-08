@@ -1,5 +1,37 @@
 # Migration Guide
 
+## v4 to v5
+
+**Breaking changes:** IETF Payment credential format, `X402Facilitator` interface, `RailVerifyResult` shape.
+
+### Why
+
+v5 is a security-hardening release. A full review of the payment flow found that stateless credentials were not bound to the route they paid for, top-up proofs could be replayed for extra credit, and currency mismatches could resolve to a zero cost. v5 closes these at the protocol level, which requires format changes.
+
+### What to change
+
+**IETF Payment clients:** charge credentials now carry a `resource` field bound into the HMAC challenge. Credentials minted before v5 are rejected — clients must request a fresh challenge. Session top-up payment hashes are single-use; retrying a top-up requires a new invoice.
+
+**Custom x402 facilitators:** `verify()` now receives the full payment requirements as a second argument. Check `amount`, `network`, `asset` and `payTo` against it (the built-in rail also enforces these around your callback):
+
+```typescript
+// v4
+verify: async (payload) => { /* ... */ }
+
+// v5
+verify: async (payload, requirements) => { /* ... */ }
+```
+
+**Custom payment rails:** `RailVerifyResult` gains `amountPaid`. Populate it so the engine can reject underpaid settlements; omitting it disables that check for your rail.
+
+### Behaviour changes (non-breaking)
+
+- Request paths are normalised before pricing lookup (`/api/joke/` and `/api/joke` are priced identically). If you relied on trailing-slash variants being unpriced, set `strictPricing: true` and price the canonical path.
+- A one-time startup warning is printed when pricing is configured and `strictPricing` is off.
+- x402 (USD) credentials on sats-only routes (and vice versa) are now challenged instead of proxied at zero cost.
+
+---
+
 ## v2 to v3
 
 **Breaking change:** `RequestEvent` and `ChallengeEvent` no longer include the `clientIp` field.
