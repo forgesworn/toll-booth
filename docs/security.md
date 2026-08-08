@@ -161,11 +161,21 @@ Cashu ecash payments use a lease-based crash recovery system:
 
 Settlement secrets (used for Cashu auth tokens) are generated as 64-character hex strings (32 bytes of entropy from `crypto.randomBytes`), not UUIDs. Status tokens use timing-safe comparison to prevent timing attacks.
 
+### Payment rail binding (v5.0.0+)
+
+Hardening applied to the stateless payment rails:
+
+- **IETF Payment charge credentials are route- and amount-bound.** The HMAC challenge covers the resource path; a credential minted for one route is rejected at any other, and the engine refuses to settle a payment whose amount is below the route's price.
+- **IETF session top-ups are single-use.** Each top-up payment hash is consumed atomically with the credit write in a single storage transaction, so a paid top-up cannot be replayed for additional credit.
+- **Currency mismatches fail closed.** If a route has no price in the authenticating rail's currency, the request is challenged rather than proxied. An x402 (USD) credential on a sats-only route no longer resolves to a zero cost.
+- **x402 payments are checked against the advertised requirements.** Network, asset, payTo and amount are validated before and after facilitator verification, from the same requirements object used to issue the challenge.
+
 ## Input validation
 
 ### Request validation
 
 - Authorization header format is strictly validated (`L402 <base64>:<hex64>`)
+- Request paths are normalised once in the engine before pricing lookup (duplicate slashes collapsed, trailing slashes stripped), so `/api/joke/`, `/api//joke` and `/api/joke` are priced identically across all adapters. Pricing keys are normalised at startup and key collisions throw.
 - Payment hashes are validated as 64-character hex strings
 - Invoice amounts are validated as positive integers within safe bounds
 - BOLT-11 strings, NWC URIs, and Cashu tokens have length limits enforced

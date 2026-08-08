@@ -1,3 +1,22 @@
+## [5.0.0](https://github.com/forgesworn/toll-booth/compare/v4.8.0...v5.0.0) (2026-08-08)
+
+Security-hardening release following a full review of the payment flow. Every finding was reproduced with a proof of concept before fixing, and each fix ships with regression tests.
+
+### Bug Fixes
+
+- **IETF session top-up replay (critical).** Top-up payment hashes are now consumed atomically with the credit write (`createSessionWithSettlement` / `topUpSessionWithSettlement` storage transactions). Previously the same challenge + preimage could be replayed to inflate session credit up to `maxDepositSats` from a single payment.
+- **IETF charge credentials are bound to route and amount.** The HMAC challenge now covers the resource path, `verify()` rejects credentials presented at a different route, and the engine refuses to settle when `amountPaid` is below the route price. A payment for a cheap route can no longer unlock an expensive one.
+- **Currency-mismatch no longer resolves to free access.** If a route has no price in the authenticating rail's currency, the engine issues a fresh challenge instead of treating the cost as zero (previously an x402 credential on a sats-only route proxied for free, indefinitely).
+- **Path normalisation.** Request paths are normalised once in the engine (duplicate slashes collapsed, trailing slashes stripped) for pricing lookup, challenge issuance, and rail verification across all adapters. Pricing-table keys are normalised at startup and collisions throw. A one-time startup warning is emitted when pricing is configured and `strictPricing` is off.
+- **x402 payments validated against advertised requirements.** Network, asset, payTo and amount are checked before and after facilitator verification; the same `buildRequirements()` output feeds both challenge and verify so they cannot drift.
+- **NWC response verification.** Wallet responses are signature-checked (defence in depth alongside relay-layer verification) and a one-time warning is emitted when a wallet falls back to NIP-04 encryption.
+
+### Breaking Changes
+
+- IETF Payment charge credentials now carry a `resource` field; credentials minted before this release are rejected. Clients must request a fresh challenge.
+- `X402Facilitator.verify(payload, requirements)` takes the full payment requirements as a second argument. Custom facilitator implementations must be updated.
+- `RailVerifyResult` gains `amountPaid`; custom payment rails should populate it.
+
 ## [4.7.0](https://github.com/forgesworn/toll-booth/compare/v4.6.1...v4.7.0) (2026-05-23)
 
 
