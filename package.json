@@ -119,7 +119,7 @@
     "@cashu/cashu-ts": "^3.6.1",
     "better-sqlite3": "^13.0.2",
     "macaroon": "^3.0.4",
-    "nostr-core": "^0.8.0",
+    "nostr-core": "^1.0.2",
     "qrcode": "^1.5.4"
   },
   "peerDependencies": {
