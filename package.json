@@ -145,5 +145,9 @@
     "tsx": "^4.21.0",
     "typescript": "^6.0.2",
     "vitest": "^4.1.0"
+  },
+  "overrides": {
+    "postcss": "^8.5.26",
+    "nanoid": "^3.3.18"
   }
 }
