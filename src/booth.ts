@@ -223,6 +223,7 @@ export class Booth {
       engine: this.engine,
       upstream,
       trustProxy: config.trustProxy,
+      trustedProxies: config.trustedProxies,
       getClientIp: config.getClientIp,
       responseHeaders: config.responseHeaders,
       upstreamTimeout: config.upstreamTimeout,
@@ -243,6 +244,7 @@ export class Booth {
         this.createInvoiceHandler = createExpressCreateInvoiceHandler({
           deps: createInvoiceDeps,
           trustProxy: config.trustProxy,
+          trustedProxies: config.trustedProxies,
           getClientIp: config.getClientIp,
         })
         if (nwcPayDeps) this.nwcPayHandler = createExpressNwcHandler(nwcPayDeps)
@@ -258,6 +260,7 @@ export class Booth {
         this.createInvoiceHandler = createWebStandardCreateInvoiceHandler({
           deps: createInvoiceDeps,
           trustProxy: config.trustProxy,
+          trustedProxies: config.trustedProxies,
           getClientIp: config.getClientIp,
         })
         if (nwcPayDeps) this.nwcPayHandler = createWebStandardNwcHandler(nwcPayDeps)

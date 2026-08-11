@@ -50,6 +50,12 @@ export interface ExpressMiddlewareConfig {
   engine: TollBoothEngine
   upstream: string
   trustProxy?: boolean
+  /**
+   * IPs/CIDRs of trusted proxy hops (e.g. "10.0.0.0/8"). When set,
+   * X-Forwarded-For is resolved right-to-left skipping these hops, so
+   * clients cannot spoof their IP by prepending header entries.
+   */
+  trustedProxies?: string[]
   responseHeaders?: Record<string, string>
   /** Timeout in milliseconds for upstream proxy requests (default: 30000). */
   upstreamTimeout?: number
@@ -132,7 +138,7 @@ export function createExpressMiddleware(
     const ip = config.getClientIp
       ? config.getClientIp(req)
       : config.trustProxy
-        ? parseForwardedIp(typeof req.headers['x-forwarded-for'] === 'string' ? req.headers['x-forwarded-for'] : undefined) ??
+        ? parseForwardedIp(typeof req.headers['x-forwarded-for'] === 'string' ? req.headers['x-forwarded-for'] : undefined, config.trustedProxies) ??
           parseForwardedIp(typeof req.headers['x-real-ip'] === 'string' ? req.headers['x-real-ip'] : undefined) ??
           req.socket.remoteAddress ??
           '127.0.0.1'
@@ -318,6 +324,8 @@ export function createExpressInvoiceStatusHandler(
 export interface CreateInvoiceHandlerConfig {
   deps: CreateInvoiceDeps
   trustProxy?: boolean
+  /** See {@link ExpressMiddlewareConfig.trustedProxies}. */
+  trustedProxies?: string[]
   getClientIp?: (req: Request) => string
 }
 
@@ -342,7 +350,7 @@ export function createExpressCreateInvoiceHandler(
     const ip = config.getClientIp
       ? config.getClientIp(req)
       : config.trustProxy
-        ? parseForwardedIp(typeof req.headers['x-forwarded-for'] === 'string' ? req.headers['x-forwarded-for'] : undefined) ??
+        ? parseForwardedIp(typeof req.headers['x-forwarded-for'] === 'string' ? req.headers['x-forwarded-for'] : undefined, config.trustedProxies) ??
           parseForwardedIp(typeof req.headers['x-real-ip'] === 'string' ? req.headers['x-real-ip'] : undefined) ??
           req.socket.remoteAddress ?? '127.0.0.1'
         : req.socket.remoteAddress ?? '127.0.0.1'

@@ -184,6 +184,7 @@ Hardening applied to the stateless payment rails:
 ### IP validation
 
 - IP addresses from `X-Forwarded-For` are validated against IPv4/IPv6 format patterns
+- XFF is resolved right-to-left, not left-most: behind appending proxies (e.g. nginx `$proxy_add_x_forwarded_for`) the left-most entry is client-spoofable, while the right-most is the address observed by the closest proxy. Configure `trustedProxies` so known proxy hops are skipped in multi-proxy chains.
 - Non-IP strings are rejected to prevent arbitrary values filling the tracking map
 - Free-tier tracking is capped at 100,000 distinct IPs to prevent memory exhaustion
 - IP addresses are one-way hashed with a daily-rotating salt before any in-memory storage

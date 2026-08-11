@@ -116,6 +116,12 @@ export interface WebStandardMiddlewareConfig {
   engine: TollBoothEngine
   upstream: string
   trustProxy?: boolean
+  /**
+   * IPs/CIDRs of trusted proxy hops (e.g. "10.0.0.0/8"). When set,
+   * X-Forwarded-For is resolved right-to-left skipping these hops, so
+   * clients cannot spoof their IP by prepending header entries.
+   */
+  trustedProxies?: string[]
   responseHeaders?: Record<string, string>
   /** Timeout in milliseconds for upstream proxy requests (default: 30000). */
   upstreamTimeout?: number
@@ -155,7 +161,7 @@ export function createWebStandardMiddleware(
     const ip = config.getClientIp
       ? config.getClientIp(req)
       : config.trustProxy
-        ? parseForwardedIp(req.headers.get('x-forwarded-for')) ?? parseForwardedIp(req.headers.get('x-real-ip')) ?? 'unknown'
+        ? parseForwardedIp(req.headers.get('x-forwarded-for'), config.trustedProxies) ?? parseForwardedIp(req.headers.get('x-real-ip')) ?? 'unknown'
         : 'unknown'
     const headers = Object.fromEntries(req.headers.entries())
 
@@ -301,6 +307,8 @@ export function createWebStandardInvoiceStatusHandler(
 export interface WebStandardCreateInvoiceConfig {
   deps: CreateInvoiceDeps
   trustProxy?: boolean
+  /** See {@link WebStandardMiddlewareConfig.trustedProxies}. */
+  trustedProxies?: string[]
   getClientIp?: (req: Request) => string
 }
 
@@ -331,7 +339,7 @@ export function createWebStandardCreateInvoiceHandler(
     const ip = config.getClientIp
       ? config.getClientIp(req)
       : config.trustProxy
-        ? parseForwardedIp(req.headers.get('x-forwarded-for')) ?? parseForwardedIp(req.headers.get('x-real-ip')) ?? 'unknown'
+        ? parseForwardedIp(req.headers.get('x-forwarded-for'), config.trustedProxies) ?? parseForwardedIp(req.headers.get('x-real-ip')) ?? 'unknown'
         : 'unknown'
 
     const result = await handleCreateInvoice(deps, { ...parsed.value, clientIp: ip })

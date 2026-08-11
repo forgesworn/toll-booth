@@ -102,6 +102,12 @@ export interface HonoTollBoothConfig {
    */
   trustProxy?: boolean
   /**
+   * IPs/CIDRs of trusted proxy hops (e.g. "10.0.0.0/8"). When set,
+   * X-Forwarded-For is resolved right-to-left skipping these hops, so
+   * clients cannot spoof their IP by prepending header entries.
+   */
+  trustedProxies?: string[]
+  /**
    * Custom callback to extract client IP from the Hono context.
    * Use this for platform-specific IP resolution (e.g. Cloudflare's
    * `CF-Connecting-IP`, or `X-Real-IP` behind a trusted reverse proxy).
@@ -158,7 +164,7 @@ export function createHonoTollBooth(config: HonoTollBoothConfig): HonoTollBooth 
     const req = c.req.raw
     const ip = config.getClientIp?.(c)
       ?? (config.trustProxy
-        ? (parseForwardedIp(c.req.header('x-forwarded-for'))
+        ? (parseForwardedIp(c.req.header('x-forwarded-for'), config.trustedProxies)
           ?? parseForwardedIp(c.req.header('x-real-ip')))
         : undefined)
       ?? '0.0.0.0'
@@ -233,7 +239,7 @@ export function createHonoTollBooth(config: HonoTollBoothConfig): HonoTollBooth 
       const ip = paymentConfig.getClientIp?.(c)
         ?? config.getClientIp?.(c)
         ?? (config.trustProxy
-          ? (parseForwardedIp(c.req.header('x-forwarded-for'))
+          ? (parseForwardedIp(c.req.header('x-forwarded-for'), config.trustedProxies)
             ?? parseForwardedIp(c.req.header('x-real-ip')))
           : undefined)
         ?? '0.0.0.0'

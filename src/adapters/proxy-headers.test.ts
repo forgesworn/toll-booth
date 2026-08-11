@@ -4,6 +4,7 @@ import {
   applyNoStoreHeaders,
   applySecurityHeaders,
   isPlausibleIp,
+  isTrustedProxyIp,
   parseForwardedIp,
   stripProxyRequestHeaders,
   stripProxyResponseHeaders,
@@ -101,15 +102,48 @@ describe('isPlausibleIp', () => {
 })
 
 describe('parseForwardedIp', () => {
-  it('extracts first valid IP from comma-separated list', () => {
-    expect(parseForwardedIp('192.168.1.1, 10.0.0.1')).toBe('192.168.1.1')
-    expect(parseForwardedIp('  203.0.113.50 , 70.41.3.18')).toBe('203.0.113.50')
+  it('extracts the right-most entry from comma-separated list', () => {
+    // Appending proxies (e.g. nginx $proxy_add_x_forwarded_for) put the
+    // client-observed address last; the left-most entry is client-spoofable.
+    expect(parseForwardedIp('192.168.1.1, 10.0.0.1')).toBe('10.0.0.1')
+    expect(parseForwardedIp('  203.0.113.50 , 70.41.3.18')).toBe('70.41.3.18')
+  })
+
+  it('spoofed left-most entries cannot hide the real client IP', () => {
+    // Client sent "X-Forwarded-For: 1.2.3.4"; proxy appended the real IP.
+    expect(parseForwardedIp('1.2.3.4, 203.0.113.7')).toBe('203.0.113.7')
+  })
+
+  it('skips trusted proxy hops when trustedProxies is set', () => {
+    const trusted = ['10.0.0.0/8', '172.16.0.1']
+    // client -> 172.16.0.1 -> 10.0.0.2 -> us
+    expect(parseForwardedIp('203.0.113.7, 172.16.0.1, 10.0.0.2', trusted)).toBe('203.0.113.7')
+    // spoofed prefix entries are walked past
+    expect(parseForwardedIp('1.2.3.4, 203.0.113.7, 10.0.0.2', trusted)).toBe('203.0.113.7')
+  })
+
+  it('falls back to the left-most entry when every hop is trusted', () => {
+    expect(parseForwardedIp('10.0.0.1, 10.0.0.2', ['10.0.0.0/8'])).toBe('10.0.0.1')
+  })
+
+  it('matches trusted proxies by exact IP and IPv4 CIDR', () => {
+    expect(isTrustedProxyIp('10.1.2.3', ['10.0.0.0/8'])).toBe(true)
+    expect(isTrustedProxyIp('11.0.0.1', ['10.0.0.0/8'])).toBe(false)
+    expect(isTrustedProxyIp('::1', ['::1'])).toBe(true)
+    expect(isTrustedProxyIp('10.1.2.3', ['10.1.2.3'])).toBe(true)
+    expect(isTrustedProxyIp('10.1.2.4', ['10.1.2.3'])).toBe(false)
+    expect(isTrustedProxyIp('10.0.0.1', ['not-a-cidr/33'])).toBe(false)
   })
 
   it('returns undefined for non-IP values', () => {
     expect(parseForwardedIp('invalid-text')).toBeUndefined()
     expect(parseForwardedIp('; DROP TABLE --')).toBeUndefined()
     expect(parseForwardedIp('localhost')).toBeUndefined()
+  })
+
+  it('skips non-IP entries in a list', () => {
+    expect(parseForwardedIp('garbage, 203.0.113.7')).toBe('203.0.113.7')
+    expect(parseForwardedIp('203.0.113.7, garbage')).toBe('203.0.113.7')
   })
 
   it('returns undefined for null/undefined/empty', () => {

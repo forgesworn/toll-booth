@@ -120,9 +120,17 @@ interface BoothConfig {
 
   /**
    * Trust X-Forwarded-For / X-Real-IP headers for client IP.
-   * Only enable if a trusted proxy overwrites these headers.
+   * Only enable behind a trusted reverse proxy. XFF is resolved
+   * right-to-left (the entry appended by the closest proxy), so
+   * client-prepended entries cannot spoof the resolved IP.
    */
   trustProxy?: boolean
+
+  /**
+   * IPs/CIDRs of trusted proxy hops (e.g. ['10.0.0.0/8']). When set, these
+   * hops are skipped during right-to-left XFF resolution.
+   */
+  trustedProxies?: string[]
 
   /**
    * Custom callback to resolve client IP (e.g. for Deno, Bun, Workers

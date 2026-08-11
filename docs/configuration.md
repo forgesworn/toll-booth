@@ -53,7 +53,8 @@ At least one payment method is required. Multiple rails can be active simultaneo
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `trustProxy` | `boolean` | `false` | Trust `X-Forwarded-For` / `X-Real-IP` headers for client IP. Enable only behind a trusted reverse proxy. |
+| `trustProxy` | `boolean` | `false` | Trust `X-Forwarded-For` / `X-Real-IP` headers for client IP. Enable only behind a trusted reverse proxy. XFF is resolved right-to-left (the entry appended by the closest proxy), so clients cannot spoof their IP by prepending entries. |
+| `trustedProxies` | `string[]` | — | IPs or IPv4 CIDRs of trusted proxy hops (e.g. `['10.0.0.0/8']`). When set, those hops are skipped during right-to-left XFF resolution so multi-proxy chains still resolve to the real client. |
 | `getClientIp` | `(request: unknown) => string` | — | Custom IP resolver for runtimes where the IP isn't in headers (Deno, Bun, Workers). |
 | `upstreamTimeout` | `number` | `30000` | Proxy timeout in milliseconds. |
 | `responseHeaders` | `Record<string, string>` | — | Extra headers added to every response. |

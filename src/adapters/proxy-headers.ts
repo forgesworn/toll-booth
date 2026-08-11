@@ -87,15 +87,67 @@ export function isPlausibleIp(value: string): boolean {
   return IPV6_RE.test(value) && value.includes(':')
 }
 
+function ipv4ToInt(ip: string): number | undefined {
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(ip)
+  if (!m) return undefined
+  const octets = m.slice(1).map(Number)
+  if (octets.some(o => o > 255)) return undefined
+  return ((octets[0] * 2 ** 24) + (octets[1] << 16) + (octets[2] << 8) + octets[3]) >>> 0
+}
+
+/**
+ * Checks whether `ip` matches an entry of `trustedProxies`. Entries are
+ * exact IPs (v4 or v6) or IPv4 CIDR ranges (e.g. "10.0.0.0/8").
+ */
+export function isTrustedProxyIp(ip: string, trustedProxies: string[]): boolean {
+  const target = ip.trim().toLowerCase()
+  const targetV4 = ipv4ToInt(target)
+  return trustedProxies.some(rawEntry => {
+    const entry = rawEntry.trim().toLowerCase()
+    const slash = entry.indexOf('/')
+    if (slash === -1) return entry === target
+    // CIDR notation is supported for IPv4 only.
+    const baseV4 = ipv4ToInt(entry.slice(0, slash))
+    const bits = parseInt(entry.slice(slash + 1), 10)
+    if (baseV4 === undefined || targetV4 === undefined || Number.isNaN(bits) || bits < 0 || bits > 32) {
+      return false
+    }
+    const mask = bits === 0 ? 0 : (0xffffffff << (32 - bits)) >>> 0
+    return (baseV4 & mask) === (targetV4 & mask)
+  })
+}
+
 /**
  * Extracts and validates the client IP from an X-Forwarded-For header value.
- * Returns the first entry if it looks like an IP, otherwise returns undefined.
+ *
+ * Entries are resolved right-to-left: proxies such as nginx
+ * (`$proxy_add_x_forwarded_for`) *append* to a client-supplied header, so
+ * the left-most entry is trivially spoofable while the right-most is the
+ * address observed by the closest proxy. When `trustedProxies` is given,
+ * entries matching it are skipped while walking right-to-left, so multi-hop
+ * proxy chains still resolve to the real client; if every hop is trusted the
+ * left-most entry is the best-known answer. Returns undefined when no entry
+ * looks like a plausible IP.
  */
-export function parseForwardedIp(header: string | null | undefined): string | undefined {
+export function parseForwardedIp(
+  header: string | null | undefined,
+  trustedProxies?: string[],
+): string | undefined {
   if (!header) return undefined
-  const first = header.split(',')[0]?.trim()
-  if (!first || !isPlausibleIp(first)) return undefined
-  return first
+  const entries = header
+    .split(',')
+    .map(s => s.trim())
+    .filter(s => s.length > 0 && isPlausibleIp(s))
+  if (entries.length === 0) return undefined
+
+  if (trustedProxies && trustedProxies.length > 0) {
+    for (let i = entries.length - 1; i >= 0; i--) {
+      if (!isTrustedProxyIp(entries[i], trustedProxies)) return entries[i]
+    }
+    return entries[0]
+  }
+
+  return entries[entries.length - 1]
 }
 
 function collectDisallowedHeaders(headers: Headers): Set<string> {

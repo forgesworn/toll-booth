@@ -314,6 +314,68 @@ describe('Hono adapter trustProxy guard', () => {
     })
     expect(res2.status).toBe(200) // separate bucket
   })
+
+  it('spoofed left-most XFF entries cannot evade the free-tier quota', async () => {
+    const engine = createTollBooth({
+      storage: memoryStorage(),
+      pricing: { '/api': 10 },
+      upstream: 'http://upstream.test',
+      rootKey: ROOT_KEY,
+      defaultInvoiceAmount: 1000,
+      freeTier: { requestsPerDay: 1 },
+    })
+    const { authMiddleware } = createHonoTollBooth({ engine, trustProxy: true })
+
+    const app = new Hono()
+    app.use('/api', authMiddleware)
+    app.get('/api', (c) => c.text('ok'))
+
+    // nginx-style appending proxy: client prepends a fake entry, proxy
+    // appends the real client IP ("spoofed, real").
+    const res1 = await app.request('/api', {
+      headers: { 'x-forwarded-for': '198.51.100.99, 203.0.113.1' },
+    })
+    expect(res1.status).toBe(200)
+
+    // Same real client, different spoofed left-most entry: the quota must
+    // be keyed on the right-most (proxy-observed) address, so this is 402.
+    const res2 = await app.request('/api', {
+      headers: { 'x-forwarded-for': '198.51.100.100, 203.0.113.1' },
+    })
+    expect(res2.status).toBe(402)
+  })
+
+  it('trustedProxies skips known proxy hops in multi-hop chains', async () => {
+    const engine = createTollBooth({
+      storage: memoryStorage(),
+      pricing: { '/api': 10 },
+      upstream: 'http://upstream.test',
+      rootKey: ROOT_KEY,
+      defaultInvoiceAmount: 1000,
+      freeTier: { requestsPerDay: 1 },
+    })
+    const { authMiddleware } = createHonoTollBooth({
+      engine,
+      trustProxy: true,
+      trustedProxies: ['10.0.0.0/8'],
+    })
+
+    const app = new Hono()
+    app.use('/api', authMiddleware)
+    app.get('/api', (c) => c.text('ok'))
+
+    // Chain: client -> 10.0.0.2 (trusted edge) -> us. Without the skip,
+    // the right-most entry would be the proxy itself.
+    const res1 = await app.request('/api', {
+      headers: { 'x-forwarded-for': '203.0.113.1, 10.0.0.2' },
+    })
+    expect(res1.status).toBe(200)
+
+    const res2 = await app.request('/api', {
+      headers: { 'x-forwarded-for': '203.0.113.1, 10.0.0.2' },
+    })
+    expect(res2.status).toBe(402) // quota keyed on the real client, not the proxy
+  })
 })
 
 describe('Express adapter body size guard', () => {
