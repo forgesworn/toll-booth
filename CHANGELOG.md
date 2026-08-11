@@ -78,6 +78,14 @@ Security-hardening release following a full review of the payment flow. Every fi
 
 # [4.5.0](https://github.com/forgesworn/toll-booth/compare/v4.4.2...v4.5.0) (2026-03-28)
 
+## 5.0.5 (2026-08-11)
+
+### Bug Fixes
+
+- resolve X-Forwarded-For right-to-left to prevent IP spoofing
+
+
+
 ## 5.0.4 (2026-08-08)
 
 ### Bug Fixes
