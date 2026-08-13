@@ -8,7 +8,6 @@ export interface InvoiceStatusDeps {
   backend?: LightningBackend
   storage: StorageBackend
   tiers?: CreditTier[]
-  nwcEnabled?: boolean
   cashuEnabled?: boolean
 }
 
@@ -92,7 +91,6 @@ export async function renderInvoiceStatusHtml(
       preimage: status.preimage,
       tokenSuffix: status.preimage ?? (status.paid ? deps.storage.getSettlementSecret(paymentHash) : undefined),
       tiers: deps.tiers ?? [],
-      nwcEnabled: deps.nwcEnabled ?? false,
       cashuEnabled: deps.cashuEnabled ?? false,
     })
     return { html, status: 200 }

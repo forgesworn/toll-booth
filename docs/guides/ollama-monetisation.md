@@ -15,7 +15,7 @@ Client ---> toll-booth (port 3000) ---> Ollama (port 11434)
 
 ## Prerequisites
 
-- **Node.js 18+**
+- **Node.js 22+**
 - **Ollama** running locally on `http://localhost:11434` (`ollama serve`)
 - A **Lightning backend** - any of: Phoenixd, LND, CLN, LNbits, or NWC
 

@@ -5,6 +5,10 @@
 **Branch:** `security-audit-2026-03-27`
 **Baseline:** 852 tests passing, 32 skipped (integration tests)
 
+> Historical snapshot. The payer-side NWC endpoint assessed here was later
+> removed because it required a payer's bearer-equivalent wallet credential to
+> cross the merchant HTTP boundary. Current NWC support is merchant-side only.
+
 ---
 
 ## Executive Summary

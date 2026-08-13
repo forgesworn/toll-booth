@@ -61,7 +61,7 @@ const booth = new Booth({
 - **Booth** — the main facade class. Instantiate with a config object, then wire `.middleware`, `.invoiceStatusHandler`, and `.createInvoiceHandler` into your router.
 - **LightningBackend** — interface with two methods: `createInvoice(amountSats, memo?)` and `checkInvoice(paymentHash)`. Five implementations provided; implement your own for custom backends.
 - **L402 flow** — client requests a priced endpoint, receives HTTP 402 with a Lightning invoice and macaroon, pays the invoice, then sends `Authorization: L402 <macaroon>:<preimage>` to access the API.
-- **Payment methods** — Lightning (via any backend), Cashu ecash tokens (via `redeemCashu` callback), x402 stablecoins, IETF Payment, or Nostr Wallet Connect (via `nwcPayInvoice` callback). Multiple rails run simultaneously on a single deployment (multi-rail).
+- **Payment methods** — Lightning (via any backend), Cashu ecash tokens (via `redeemCashu` callback), x402 stablecoins, and IETF Payment. NWC is one merchant-side Lightning backend, not a separate payer rail. Multiple rails run simultaneously on a single deployment.
 - **Credit system** — payments grant a credit balance. Each request deducts from the balance. Volume discount tiers available via `creditTiers`.
 - **Free tier** — optional per-IP daily allowance. Request-based: `freeTier: { requestsPerDay: N }`. Usage-based: `freeTier: { creditsPerDay: N }` (daily sats budget debited by each request's cost). Requests within the allowance bypass payment.
 - **Payment rails** — pluggable payment rail abstraction (`PaymentRail` interface). Built-in rails: `createL402Rail()` for Lightning/macaroon auth, `createX402Rail()` for on-chain stablecoin payments, and IETF Payment for standards-track HTTP payment authentication. Multiple rails can run simultaneously on the same deployment.
@@ -194,7 +194,6 @@ Booth instance properties:
 - `.middleware` — main request handler (checks auth, proxies upstream)
 - `.invoiceStatusHandler` — GET /invoice-status/:paymentHash
 - `.createInvoiceHandler` — POST /create-invoice
-- `.nwcPayHandler` — POST /nwc-pay (when nwcPayInvoice configured)
 - `.cashuRedeemHandler` — POST /cashu-redeem (when redeemCashu configured)
 - `.resetFreeTier()` — reset daily free-tier counters
 - `.close()` — clean up timers and database connections

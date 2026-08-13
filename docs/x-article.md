@@ -65,11 +65,14 @@ Cashu ecash tokens let clients pay without any Lightning infrastructure on the s
 
 Serverless micropayments. For real.
 
-### NWC: wallet-native payments over Nostr
+### NWC: a merchant Lightning backend
 
-Nostr Wallet Connect adds a third payment rail. Clients pay from any NWC-compatible wallet using the same relay infrastructure they already use for social. The server doesn't need to know or care which method the client chooses -Lightning, Cashu, or NWC all settle the same way.
+Nostr Wallet Connect lets an operator use its own compatible wallet as the
+Lightning backend without exposing a node API. It is not a third client payment
+rail. The client receives a normal BOLT-11 invoice and pays it with its own
+wallet. Its NWC credential never goes to the server.
 
-Three payment rails. One middleware. The client picks.
+Multiple payment rails. One middleware. NWC stays behind the Lightning rail.
 
 ### Not vapourware
 

@@ -24,9 +24,8 @@ graph TB
     end
 
     subgraph "Payment Rails"
-        LN[Lightning<br/>Phoenixd / LND / CLN / LNbits / NWC]
+        LN[Lightning / L402<br/>Phoenixd / LND / CLN / LNbits / NWC backend]
         CASHU[Cashu<br/>ecash tokens]
-        NWC[NWC<br/>Nostr Wallet Connect]
         X402["x402<br/>USDC stablecoins<br/><i>(coming soon)</i>"]
     end
 
@@ -43,7 +42,6 @@ graph TB
     FUTURE --> TB
     TB --> LN
     TB --> CASHU
-    TB --> NWC
     TB -.-> X402
     TT -->|"proxy inference"| OLLAMA
     TT -->|"proxy inference"| VLLM
@@ -145,19 +143,17 @@ graph LR
     subgraph "Alternative Rails"
         direction TB
         CASHU_R["redeemCashu()"]
-        NWC_R["nwcPayInvoice()"]
         X402_R["x402Backend()<br/><i>(planned)</i>"]
     end
 
     GATE --> CI
     GATE --> CASHU_R
-    GATE --> NWC_R
     GATE -.-> X402_R
     CI --> PHX
     CI --> LND_B
     CI --> CLN_B
     CI --> LNBITS
-    CI --> ALBY
+    CI --> NWC_B
 ```
 
 ## satgate: inference-specific layer

@@ -269,6 +269,7 @@ describe('IETF Session Rail', () => {
       expect(closeResult.authenticated).toBe(true)
       expect(closeResult.creditBalance).toBe(0)
       expect(closeResult.customCaveats?.['X-Session-Closed']).toBe('true')
+      expect(closeResult.customCaveats?.['X-Refund-Status']).toBe('settled')
     })
 
     it('closes an already-closed session gracefully (close replay)', async () => {
@@ -389,12 +390,14 @@ describe('IETF Session Rail', () => {
         },
       }
 
+      const events: Array<{ refundStatus?: string }> = []
       const rail = createIETFSessionRail({
         hmacSecret: HMAC_SECRET,
         realm: REALM,
         backend: failingBackend,
         storage,
         session: sessionConfig,
+        onSessionEvent: event => events.push(event),
       })
 
       // Open a session with a returnInvoice
@@ -455,8 +458,10 @@ describe('IETF Session Rail', () => {
       const closeResult = await rail.verify(makeRequest(encodeCredential(closeCredential)))
       expect(closeResult.authenticated).toBe(true)
       expect(closeResult.customCaveats?.['X-Session-Closed']).toBe('true')
+      expect(closeResult.customCaveats?.['X-Refund-Status']).toBe('unknown')
       // No refund preimage since sendPayment failed
       expect(closeResult.customCaveats?.['X-Refund-Preimage']).toBeUndefined()
+      expect(events.at(-1)?.refundStatus).toBe('unknown')
     })
 
     it('accepts top-up with same preimage as deposit (different challenge)', async () => {

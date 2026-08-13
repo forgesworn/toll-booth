@@ -226,13 +226,6 @@ export interface BoothConfig {
   creditTiers?: CreditTier[]
 
   /**
-   * Pay a Lightning invoice via Nostr Wallet Connect.
-   * Accepts NWC URI + bolt11, returns the payment preimage.
-   * When provided, the payment page shows an NWC option.
-   */
-  nwcPayInvoice?: (nwcUri: string, bolt11: string) => Promise<string>
-
-  /**
    * Redeem a Cashu token as payment.
    * Returns the credited amount in satoshis. Implementations should be
    * idempotent for the same `paymentHash` if you rely on retry/recovery.

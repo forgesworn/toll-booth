@@ -103,17 +103,6 @@ export interface InvoiceStatusResult {
   invoice?: StoredInvoice
 }
 
-export interface NwcPayRequest {
-  nwcUri: string
-  bolt11: string
-  paymentHash: string
-  statusToken: string
-}
-
-export type NwcPayResult =
-  | { success: true; preimage: string }
-  | { success: false; error: string; status: 400 | 500 }
-
 export interface CashuRedeemRequest {
   token: string
   paymentHash: string

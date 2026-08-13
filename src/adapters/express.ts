@@ -5,8 +5,6 @@ import type { CreateInvoiceDeps } from '../core/create-invoice.js'
 import type { InvoiceStatusDeps } from '../core/invoice-status.js'
 import { handleCreateInvoice } from '../core/create-invoice.js'
 import { handleInvoiceStatus, renderInvoiceStatusHtml } from '../core/invoice-status.js'
-import { handleNwcPay } from '../core/nwc-pay.js'
-import type { NwcPayDeps } from '../core/nwc-pay.js'
 import { handleCashuRedeem } from '../core/cashu-redeem.js'
 import type { CashuRedeemDeps } from '../core/cashu-redeem.js'
 import { PAYMENT_HASH_RE } from '../core/types.js'
@@ -372,27 +370,6 @@ export function createExpressCreateInvoiceHandler(
       macaroon: d.macaroon,
       qr_svg: d.qrSvg,
     })
-  }
-}
-
-// -- NWC handler --------------------------------------------------------------
-
-/**
- * Returns an Express `RequestHandler` that pays a Lightning invoice via NWC.
- *
- * Expects JSON body with `{ nwcUri, bolt11, paymentHash, statusToken }`.
- * Returns the payment preimage on success.
- */
-export function createExpressNwcHandler(deps: NwcPayDeps): RequestHandler {
-  return async (req: Request, res: Response, _next: NextFunction) => {
-    if (rejectOversizedBody(req, res)) return
-    const body = req.body ?? {}
-    const result = await handleNwcPay(deps, body)
-    if (result.success) {
-      jsonWithSensitiveHeaders(res, { preimage: result.preimage })
-    } else {
-      jsonWithSensitiveHeaders(res, { error: result.error }, result.status)
-    }
   }
 }
 

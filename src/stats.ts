@@ -27,8 +27,6 @@ export interface BoothStats {
   revenue: {
     /** Lightning invoices settled via L402 preimage. */
     invoicesPaid: number
-    /** Payments made via Nostr Wallet Connect. */
-    nwcPayments: number
     /** Payments made via Cashu token redemption. */
     cashuRedemptions: number
     /** Total satoshis credited to balances. */
@@ -52,7 +50,6 @@ export class StatsCollector {
   private requests = { total: 0, authenticated: 0, freeTier: 0, challenged: 0 }
   private revenue = {
     invoicesPaid: 0,
-    nwcPayments: 0,
     cashuRedemptions: 0,
     totalCredited: 0,
     totalConsumed: 0,
@@ -94,12 +91,6 @@ export class StatsCollector {
   /** Record a 402 challenge issued. */
   recordChallenge(_event: ChallengeEvent): void {
     this.requests.challenged++
-  }
-
-  /** Record a successful NWC payment. */
-  recordNwcPayment(amountSats: number): void {
-    this.revenue.nwcPayments++
-    this.revenue.totalCredited += amountSats
   }
 
   /** Record a successful Cashu token redemption. */

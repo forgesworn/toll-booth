@@ -80,7 +80,7 @@ Add 402-mcp to your `claude_desktop_config.json`:
       "command": "npx",
       "args": ["402-mcp"],
       "env": {
-        "NWC_URL": "nostr+walletconnect://..."
+        "NWC_URI_FILE": "/absolute/path/to/402-mcp.nwc"
       }
     }
   }
@@ -93,7 +93,7 @@ Add 402-mcp in your MCP settings (Settings > MCP Servers > Add):
 
 - **Name:** `402-mcp`
 - **Command:** `npx 402-mcp`
-- **Environment:** `NWC_URL=nostr+walletconnect://...`
+- **Environment:** `NWC_URI_FILE=/absolute/path/to/402-mcp.nwc`
 
 ### Any MCP host
 
@@ -103,7 +103,11 @@ The command is always the same:
 npx 402-mcp
 ```
 
-402-mcp needs a wallet to pay invoices. Set the `NWC_URL` environment variable to a [Nostr Wallet Connect](https://nwc.dev) connection string from any compatible wallet (Alby Hub, Phoenix, Mutiny, Umbrel, etc.).
+402-mcp needs a wallet to pay invoices. Generate a tightly permissioned
+[Nostr Wallet Connect](https://nwc.dev) connection with any compatible wallet,
+store it in a local `0600` file, and pass only that file path as `NWC_URI_FILE`.
+Raw bearer URIs are refused so they cannot leak through MCP configuration or a
+process environment.
 
 ## The flow, explained
 

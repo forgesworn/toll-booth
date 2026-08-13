@@ -2,7 +2,7 @@
 
 ## v4 to v5
 
-**Breaking changes:** IETF Payment credential format, `X402Facilitator` interface, `RailVerifyResult` shape.
+**Breaking changes:** IETF Payment credential format, `X402Facilitator` interface, `RailVerifyResult` shape. <!-- gitleaks:allow -- false-positive type name -->
 
 ### Why
 
@@ -67,7 +67,8 @@ If you need client identification for analytics, use the `getClientIp` callback 
 
 ## v1 to v2
 
-**Breaking change:** The Alby/NWC backend was replaced with a proper NWC backend using NIP-44 encryption.
+**Breaking change:** The old unauthenticated relay backend was replaced with a
+proper NWC backend using NIP-44 encryption.
 
 ### What changed
 
@@ -81,7 +82,9 @@ If you need client identification for analytics, use the `getClientIp` callback 
 
 ### Why
 
-The v1 Alby backend used an unauthenticated JSON relay transport that required an explicit `allowInsecureRelay: true` opt-in. This was a stopgap; the v2 NWC backend uses proper NIP-44 encryption via Nostr relays, making it secure by default and compatible with any NWC wallet (Alby Hub, Mutiny, Umbrel, Phoenix, and more).
+The v1 backend used an unauthenticated JSON relay transport that required an
+explicit `allowInsecureRelay: true` opt-in. This was a stopgap; the v2 backend
+uses authenticated NIP-44 encryption and the standard NIP-47 contract.
 
 ### What to change
 
@@ -96,10 +99,40 @@ const backend = albyBackend({
 
 // v2
 import { nwcBackend } from '@forgesworn/toll-booth/backends/nwc'
+import { closeSync, fstatSync, openSync, readSync } from 'node:fs'
+
+function loadNwcUri(file: string): string {
+  const descriptor = openSync(file, 'r')
+  let bytes: Buffer | undefined
+  try {
+    const info = fstatSync(descriptor)
+    if (!info.isFile() || info.size === 0 || info.size > 8192) throw new Error('Invalid NWC URI file')
+    if (process.platform !== 'win32' && (info.mode & 0o077) !== 0) throw new Error('Run chmod 600 on the NWC URI file')
+    bytes = Buffer.allocUnsafe(info.size)
+    let offset = 0
+    while (offset < bytes.length) {
+      const count = readSync(descriptor, bytes, offset, bytes.length - offset, null)
+      if (count === 0) throw new Error('NWC URI file changed while it was being read')
+      offset += count
+    }
+    const extra = Buffer.allocUnsafe(1)
+    try {
+      if (readSync(descriptor, extra, 0, 1, null) !== 0) throw new Error('NWC URI file changed while it was being read')
+    } finally {
+      extra.fill(0)
+    }
+    return bytes.toString('utf8').trim()
+  } finally {
+    bytes?.fill(0)
+    closeSync(descriptor)
+  }
+}
 
 const backend = nwcBackend({
-  nwcUrl: 'nostr+walletconnect://...',
+  nwcUrl: loadNwcUri(process.env.NWC_URI_FILE!),
 })
 ```
 
-The `nwcUrl` format is the same. Remove `allowInsecureRelay` as it is no longer needed.
+The `nwcUrl` format is the same. Remove `allowInsecureRelay` as it is no longer
+needed, and keep the bearer URI in a private secret file rather than source code
+or a raw environment value.

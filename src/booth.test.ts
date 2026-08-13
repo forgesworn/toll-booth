@@ -28,7 +28,6 @@ const TIERS: CreditTier[] = [
 ]
 
 function setup(overrides?: Partial<{
-  nwcPayInvoice: any
   redeemCashu: any
   trustProxy: boolean
   getClientIp: (req: unknown) => string
@@ -60,7 +59,6 @@ function setup(overrides?: Partial<{
   const middleware = booth.middleware as WebStandardHandler
   const invoiceStatusHandler = booth.invoiceStatusHandler as WebStandardHandler
   const createInvoiceHandler = booth.createInvoiceHandler as WebStandardHandler
-  const nwcPayHandler = booth.nwcPayHandler as WebStandardHandler | undefined
   const cashuRedeemHandler = booth.cashuRedeemHandler as WebStandardHandler | undefined
 
   /** Route a Request to the appropriate handler based on URL path. */
@@ -71,7 +69,6 @@ function setup(overrides?: Partial<{
 
     if (path.startsWith('/invoice-status/')) return invoiceStatusHandler(req)
     if (path === '/create-invoice') return createInvoiceHandler(req)
-    if (path === '/nwc-pay' && nwcPayHandler) return nwcPayHandler(req)
     if (path === '/cashu-redeem' && cashuRedeemHandler) return cashuRedeemHandler(req)
     return middleware(req)
   }
@@ -318,42 +315,6 @@ describe('Booth', () => {
     expect(body.error).toContain('positive integer')
 
     booth.close()
-  })
-
-  describe('NWC adapter', () => {
-    it('pays via NWC and returns preimage', async () => {
-      const { preimage } = makePreimageAndHash()
-      const nwcPayInvoice = vi.fn().mockResolvedValue(preimage)
-      const { request, booth, paymentHash } = setup({ nwcPayInvoice })
-
-      const challengeRes = await request('/route', { method: 'POST' })
-      const challengeBody = await challengeRes.json()
-      const statusToken = extractStatusToken(challengeBody.l402.payment_url)
-
-      const res = await request('/nwc-pay', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          nwcUri: 'nostr+walletconnect://...',
-          bolt11: 'lnbc1000n1test...',
-          paymentHash,
-          statusToken,
-        }),
-      })
-
-      expect(res.status).toBe(200)
-      const body = await res.json()
-      expect(body.preimage).toBe(preimage)
-      expect(nwcPayInvoice).toHaveBeenCalledWith('nostr+walletconnect://...', 'lnbc1000n1test...')
-
-      booth.close()
-    })
-
-    it('does not expose /nwc-pay when adapter not provided', async () => {
-      const { booth } = setup()
-      expect(booth.nwcPayHandler).toBeUndefined()
-      booth.close()
-    })
   })
 
   describe('Cashu adapter', () => {

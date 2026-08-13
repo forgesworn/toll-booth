@@ -17,7 +17,6 @@ describe('renderPaymentPage', () => {
       invoice: mockInvoice,
       paid: false,
       tiers: [],
-      nwcEnabled: false,
       cashuEnabled: false,
     })
 
@@ -36,7 +35,6 @@ describe('renderPaymentPage', () => {
       paid: true,
       preimage: 'deadbeef'.repeat(8),
       tiers: [],
-      nwcEnabled: false,
       cashuEnabled: false,
     })
 
@@ -56,7 +54,6 @@ describe('renderPaymentPage', () => {
         { amountSats: 10_000, creditSats: 11_100, label: 'Pro' },
         { amountSats: 100_000, creditSats: 125_000, label: 'Business' },
       ],
-      nwcEnabled: false,
       cashuEnabled: false,
     })
 
@@ -69,25 +66,11 @@ describe('renderPaymentPage', () => {
     expect(html).not.toContain('+0% bonus')
   })
 
-  it('shows NWC button when enabled', async () => {
-    const html = await renderPaymentPage({
-      invoice: mockInvoice,
-      paid: false,
-      tiers: [],
-      nwcEnabled: true,
-      cashuEnabled: false,
-    })
-
-    expect(html).toContain('Pay with Nostr Wallet Connect')
-    expect(html).toContain('id="nwc-form"')
-  })
-
   it('shows Cashu button when enabled', async () => {
     const html = await renderPaymentPage({
       invoice: mockInvoice,
       paid: false,
       tiers: [],
-      nwcEnabled: false,
       cashuEnabled: true,
     })
 
@@ -100,7 +83,6 @@ describe('renderPaymentPage', () => {
       invoice: mockInvoice,
       paid: false,
       tiers: [],
-      nwcEnabled: false,
       cashuEnabled: false,
     })
 
@@ -117,7 +99,6 @@ describe('renderPaymentPage', () => {
       invoice: xssInvoice,
       paid: false,
       tiers: [],
-      nwcEnabled: false,
       cashuEnabled: false,
     })
 
@@ -130,7 +111,6 @@ describe('renderPaymentPage', () => {
       invoice: mockInvoice,
       paid: false,
       tiers: [],
-      nwcEnabled: false,
       cashuEnabled: false,
     })
 
@@ -146,7 +126,6 @@ describe('renderPaymentPage', () => {
         { amountSats: 1000, creditSats: 1000, label: 'Starter' },
         { amountSats: 10_000, creditSats: 11_100, label: 'Pro' },
       ],
-      nwcEnabled: false,
       cashuEnabled: false,
     })
 
@@ -164,7 +143,6 @@ describe('renderPaymentPage', () => {
       invoice: mockInvoice,
       paid: false,
       tiers: [],
-      nwcEnabled: false,
       cashuEnabled: false,
     })
 
@@ -179,7 +157,6 @@ describe('renderPaymentPage', () => {
       paid: true,
       preimage: 'deadbeef'.repeat(8),
       tiers: [],
-      nwcEnabled: false,
       cashuEnabled: false,
     })
 
@@ -192,7 +169,6 @@ describe('renderPaymentPage', () => {
       paid: true,
       tokenSuffix: 'cashu-settlement-secret-abc',
       tiers: [],
-      nwcEnabled: false,
       cashuEnabled: true,
     })
 
@@ -206,7 +182,6 @@ describe('renderPaymentPage', () => {
       invoice: mockInvoice,
       paid: true,
       tiers: [],
-      nwcEnabled: false,
       cashuEnabled: true,
     })
 

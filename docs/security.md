@@ -32,6 +32,13 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
 Macaroons support first-party caveats that restrict their use:
 
+Macaroon v2 output is serialized by a small bounded linear encoder in
+`src/macaroon.ts`. This avoids the upstream JavaScript serializer's
+exponential buffer-growth defect. Inputs are canonical-base64 checked and
+limited to 24 KiB before parsing; minting validates 32-byte keys and hashes,
+safe non-negative balances, unique caveat keys, at most 16 custom caveats,
+and at most 1024 characters per caveat.
+
 - **`payment_hash`**, **`credit_balance`**, **`currency`** - reserved caveats set by toll-booth; cannot be overridden via the API
 - **`route`** - restricts the macaroon to a specific path prefix
 - **`expires`** - Unix timestamp after which the macaroon is rejected
@@ -167,6 +174,12 @@ Hardening applied to the stateless payment rails:
 
 - **IETF Payment charge credentials are route- and amount-bound.** The HMAC challenge covers the resource path; a credential minted for one route is rejected at any other, and the engine refuses to settle a payment whose amount is below the route's price.
 - **IETF session top-ups are single-use.** Each top-up payment hash is consumed atomically with the credit write in a single storage transaction, so a paid top-up cannot be replayed for additional credit.
+- **Session refunds close before payment and never retry automatically.** A
+  refund response includes `X-Refund-Status`. `settled` is returned only with
+  a payment preimage; `unknown` means the backend may have submitted payment
+  before confirmation was lost and the original invoice must be reconciled
+  before any manual retry. The session event carries the same status for
+  operator monitoring.
 - **Currency mismatches fail closed.** If a route has no price in the authenticating rail's currency, the request is challenged rather than proxied. An x402 (USD) credential on a sats-only route no longer resolves to a zero cost.
 - **x402 payments are checked against the advertised requirements.** Network, asset, payTo and amount are validated before and after facilitator verification, from the same requirements object used to issue the challenge.
 
@@ -178,7 +191,10 @@ Hardening applied to the stateless payment rails:
 - Request paths are normalised once in the engine before pricing lookup (duplicate slashes collapsed, trailing slashes stripped), so `/api/joke/`, `/api//joke` and `/api/joke` are priced identically across all adapters. Pricing keys are normalised at startup and key collisions throw.
 - Payment hashes are validated as 64-character hex strings
 - Invoice amounts are validated as positive integers within safe bounds
-- BOLT-11 strings, NWC URIs, and Cashu tokens have length limits enforced
+- BOLT-11 strings and Cashu tokens have length limits enforced
+- The merchant-owned NWC connection is strictly parsed at startup, permits only
+  `wss://` relays, and never crosses the public HTTP boundary. Generated apps
+  load it only from a bounded private `NWC_URI_FILE`, not a raw environment value
 - `X-Toll-Cost` header (variable metering) uses strict integer validation; scientific notation and floating point are rejected
 
 ### IP validation

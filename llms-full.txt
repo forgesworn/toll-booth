@@ -145,13 +145,6 @@ interface BoothConfig {
   creditTiers?: CreditTier[]
 
   /**
-   * NWC callback: pay a Lightning invoice via Nostr Wallet Connect.
-   * Accepts NWC URI + bolt11, returns the payment preimage.
-   * When provided, the payment page shows an NWC option.
-   */
-  nwcPayInvoice?: (nwcUri: string, bolt11: string) => Promise<string>
-
-  /**
    * Cashu callback: redeem a Cashu ecash token as payment.
    * Returns the credited amount in satoshis.
    * When provided, the payment page shows a Cashu option and the
@@ -191,9 +184,6 @@ class Booth {
 
   /** POST /create-invoice */
   readonly createInvoiceHandler: unknown
-
-  /** POST /nwc-pay (only present when nwcPayInvoice is configured) */
-  readonly nwcPayHandler?: unknown
 
   /** POST /cashu-redeem (only present when redeemCashu is configured) */
   readonly cashuRedeemHandler?: unknown
@@ -355,16 +345,18 @@ Works with self-hosted or hosted LNbits instances.
 import { nwcBackend } from '@forgesworn/toll-booth/backends/nwc'
 
 interface NwcConfig {
-  /** NWC connection URI: nostr+walletconnect://pubkey?relay=wss://...&secret=... */
+  /** Merchant-owned NWC connection URI. Never accept one from a payer. */
   nwcUrl: string
-  /** Reply timeout in ms (default: 60000) */
+  /** Request and response timeout in ms (default: 60000) */
   timeout?: number
 }
 
 nwcBackend(config: NwcConfig): LightningBackend
 ```
 
-Works with any NWC-compatible wallet (Alby Hub, Mutiny, Umbrel, Phoenix, and others). Communication is end-to-end encrypted over Nostr relays using NIP-44.
+Works with NIP-44 v2 NWC wallets. This is a merchant Lightning backend
+connector, not a separate payment rail. The URI is a bearer-equivalent wallet
+credential and never crosses the public HTTP boundary.
 
 ## Storage Backend
 
@@ -549,7 +541,7 @@ app.get('/api/data', (c) => {
 export default app
 ```
 
-The Hono adapter provides `createHonoTollBooth()` which returns an `authMiddleware` and a `createPaymentApp()` factory. The payment app is a Hono sub-app with `/create-invoice`, `/invoice-status/:paymentHash`, and optional `/nwc-pay` and `/cashu-redeem` routes. Context variables (`TollBoothEnv`) expose payment state to downstream handlers via `c.get()`.
+The Hono adapter provides `createHonoTollBooth()` which returns an `authMiddleware` and a `createPaymentApp()` factory. The payment app is a Hono sub-app with `/create-invoice`, `/invoice-status/:paymentHash`, and optional `/cashu-redeem` routes. Context variables (`TollBoothEnv`) expose payment state to downstream handlers via `c.get()`.
 
 ### Custom LightningBackend
 

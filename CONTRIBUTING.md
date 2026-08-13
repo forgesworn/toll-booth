@@ -94,11 +94,11 @@ toll-booth ships with Phoenixd, LND, CLN, LNbits, and NWC backends. To add anoth
 
 ## Adding a payment rail
 
-Payment rails (NWC, Cashu, IETF Payment) live in `src/core/` as framework-agnostic handlers. The pattern:
+Payment rails and redemption methods live in `src/core/` as framework-agnostic handlers. The pattern:
 
 1. Define request/result types in `src/core/types.ts`
 2. Implement the handler in `src/core/your-rail.ts`
 3. Wire it through adapters (Express, Web Standard, Hono) so each framework exposes the route
 4. Add integration tests in `src/e2e/`
 
-Look at `src/core/nwc-pay.ts` or `src/core/cashu-redeem.ts` as reference implementations.
+Look at `src/core/cashu-redeem.ts` or the `PaymentRail` implementations as references. NWC is a merchant Lightning backend under `src/backends/`, not a payment rail.

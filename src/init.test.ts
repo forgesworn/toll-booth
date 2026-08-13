@@ -166,7 +166,7 @@ describe('generated server.ts content', () => {
     const server = project.files['server.ts']!
 
     expect(server).toContain("import { Hono } from 'hono'")
-    expect(server).toContain("import { createHonoTollBooth } from '@forgesworn/toll-booth/adapters/hono'")
+    expect(server).toContain("import { createHonoTollBooth, type TollBoothEnv } from '@forgesworn/toll-booth/hono'")
     expect(server).not.toContain('phoenixdBackend')
     expect(server).not.toContain('lndBackend')
   })
@@ -187,7 +187,7 @@ describe('generated server.ts content', () => {
     const server = project.files['server.ts']!
 
     expect(server).toContain("import { nwcBackend } from '@forgesworn/toll-booth/backends/nwc'")
-    expect(server).toContain('NWC_URI')
+    expect(server).toContain('NWC_URI_FILE')
   })
 
   it('deno template generates deno.json instead of package.json', () => {
