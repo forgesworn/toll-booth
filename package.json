@@ -4,6 +4,9 @@
   "type": "module",
   "description": "Monetise any API with HTTP 402 payments. Payment-rail agnostic middleware for Express, Hono, Deno, Bun, and Workers.",
   "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
   "publishConfig": {
     "provenance": true
   },
@@ -108,18 +111,21 @@
   "scripts": {
     "build": "rm -rf dist && tsc",
     "test": "vitest run",
+    "test:release": "npm run check:publish-dependencies && npm test",
+    "check:publish-dependencies": "node scripts/check-publish-dependencies.mjs",
     "test:integration": "bash scripts/test-integration.sh",
     "test:integration:ln": "bash scripts/test-integration.sh --ln-only",
     "test:integration:cashu": "bash scripts/test-integration.sh --cashu-only",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run build && npm test",
+    "prepublishOnly": "npm run check:publish-dependencies && npm run build && npm test",
     "prepare": "patch-package"
   },
   "dependencies": {
     "@cashu/cashu-ts": "^4.7.2",
+    "@forgesworn/nwc-kit": "0.1.1",
     "better-sqlite3": "^13.0.2",
+    "farrier-kit": "1.1.2",
     "macaroon": "^3.0.4",
-    "nostr-tools": "^2.24.1",
     "qrcode": "^1.5.4"
   },
   "peerDependencies": {
@@ -141,6 +147,7 @@
     "@types/qrcode": "^1.5.6",
     "express": "^5.2.1",
     "hono": "^4.12.8",
+    "nostr-tools": "^2.24.1",
     "patch-package": "^8.0.1",
     "tsx": "^4.21.0",
     "typescript": "^6.0.2",

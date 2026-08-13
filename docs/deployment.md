@@ -1,6 +1,8 @@
 # Deployment Guide
 
-toll-booth runs anywhere Node.js runs. This guide covers common deployment patterns, from Docker Compose to serverless edge functions.
+toll-booth supports Node.js 22 and newer, alongside the documented Bun, Deno
+and edge-runtime adapters. This guide covers common deployment patterns, from
+Docker Compose to serverless edge functions.
 
 ## Deployment architecture
 

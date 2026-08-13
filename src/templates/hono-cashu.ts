@@ -17,7 +17,7 @@ function generateServer(ctx: TemplateContext): string {
 
   return `import { Hono } from 'hono'
 import { serve } from '@hono/node-server'
-import { createHonoTollBooth } from '@forgesworn/toll-booth/adapters/hono'
+import { createHonoTollBooth, type TollBoothEnv } from '@forgesworn/toll-booth/hono'
 import { createTollBooth } from '@forgesworn/toll-booth'
 import { memoryStorage } from '@forgesworn/toll-booth'
 
@@ -30,7 +30,6 @@ const engine = createTollBooth({
   defaultInvoiceAmount: 1000,
   freeTier: { requestsPerDay: parseInt(process.env.FREE_TIER_REQUESTS ?? '10', 10) },
   rootKey: process.env.ROOT_KEY ?? '',
-  normalisedPricing: new Map([['/', { default: { amount: 1, currency: 'sat' } }]]),
   rails: [],
 })
 
@@ -46,7 +45,7 @@ const paymentApp = createPaymentApp({
   defaultAmount: 1000,
 })
 
-const app = new Hono()
+const app = new Hono<TollBoothEnv>()
 app.route('/pay', paymentApp)
 app.use('*', authMiddleware)
 

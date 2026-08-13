@@ -20,14 +20,12 @@ import {
   createExpressMiddleware,
   createExpressInvoiceStatusHandler,
   createExpressCreateInvoiceHandler,
-  createExpressNwcHandler,
   createExpressCashuHandler,
 } from './adapters/express.js'
 import {
   createWebStandardMiddleware,
   createWebStandardInvoiceStatusHandler,
   createWebStandardCreateInvoiceHandler,
-  createWebStandardNwcHandler,
   createWebStandardCashuHandler,
 } from './adapters/web-standard.js'
 
@@ -59,7 +57,7 @@ export interface BoothOptions extends BoothConfig {
 
 /**
  * Encapsulates the middleware, invoice-status handler, create-invoice handler,
- * and wallet adapter endpoints with shared internal state.
+ * and optional redemption endpoints with shared internal state.
  *
  * The `adapter` option selects the framework integration:
  * - `'express'` — Express middleware and handlers
@@ -76,7 +74,6 @@ export class Booth {
   readonly middleware: unknown
   readonly invoiceStatusHandler: unknown
   readonly createInvoiceHandler: unknown
-  readonly nwcPayHandler?: unknown
   readonly cashuRedeemHandler?: unknown
 
   /** Aggregate usage statistics. Resets on restart. */
@@ -213,7 +210,6 @@ export class Booth {
       backend: config.backend,
       storage: this.storage,
       tiers: config.creditTiers,
-      nwcEnabled: !!config.nwcPayInvoice,
       cashuEnabled: !!config.redeemCashu,
     }
 
@@ -229,10 +225,6 @@ export class Booth {
       upstreamTimeout: config.upstreamTimeout,
     }
 
-    const nwcPayDeps = config.nwcPayInvoice
-      ? { nwcPay: config.nwcPayInvoice, storage: this.storage }
-      : undefined
-
     const cashuRedeemDeps = config.redeemCashu
       ? { redeem: config.redeemCashu, storage: this.storage }
       : undefined
@@ -247,7 +239,6 @@ export class Booth {
           trustedProxies: config.trustedProxies,
           getClientIp: config.getClientIp,
         })
-        if (nwcPayDeps) this.nwcPayHandler = createExpressNwcHandler(nwcPayDeps)
         if (cashuRedeemDeps) {
           this.redeemCashu = config.redeemCashu
           this.cashuRedeemHandler = createExpressCashuHandler(cashuRedeemDeps)
@@ -263,7 +254,6 @@ export class Booth {
           trustedProxies: config.trustedProxies,
           getClientIp: config.getClientIp,
         })
-        if (nwcPayDeps) this.nwcPayHandler = createWebStandardNwcHandler(nwcPayDeps)
         if (cashuRedeemDeps) {
           this.redeemCashu = config.redeemCashu
           this.cashuRedeemHandler = createWebStandardCashuHandler(cashuRedeemDeps)

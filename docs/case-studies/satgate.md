@@ -41,7 +41,7 @@ satgate does not contain a single line of payment code. All of this is delegated
 - **Credit ledger** - pre-paid balance tracking with atomic debit-on-request
 - **Volume discount tiers** - buy 10,000 sats of credit, get 11,100 credits
 - **Free tier** - configurable daily allowance per IP (hashed; no PII stored)
-- **Multiple payment rails** - Lightning (five backends), Cashu ecash, xcashu (NUT-24), x402 stablecoins, IETF Payment, NWC - simultaneously
+- **Multiple payment rails** - Lightning, Cashu ecash, xcashu (NUT-24), x402 stablecoins, and IETF Payment simultaneously, with five interchangeable Lightning backends including NWC
 - **Macaroon authentication** - cryptographic bearer credentials with caveats
 - **SQLite persistence** - WAL mode, automatic invoice expiry pruning
 - **Self-service payment page** - QR codes, tier selector, wallet adapter buttons

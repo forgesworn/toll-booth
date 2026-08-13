@@ -26,11 +26,14 @@ A single protocol. Multiple rails. The client picks how to pay.
 
 **Cashu** — ecash tokens. No Lightning node required. No channel liquidity. No routing failures. Mint tokens from any Cashu mint, redeem them at the toll booth, receive access. This is the edge computing play: a Cloudflare Worker can gate an API behind Cashu payments without a single piece of Lightning infrastructure. Instant, offline-capable, privacy-preserving.
 
-**Nostr Wallet Connect** — wallet-to-wallet payments over Nostr relays. The client's wallet pays the invoice directly, no browser extension required. Any NWC-compatible wallet works. The payment travels the same relay infrastructure the client already uses for social communication.
+**Nostr Wallet Connect backend** — an operator can use its own NWC-compatible
+wallet instead of exposing a node API. This is a connector behind the Lightning
+rail. The payer still receives and pays an ordinary BOLT-11 invoice with its own
+wallet. toll-booth never asks the payer for an NWC connection URI.
 
-**x402 / stablecoins** — on the roadmap. Coinbase's x402 protocol brings USDC and other stablecoins to the HTTP 402 flow. When toll-booth adds x402 as a backend, a single deployment will accept Lightning, Cashu, NWC, and stablecoin payments simultaneously. Same middleware, same credit accounting, one more rail.
+**x402 / stablecoins** — Coinbase's x402 protocol brings USDC and other stablecoins to the HTTP 402 flow. A single deployment can accept Lightning, Cashu, and stablecoin payments simultaneously. Same middleware, same credit accounting, one more rail.
 
-Four rails and counting. One middleware. The API operator picks which to accept. The client picks which to use. Neither needs permission from the other.
+Multiple rails, one middleware. The API operator picks which to accept. The client picks which to use. Neither needs permission from the other.
 
 ## The vending machine web
 

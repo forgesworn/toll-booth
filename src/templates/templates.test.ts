@@ -1,5 +1,6 @@
 // src/templates/templates.test.ts
 import { describe, it, expect } from 'vitest'
+import ts from 'typescript'
 import { buildTemplateContext } from '../init-prompts.js'
 import type { TemplateContext } from '../init-prompts.js'
 import { generateExpressPhoenixd } from './express-phoenixd.js'
@@ -28,6 +29,19 @@ function makeContext(overrides: Partial<Parameters<typeof buildTemplateContext>[
   })
 }
 
+function expectValidTypeScript(source: string): void {
+  const result = ts.transpileModule(source, {
+    reportDiagnostics: true,
+    compilerOptions: {
+      target: ts.ScriptTarget.ES2022,
+      module: ts.ModuleKind.NodeNext,
+      moduleResolution: ts.ModuleResolutionKind.NodeNext,
+    },
+  })
+  const errors = result.diagnostics?.filter((diagnostic) => diagnostic.category === ts.DiagnosticCategory.Error) ?? []
+  expect(errors.map((diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'))).toEqual([])
+}
+
 // ---- Shared helpers ----
 
 describe('shared helpers', () => {
@@ -43,6 +57,8 @@ describe('shared helpers', () => {
     expect(pkg.scripts.dev).toBeDefined()
     expect(pkg.dependencies['@forgesworn/toll-booth']).toBeDefined()
     expect(pkg.dependencies.express).toBeDefined()
+    expect(pkg.dependencies['@forgesworn/toll-booth']).toBe('^6.0.0')
+    expect(Object.values(pkg.dependencies)).not.toContain('latest')
     expect(pkg.devDependencies.typescript).toBeDefined()
     expect(pkg.devDependencies['@types/node']).toBeDefined()
     expect(pkg.devDependencies['@types/express']).toBeDefined()
@@ -53,6 +69,12 @@ describe('shared helpers', () => {
     const pkg = JSON.parse(json)
 
     expect(pkg.devDependencies['@types/express']).toBeUndefined()
+  })
+
+  it('generates Bun types and refuses unreviewed dependencies', () => {
+    const pkg = JSON.parse(generatePackageJson('my-api', ['@forgesworn/toll-booth'], 'bun'))
+    expect(pkg.devDependencies['@types/bun']).toBe('^1.3.14')
+    expect(() => generatePackageJson('my-api', ['unreviewed-package'], 'express')).toThrow('No tested scaffold dependency range')
   })
 
   it('generateEnvExample produces key=value pairs with comments', () => {
@@ -92,6 +114,11 @@ describe('shared helpers', () => {
     expect(config.compilerOptions.target).toBe('ES2022')
     expect(config.compilerOptions.module).toBe('Node16')
     expect(config.compilerOptions.moduleResolution).toBe('Node16')
+    expect(config.compilerOptions.types).toEqual(['node'])
+  })
+
+  it('generateTsConfig includes Bun runtime types for Bun projects', () => {
+    expect(JSON.parse(generateTsConfig('bun')).compilerOptions.types).toEqual(['node', 'bun'])
   })
 })
 
@@ -159,7 +186,7 @@ describe('hono-cashu template', () => {
   it('server.ts imports Hono and createHonoTollBooth', () => {
     const server = project.files['server.ts']
     expect(server).toContain("import { Hono } from 'hono'")
-    expect(server).toContain("import { createHonoTollBooth } from '@forgesworn/toll-booth/adapters/hono'")
+    expect(server).toContain("import { createHonoTollBooth, type TollBoothEnv } from '@forgesworn/toll-booth/hono'")
   })
 
   it('server.ts does NOT import any Lightning backend', () => {
@@ -174,11 +201,13 @@ describe('hono-cashu template', () => {
     expect(server).toContain('createHonoTollBooth')
     expect(server).toContain('authMiddleware')
     expect(server).toContain('createPaymentApp')
+    expect(server).toContain('new Hono<TollBoothEnv>()')
   })
 
   it('package.json has hono dependency', () => {
     const pkg = JSON.parse(project.files['package.json'])
     expect(pkg.dependencies.hono).toBeDefined()
+    expect(pkg.dependencies['@hono/node-server']).toBeDefined()
     expect(pkg.dependencies['@forgesworn/toll-booth']).toBeDefined()
   })
 
@@ -234,7 +263,11 @@ describe('deno-lnd template', () => {
 
   it('deno.json has import maps for toll-booth', () => {
     const denoConfig = JSON.parse(project.files['deno.json'])
-    expect(denoConfig.imports['@forgesworn/toll-booth']).toBeDefined()
+    expect(denoConfig.imports['@forgesworn/toll-booth']).toBe('npm:@forgesworn/toll-booth@^6.0.0')
+    expect(denoConfig.imports['@forgesworn/toll-booth/backends/lnd']).toBe(
+      'npm:@forgesworn/toll-booth@^6.0.0/backends/lnd',
+    )
+    expect(denoConfig.imports['@forgesworn/toll-booth/']).toBeUndefined()
   })
 })
 
@@ -258,6 +291,11 @@ describe('express-nwc template', () => {
   it('server.ts uses nwcUrl parameter (real API)', () => {
     const server = project.files['server.ts']
     expect(server).toContain('nwcUrl:')
+    expect(server).toContain('NWC_URI_FILE')
+    expect(server).toContain('info.size > 8192')
+    expect(server).toContain('chmod 600')
+    expect(server).toContain('fstatSync(descriptor)')
+    expect(server).toContain('bytes?.fill(0)')
   })
 
   it('server.ts uses express adapter', () => {
@@ -265,9 +303,9 @@ describe('express-nwc template', () => {
     expect(server).toContain("adapter: 'express'")
   })
 
-  it('.env.example has NWC_URI variable', () => {
+  it('.env.example has NWC_URI_FILE variable', () => {
     const env = project.files['.env.example']
-    expect(env).toContain('NWC_URI')
+    expect(env).toContain('NWC_URI_FILE')
   })
 
   it('package.json has express dependency', () => {
@@ -279,6 +317,15 @@ describe('express-nwc template', () => {
 // ---- Generic template ----
 
 describe('generic template', () => {
+  it('transpiles every generated NWC server without syntax errors', () => {
+    expectValidTypeScript(generateExpressNwc(makeContext({ framework: 'express', backend: 'nwc' })).files['server.ts'])
+    for (const framework of ['hono', 'deno', 'bun'] as const) {
+      const server = generateGeneric(makeContext({ framework, backend: 'nwc' })).files['server.ts']
+      expectValidTypeScript(server)
+      expect(server.match(/const backend =/g)).toHaveLength(1)
+    }
+  })
+
   it('works for Hono + LND (non-golden-path)', () => {
     const ctx = makeContext({ framework: 'hono', backend: 'lnd' })
     const project = generateGeneric(ctx)
@@ -317,6 +364,37 @@ describe('generic template', () => {
     expect(server).toContain("adapter: 'web-standard'")
   })
 
+  it('generates a bounded Deno-native NWC secret-file loader', () => {
+    const ctx = makeContext({ framework: 'deno', backend: 'nwc' })
+    const project = generateGeneric(ctx)
+    const server = project.files['server.ts']
+    const denoConfig = JSON.parse(project.files['deno.json'])
+
+    expect(server).toContain("Deno.env.get('NWC_URI_FILE')")
+    expect(server).toContain("Deno.openSync(file, { read: true })")
+    expect(server).toContain('handle.statSync()')
+    expect(server).toContain('bytes.fill(0)')
+    expect(server).not.toContain("from 'node:fs'")
+    expect(denoConfig.imports['@forgesworn/toll-booth']).toBe('npm:@forgesworn/toll-booth@^6.0.0')
+    expect(denoConfig.imports['@forgesworn/toll-booth/backends/nwc']).toBe(
+      'npm:@forgesworn/toll-booth@^6.0.0/backends/nwc',
+    )
+    expect(denoConfig.imports['@forgesworn/toll-booth/']).toBeUndefined()
+  })
+
+  it('generates a bounded Node-compatible NWC secret-file loader', () => {
+    const ctx = makeContext({ framework: 'hono', backend: 'nwc' })
+    const server = generateGeneric(ctx).files['server.ts']
+
+    expect(server).toContain("import { closeSync, fstatSync, openSync, readSync } from 'node:fs'")
+    expect(server).toContain('process.env.NWC_URI_FILE')
+    expect(server).toContain('info.size > 8192')
+    expect(server).toContain('chmod 600')
+    expect(server).toContain('fstatSync(descriptor)')
+    expect(server).toContain('readSync(descriptor')
+    expect(server).not.toContain('rails: []')
+  })
+
   it('works for Bun + LNbits', () => {
     const ctx = makeContext({ framework: 'bun' as any, backend: 'lnbits' })
     const project = generateGeneric(ctx)
@@ -324,6 +402,7 @@ describe('generic template', () => {
     const server = project.files['server.ts']
     expect(server).toContain('Bun.serve')
     expect(server).toContain('lnbitsBackend')
+    expect(JSON.parse(project.files['package.json']).devDependencies['@types/bun']).toBeDefined()
   })
 
   it('works for Express + cashu-only', () => {

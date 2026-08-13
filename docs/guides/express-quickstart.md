@@ -6,7 +6,7 @@ An Express API that charges 10 sats per request via Lightning. Free tier include
 
 ## Prerequisites
 
-- Node.js 18+
+- Node.js 22+
 - A Lightning backend ([Phoenixd](https://phoenix.acinq.co/server) recommended), or skip it and use a mock for testing
 
 ## Install

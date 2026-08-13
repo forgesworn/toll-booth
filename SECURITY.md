@@ -27,7 +27,7 @@ toll-booth is L402 middleware that creates Lightning invoices, issues macaroon t
 - **Request body size**: Capped at 64 KiB across all adapters; `Content-Length` headers validated for format, non-negativity, and size.
 - **Macaroon caveats**: Maximum 1024 characters per caveat. Reserved keys (`payment_hash`, `credit_balance`) rejected at mint time.
 - **Status tokens**: Validated via timing-safe comparison in storage layer.
-- **NWC URIs**: Scheme-validated to `nostr+walletconnect://` to prevent SSRF.
+- **Merchant NWC URI**: Parsed strictly at startup, limited to authenticated key material and `wss://` relays, and never accepted in an HTTP request.
 - **Cashu tokens**: Maximum 16,384 characters.
 - **X-Toll-Cost header**: Strict integer format validation (`/^\d+$/`) prevents `parseInt` truncation attacks.
 

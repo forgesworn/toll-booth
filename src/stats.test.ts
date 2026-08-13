@@ -107,16 +107,6 @@ describe('StatsCollector', () => {
     })
   })
 
-  describe('recordNwcPayment', () => {
-    it('increments nwcPayments and totalCredited', () => {
-      stats.recordNwcPayment(1000)
-
-      const snap = stats.snapshot()
-      expect(snap.revenue.nwcPayments).toBe(1)
-      expect(snap.revenue.totalCredited).toBe(1000)
-    })
-  })
-
   describe('recordCashuRedemption', () => {
     it('increments cashuRedemptions and totalCredited', () => {
       stats.recordCashuRedemption(500)
@@ -174,7 +164,6 @@ describe('StatsCollector', () => {
       })
       expect(snap.revenue).toEqual({
         invoicesPaid: 0,
-        nwcPayments: 0,
         cashuRedemptions: 0,
         totalCredited: 0,
         totalConsumed: 0,

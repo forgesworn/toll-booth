@@ -65,6 +65,25 @@ Topics: bitcoin, lightning, nostr, freedom tech, meshtastic, handshake
 | `ROOT_KEY` | Production | 64 hex chars for macaroon signing (persists tokens across restarts) |
 | `PORT` | No | HTTP port (default: 3000) |
 
+### Release deployment
+
+[`deploy/production-jokes.sh`](../../deploy/production-jokes.sh) is the
+canonical production deploy script. It accepts only an exact release tag via
+`DEPLOY_REF`, builds that tag in an isolated Git worktree, reads the Phoenixd
+credential from the running node without a fallback, and rolls back the
+container if the health check fails.
+
+The server-local `/opt/sats-for-laughs/deploy.conf` contains non-secret runtime
+identity only:
+
+```dotenv
+PUBLIC_URL=https://service.example.com
+ANNOUNCE_RELAYS=wss://relay.example.com,wss://relay2.example.com
+```
+
+The macaroon root key remains in a mode-0600 server-local file. Never put it or
+the Phoenixd password in `deploy.conf`, a workflow, or a command argument.
+
 ## Regenerating jokes
 
 Requires an OpenAI API key:

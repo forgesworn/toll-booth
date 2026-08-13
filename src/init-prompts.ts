@@ -78,9 +78,9 @@ const BACKEND_MAP: Record<Backend, {
   },
   nwc: {
     importStatement: "import { nwcBackend } from '@forgesworn/toll-booth/backends/nwc'",
-    setup: "nwcBackend({ nwcUrl: process.env.NWC_URI! })",
+    setup: "nwcBackend({ nwcUrl: loadNwcUri() })",
     envVars: {
-      NWC_URI: 'Nostr Wallet Connect URI (nostr+walletconnect://...)',
+      NWC_URI_FILE: 'Private 0600 file containing the Nostr Wallet Connect URI',
     },
   },
   'cashu-only': {
@@ -115,7 +115,7 @@ export function buildTemplateContext(config: InitConfig): TemplateContext {
   if (config.framework === 'express') {
     dependencies.push('express')
   } else if (config.framework === 'hono') {
-    dependencies.push('hono')
+    dependencies.push('hono', '@hono/node-server')
   }
   // deno and bun have no extra framework dependency
 

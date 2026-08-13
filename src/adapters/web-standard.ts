@@ -1,12 +1,10 @@
 // src/adapters/web-standard.ts
 import type { TollBoothEngine } from '../core/toll-booth.js'
 import type { CreateInvoiceDeps } from '../core/create-invoice.js'
-import type { CreateInvoiceRequest, NwcPayRequest, CashuRedeemRequest } from '../core/types.js'
+import type { CreateInvoiceRequest, CashuRedeemRequest } from '../core/types.js'
 import type { InvoiceStatusDeps } from '../core/invoice-status.js'
 import { handleCreateInvoice } from '../core/create-invoice.js'
 import { handleInvoiceStatus, renderInvoiceStatusHtml } from '../core/invoice-status.js'
-import { handleNwcPay } from '../core/nwc-pay.js'
-import type { NwcPayDeps } from '../core/nwc-pay.js'
 import { handleCashuRedeem } from '../core/cashu-redeem.js'
 import type { CashuRedeemDeps } from '../core/cashu-redeem.js'
 import { PAYMENT_HASH_RE } from '../core/types.js'
@@ -363,35 +361,6 @@ export function createWebStandardCreateInvoiceHandler(
         qr_svg: d.qrSvg,
       },
       { headers: applyNoStoreHeaders(new Headers()) },
-    )
-  }
-}
-
-// -- NWC handler --------------------------------------------------------------
-
-/**
- * Returns a `WebStandardHandler` that pays a Lightning invoice via NWC.
- *
- * Expects JSON body with `{ nwcUri, bolt11, paymentHash, statusToken }`.
- * Returns the payment preimage on success.
- */
-export function createWebStandardNwcHandler(deps: NwcPayDeps): WebStandardHandler {
-  return async (req: Request): Promise<Response> => {
-    const parsed = await safeParseJson<NwcPayRequest>(req)
-    if (!parsed.ok) {
-      return Response.json(
-        { error: 'Invalid JSON body' },
-        { status: 400, headers: applyNoStoreHeaders(new Headers()) },
-      )
-    }
-
-    const result = await handleNwcPay(deps, parsed.value)
-    if (result.success) {
-      return Response.json({ preimage: result.preimage }, { headers: applyNoStoreHeaders(new Headers()) })
-    }
-    return Response.json(
-      { error: result.error },
-      { status: result.status, headers: applyNoStoreHeaders(new Headers()) },
     )
   }
 }

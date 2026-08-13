@@ -9,7 +9,6 @@ export interface PaymentPageData {
   preimage?: string
   tokenSuffix?: string
   tiers: CreditTier[]
-  nwcEnabled: boolean
   cashuEnabled: boolean
 }
 
@@ -19,7 +18,7 @@ export interface PaymentPageErrorData {
 }
 
 export async function renderPaymentPage(data: PaymentPageData): Promise<string> {
-  const { invoice, paid, preimage, tokenSuffix, tiers, nwcEnabled, cashuEnabled } = data
+  const { invoice, paid, preimage, tokenSuffix, tiers, cashuEnabled } = data
   const qrSvg = await QRCode.toString(`lightning:${invoice.bolt11}`.toUpperCase(), { type: 'svg', margin: 2 })
 
   return `<!DOCTYPE html>
@@ -70,11 +69,10 @@ h1{font-size:1.4rem;text-align:center;margin-bottom:1.5rem;color:#fff}
   data-payment-hash="${esc(invoice.paymentHash)}"
   data-macaroon="${esc(invoice.macaroon)}"
   data-paid="${paid}"
-  data-nwc="${nwcEnabled}"
   data-cashu="${cashuEnabled}"
 >
 
-${paid ? renderPaidState(invoice, preimage, tokenSuffix) : renderAwaitingState(invoice, qrSvg, tiers, nwcEnabled, cashuEnabled)}
+${paid ? renderPaidState(invoice, preimage, tokenSuffix) : renderAwaitingState(invoice, qrSvg, tiers, cashuEnabled)}
 
 <div class="info">Powered by <strong>toll-booth</strong> &middot; L402</div>
 </div>
@@ -94,7 +92,6 @@ function renderAwaitingState(
   invoice: StoredInvoice,
   qrSvg: string,
   tiers: CreditTier[],
-  nwcEnabled: boolean,
   cashuEnabled: boolean,
 ): string {
   const tiersHtml = tiers.length > 0 ? `
@@ -114,9 +111,6 @@ function renderAwaitingState(
   const walletButtons: string[] = []
   walletButtons.push(`<button class="btn btn-primary" id="btn-copy" onclick="copyInvoice()">Copy Invoice</button>`)
   walletButtons.push(`<button class="btn btn-secondary hidden" id="btn-webln" onclick="payWebLN()">Pay with WebLN</button>`)
-  if (nwcEnabled) {
-    walletButtons.push(`<button class="btn btn-secondary" id="btn-nwc" onclick="showNwc()">Pay with Nostr Wallet Connect</button>`)
-  }
   if (cashuEnabled) {
     walletButtons.push(`<button class="btn btn-secondary" id="btn-cashu" onclick="showCashu()">Redeem Cashu Token</button>`)
   }
@@ -135,12 +129,6 @@ ${tiersHtml}
 
 <div class="wallets">
   ${walletButtons.join('\n  ')}
-</div>
-
-<div class="hidden" id="nwc-form">
-  <input type="text" placeholder="nostr+walletconnect://..." id="nwc-uri"
-    style="width:100%;padding:.5rem;border-radius:8px;border:1px solid #3a3a50;background:#0d0d15;color:#e0e0e0;font-size:.85rem;margin-bottom:.5rem">
-  <button class="btn btn-primary" onclick="payNwc()">Pay via NWC</button>
 </div>
 
 <div class="hidden" id="cashu-form">
@@ -296,29 +284,8 @@ function clientScript(): string {
     .catch(function(e){ console.error('Tier selection failed:', e) });
   };
 
-  window.showNwc = function(){
-    document.getElementById('nwc-form').classList.toggle('hidden');
-  };
-
   window.showCashu = function(){
     document.getElementById('cashu-form').classList.toggle('hidden');
-  };
-
-  window.payNwc = function(){
-    var uri = document.getElementById('nwc-uri').value.trim();
-    if (!uri) return;
-    var invoice = document.getElementById('invoice-str').textContent;
-    fetch(basePath + '/nwc-pay', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({nwcUri: uri, bolt11: invoice, paymentHash: hash, statusToken: statusToken})
-    })
-    .then(function(r){return r.json()})
-    .then(function(d){
-      if (d.preimage) showPaid(d.preimage, 0, null, d.token_suffix);
-      else if (d.error) alert(d.error);
-    })
-    .catch(function(e){ alert('NWC payment failed: ' + e.message) });
   };
 
   window.redeemCashu = function(){
@@ -361,8 +328,6 @@ function clientScript(): string {
     if(tiers) tiers.style.display = 'none';
     var wallets = document.querySelector('.wallets');
     if(wallets) wallets.style.display = 'none';
-    var nwcForm = document.getElementById('nwc-form');
-    if(nwcForm) nwcForm.style.display = 'none';
     var cashuForm = document.getElementById('cashu-form');
     if(cashuForm) cashuForm.style.display = 'none';
 

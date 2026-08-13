@@ -16,6 +16,28 @@ permissions:
 
 jobs:
   release:
-    uses: forgesworn/anvil/.github/workflows/release.yml@v0
+    uses: forgesworn/anvil/.github/workflows/release.yml@d4294e622932d93957d73e5b1af0267382b6af04 # v0.10.1
     with:
       tag: ${{ inputs.tag || '' }}
+      test-command: npm run test:release
+      strict-action-pins: true
+      lifecycle-scripts-policy: strict
+      reproducibility-mode: strict
+
+  deploy:
+    needs: release
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    env:
+      DEPLOY_REF: ${{ inputs.tag || github.event.release.tag_name }}
+    steps:
+      - name: Deploy Toll Booth production demo
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+        with:
+          host: 95.217.39.110
+          username: deploy
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          fingerprint: SHA256:ptjKUi+4n8CHpJL8Fbx72eSBrwdLzUZx4Jvn7K2hMjs
+          envs: DEPLOY_REF
+          script: /opt/sats-for-laughs/deploy.sh

@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto'
 import { newMacaroon, importMacaroon } from 'macaroon'
+import type { Macaroon } from 'macaroon'
 
 const LOCATION = 'toll-booth'
 
@@ -26,8 +27,19 @@ const RESERVED_CAVEAT_KEYS = new Set(['payment_hash', 'credit_balance', 'currenc
  */
 /** Maximum number of custom caveats allowed per macaroon. */
 const MAX_CUSTOM_CAVEATS = 16
+const MAX_CAVEAT_LENGTH = 1024
+const MAX_MACAROON_BYTES = 24_576
+const HEX_32_BYTES = /^[0-9a-f]{64}$/i
 
 export function mintMacaroon(rootKey: string, paymentHash: string, creditBalanceSats: number, caveats?: string[], currency?: string): string {
+  if (!HEX_32_BYTES.test(rootKey)) throw new Error('Root key must be exactly 32 bytes of hex')
+  if (!HEX_32_BYTES.test(paymentHash)) throw new Error('Payment hash must be exactly 32 bytes of hex')
+  if (!Number.isSafeInteger(creditBalanceSats) || creditBalanceSats < 0) {
+    throw new Error('Credit balance must be a non-negative safe integer')
+  }
+  if (currency !== undefined && currency !== 'sat' && currency !== 'usd') {
+    throw new Error('Currency must be sat or usd')
+  }
   const keyBytes = hexToBytes(rootKey)
   const m = newMacaroon({
     identifier: encodeL402Identifier(paymentHash),
@@ -42,21 +54,72 @@ export function mintMacaroon(rootKey: string, paymentHash: string, creditBalance
     if (caveats.length > MAX_CUSTOM_CAVEATS) {
       throw new Error(`Too many caveats: maximum ${MAX_CUSTOM_CAVEATS} custom caveats allowed`)
     }
+    const seenKeys = new Set<string>()
     for (const caveat of caveats) {
       if (!caveat.includes(' = ')) {
         throw new Error(`Invalid caveat format (must contain " = "): ${caveat}`)
       }
-      if (caveat.length > 1024) {
-        throw new Error(`Caveat exceeds maximum length of 1024 characters`)
+      if (caveat.length > MAX_CAVEAT_LENGTH) {
+        throw new Error(`Caveat exceeds maximum length of ${MAX_CAVEAT_LENGTH} characters`)
       }
       const key = caveat.slice(0, caveat.indexOf(' = ')).trim()
+      if (!key) throw new Error('Caveat key must not be empty')
       if (RESERVED_CAVEAT_KEYS.has(key)) {
         throw new Error(`Caveat key "${key}" is reserved and cannot be overridden`)
       }
+      if (seenKeys.has(key)) throw new Error(`Duplicate caveat key: ${key}`)
+      seenKeys.add(key)
       m.addFirstPartyCaveat(caveat)
     }
   }
-  return uint8ToBase64(m.exportBinary())
+  return uint8ToBase64(serializeMacaroonV2(m))
+}
+
+/**
+ * Linear, bounded Macaroon v2 binary serialization.
+ *
+ * macaroon@3.0.4's ByteBuffer does not retain its capacity and therefore
+ * doubles on every field append. Keeping this small encoder here avoids an
+ * exponential allocation path while preserving the standard v2 wire format.
+ * It is intentionally not re-exported from the package entrypoint.
+ */
+export function serializeMacaroonV2(macaroon: Macaroon): Uint8Array {
+  const output: number[] = [2]
+  const encoder = new TextEncoder()
+
+  function appendUvarint(value: number): void {
+    if (!Number.isSafeInteger(value) || value < 0 || value > MAX_MACAROON_BYTES) {
+      throw new Error('Macaroon field length is out of bounds')
+    }
+    while (value >= 0x80) {
+      output.push((value & 0x7f) | 0x80)
+      value = Math.floor(value / 128)
+    }
+    output.push(value)
+  }
+
+  function appendField(type: 0 | 1 | 2 | 4 | 6, bytes?: Uint8Array): void {
+    output.push(type)
+    if (type !== 0) {
+      const value = bytes ?? new Uint8Array()
+      appendUvarint(value.length)
+      for (const byte of value) output.push(byte)
+    }
+    if (output.length > MAX_MACAROON_BYTES) throw new Error('Macaroon exceeds maximum size')
+  }
+
+  if (macaroon.location) appendField(1, encoder.encode(macaroon.location))
+  appendField(2, macaroon.identifier)
+  appendField(0)
+  for (const caveat of macaroon.caveats) {
+    if (caveat.location) appendField(1, encoder.encode(caveat.location))
+    appendField(2, caveat.identifier)
+    if (caveat.vid) appendField(4, caveat.vid)
+    appendField(0)
+  }
+  appendField(0)
+  appendField(6, macaroon.signature)
+  return Uint8Array.from(output)
 }
 
 /**
@@ -239,5 +302,13 @@ function uint8ToBase64(bytes: Uint8Array): string {
 }
 
 function base64ToUint8(b64: string): Uint8Array {
-  return new Uint8Array(Buffer.from(b64, 'base64'))
+  if (b64.length === 0 || b64.length > Math.ceil(MAX_MACAROON_BYTES / 3) * 4) {
+    throw new Error('Macaroon is empty or exceeds maximum size')
+  }
+  if (b64.length % 4 !== 0 || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(b64)) {
+    throw new Error('Macaroon is not canonical base64')
+  }
+  const bytes = new Uint8Array(Buffer.from(b64, 'base64'))
+  if (bytes.length > MAX_MACAROON_BYTES) throw new Error('Macaroon exceeds maximum size')
+  return bytes
 }

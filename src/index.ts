@@ -14,8 +14,6 @@ export { handleCreateInvoice } from './core/create-invoice.js'
 export type { CreateInvoiceDeps } from './core/create-invoice.js'
 export { handleInvoiceStatus, renderInvoiceStatusHtml } from './core/invoice-status.js'
 export type { InvoiceStatusDeps } from './core/invoice-status.js'
-export { handleNwcPay } from './core/nwc-pay.js'
-export type { NwcPayDeps } from './core/nwc-pay.js'
 export { handleCashuRedeem, REDEEM_LEASE_MS } from './core/cashu-redeem.js'
 export type { CashuRedeemDeps } from './core/cashu-redeem.js'
 
@@ -26,9 +24,9 @@ export type { SqliteStorageConfig } from './storage/sqlite.js'
 export { memoryStorage } from './storage/memory.js'
 
 // Adapters
-export { createExpressMiddleware, createExpressInvoiceStatusHandler, createExpressCreateInvoiceHandler, createExpressNwcHandler, createExpressCashuHandler } from './adapters/express.js'
+export { createExpressMiddleware, createExpressInvoiceStatusHandler, createExpressCreateInvoiceHandler, createExpressCashuHandler } from './adapters/express.js'
 export type { ExpressMiddlewareConfig } from './adapters/express.js'
-export { createWebStandardMiddleware, createWebStandardInvoiceStatusHandler, createWebStandardCreateInvoiceHandler, createWebStandardNwcHandler, createWebStandardCashuHandler } from './adapters/web-standard.js'
+export { createWebStandardMiddleware, createWebStandardInvoiceStatusHandler, createWebStandardCreateInvoiceHandler, createWebStandardCashuHandler } from './adapters/web-standard.js'
 export type { WebStandardHandler, WebStandardMiddlewareConfig } from './adapters/web-standard.js'
 // Hono adapter types (implementation at @forgesworn/toll-booth/hono)
 export type { HonoTollBoothConfig, HonoTollBooth, PaymentAppConfig, TollBoothEnv } from './adapters/hono.js'

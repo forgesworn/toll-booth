@@ -108,12 +108,12 @@ describe('buildTemplateContext', () => {
 
     it('produces correct setup code', () => {
       expect(ctx.backendSetup).toBe(
-        "nwcBackend({ nwcUrl: process.env.NWC_URI! })",
+        "nwcBackend({ nwcUrl: loadNwcUri() })",
       )
     })
 
     it('includes backend-specific env vars', () => {
-      expect(ctx.envVars).toHaveProperty('NWC_URI')
+      expect(ctx.envVars).toHaveProperty('NWC_URI_FILE')
     })
   })
 
@@ -148,6 +148,7 @@ describe('buildTemplateContext', () => {
 
     it('includes hono dependency', () => {
       expect(ctx.dependencies).toContain('hono')
+      expect(ctx.dependencies).toContain('@hono/node-server')
     })
   })
 

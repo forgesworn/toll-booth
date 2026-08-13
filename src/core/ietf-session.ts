@@ -121,6 +121,8 @@ export interface SessionEvent {
   amountSats?: number
   balanceSats?: number
   refundPreimage?: string
+  /** Settlement truth for an outbound refund. Unknown must be reconciled before any manual retry. */
+  refundStatus?: 'settled' | 'unknown' | 'not-requested' | 'amount-mismatch'
   timestamp: string
 }
 
@@ -184,12 +186,16 @@ export function createIETFSessionRail(config: IETFSessionRailConfig): PaymentRai
    * Uses atomic close-before-pay to prevent TOCTOU double-refund:
    * the session is marked closed BEFORE the payment is sent.
    */
-  async function refundAndClose(session: Session): Promise<string | undefined> {
+  async function refundAndClose(session: Session): Promise<{
+    preimage?: string
+    status: 'settled' | 'unknown' | 'not-requested' | 'amount-mismatch'
+  }> {
     // TOCTOU protection: close the session first, then attempt refund.
     // This prevents concurrent close + sweep from both sending payments.
     storage.closeSession(session.sessionId)
 
     let refundPreimage: string | undefined
+    let refundStatus: 'settled' | 'unknown' | 'not-requested' | 'amount-mismatch' = 'not-requested'
     if (session.balanceSats > 0 && session.returnInvoice && backend.sendPayment) {
       // Validate return invoice amount matches remaining balance
       const invoiceAmountSats = parseBolt11AmountSats(session.returnInvoice)
@@ -201,14 +207,23 @@ export function createIETFSessionRail(config: IETFSessionRailConfig): PaymentRai
           paymentHash: session.paymentHash,
           amountSats: session.balanceSats,
           balanceSats: 0,
+          refundStatus: 'amount-mismatch',
           timestamp: new Date().toISOString(),
         })
-        return undefined
+        return { status: 'amount-mismatch' }
       }
-      const result = await backend.sendPayment(session.returnInvoice)
-      refundPreimage = result.preimage
-      // Update the closed session with the refund preimage
-      storage.closeSession(session.sessionId, refundPreimage)
+      try {
+        const result = await backend.sendPayment(session.returnInvoice)
+        refundPreimage = result.preimage
+        refundStatus = 'settled'
+        // Update the closed session with the refund preimage
+        storage.closeSession(session.sessionId, refundPreimage)
+      } catch {
+        // The backend may have submitted the payment before losing its
+        // response. The closed session and retained balance are the durable
+        // reconciliation record; never retry this invoice automatically.
+        refundStatus = 'unknown'
+      }
     }
 
     emitEvent({
@@ -218,9 +233,13 @@ export function createIETFSessionRail(config: IETFSessionRailConfig): PaymentRai
       amountSats: session.balanceSats,
       balanceSats: 0,
       refundPreimage,
+      refundStatus,
       timestamp: new Date().toISOString(),
     })
-    return refundPreimage
+    return {
+      ...(refundPreimage ? { preimage: refundPreimage } : {}),
+      status: refundStatus,
+    }
   }
 
   return {
@@ -522,6 +541,7 @@ export function createIETFSessionRail(config: IETFSessionRailConfig): PaymentRai
 
         // Attempt refund if balance > 0 and return invoice exists
         let refundPreimage: string | undefined
+        let refundStatus: 'settled' | 'unknown' | 'not-requested' | 'amount-mismatch' = 'not-requested'
         if (session.balanceSats > 0 && returnInvoice && backend.sendPayment) {
           // CRITICAL: validate return invoice amount matches remaining balance.
           // Amountless invoices are always safe; amount-specified invoices must
@@ -535,6 +555,7 @@ export function createIETFSessionRail(config: IETFSessionRailConfig): PaymentRai
               paymentHash: session.paymentHash,
               amountSats: session.balanceSats,
               balanceSats: 0,
+              refundStatus: 'amount-mismatch',
               timestamp: new Date().toISOString(),
             })
             storage.closeSession(session.sessionId)
@@ -553,8 +574,11 @@ export function createIETFSessionRail(config: IETFSessionRailConfig): PaymentRai
           try {
             const result = await backend.sendPayment(returnInvoice)
             refundPreimage = result.preimage
+            refundStatus = 'settled'
           } catch {
-            // Refund failed — close anyway, operator can handle manually
+            // Submission may have succeeded before confirmation was lost.
+            // Close once, surface unknown, and require operator reconciliation.
+            refundStatus = 'unknown'
           }
         }
 
@@ -567,6 +591,7 @@ export function createIETFSessionRail(config: IETFSessionRailConfig): PaymentRai
           amountSats: session.balanceSats,
           balanceSats: 0,
           refundPreimage,
+          refundStatus,
           timestamp: new Date().toISOString(),
         })
 
@@ -578,6 +603,7 @@ export function createIETFSessionRail(config: IETFSessionRailConfig): PaymentRai
           currency: 'sat',
           customCaveats: {
             'X-Session-Closed': 'true',
+            'X-Refund-Status': refundStatus,
             ...(refundPreimage && { 'X-Refund-Preimage': refundPreimage }),
           },
         }

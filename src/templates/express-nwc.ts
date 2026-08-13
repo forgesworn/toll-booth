@@ -16,14 +16,48 @@ function generateServer(ctx: TemplateContext): string {
     : `process.env.UPSTREAM_URL ?? 'http://localhost:4000'`
 
   return `import express from 'express'
+import { closeSync, fstatSync, openSync, readSync } from 'node:fs'
 import { Booth } from '@forgesworn/toll-booth'
 import { nwcBackend } from '@forgesworn/toll-booth/backends/nwc'
+
+function loadNwcUri(): string {
+  const file = process.env.NWC_URI_FILE
+  if (!file) throw new Error('NWC_URI_FILE is required')
+  const descriptor = openSync(file, 'r')
+  let bytes: Buffer | undefined
+  try {
+    const info = fstatSync(descriptor)
+    if (!info.isFile() || info.size === 0 || info.size > 8192) {
+      throw new Error('NWC_URI_FILE must be a non-empty regular file no larger than 8192 bytes')
+    }
+    if (process.platform !== 'win32' && (info.mode & 0o077) !== 0) {
+      throw new Error('NWC_URI_FILE permissions are too broad; run chmod 600 on the file')
+    }
+    bytes = Buffer.allocUnsafe(info.size)
+    let offset = 0
+    while (offset < bytes.length) {
+      const count = readSync(descriptor, bytes, offset, bytes.length - offset, null)
+      if (count === 0) throw new Error('NWC_URI_FILE changed while it was being read')
+      offset += count
+    }
+    const extra = Buffer.allocUnsafe(1)
+    try {
+      if (readSync(descriptor, extra, 0, 1, null) !== 0) throw new Error('NWC_URI_FILE changed while it was being read')
+    } finally {
+      extra.fill(0)
+    }
+    return bytes.toString('utf8').trim()
+  } finally {
+    bytes?.fill(0)
+    closeSync(descriptor)
+  }
+}
 
 const app = express()
 app.use(express.json())
 
 const backend = nwcBackend({
-  nwcUrl: process.env.NWC_URI ?? '',
+  nwcUrl: loadNwcUri(),
 })
 
 const booth = new Booth({

@@ -46,8 +46,14 @@ At least one payment method is required. Multiple rails can be active simultaneo
 | `xcashu` | `XCashuConfig` | xcashu (NUT-24) direct-header Cashu payments. Requires `mints` (array of accepted mint URLs). Optional `unit` (default `'sat'`) and `onProofsReceived` callback. |
 | `ietfPayment` | `IETFPaymentConfig` | IETF Payment authentication (draft-ryan-httpauth-payment-01). Requires `realm`. Optional `hmacSecret` (auto-derived from rootKey), `challengeExpirySecs` (default 900), `description`. Requires a Lightning backend. |
 | `ietfSession` | `SessionConfig` | IETF Payment session intent for streaming payments. Requires `ietfPayment` and a Lightning backend with `sendPayment()`. Optional `maxSessionDurationMs`, `maxDepositSats`, `sessionPruneIntervalMs`. |
-| `nwcPayInvoice` | `(nwcUri: string, bolt11: string) => Promise<string>` | NWC payment callback. Returns the payment preimage. Enables NWC option on the payment page. |
 | `redeemCashu` | `(token: string, paymentHash: string) => Promise<number>` | Cashu redemption callback. Returns credited amount in sats. Must be idempotent for crash recovery. Enables Cashu option on the payment page. |
+
+NWC is configured through `nwcBackend()` as the operator's Lightning backend.
+toll-booth never accepts a payer's NWC connection URI. An NWC URI is a
+bearer-equivalent wallet credential and must remain on the wallet-owning side of
+the connection. Generated applications read it from `NWC_URI_FILE`, which must
+be a private `0600` regular file no larger than 8192 bytes; the URI itself is
+never placed in generated environment configuration.
 
 ### Network and proxy
 

@@ -33,7 +33,6 @@ src/
     ietf-session.ts         # IETF Payment session intent rail
     create-invoice.ts       # POST /create-invoice handler (tier support)
     invoice-status.ts       # GET /invoice-status/:paymentHash handler
-    nwc-pay.ts              # NWC (Nostr Wallet Connect) payment handler
     cashu-redeem.ts         # Cashu token redemption with lease/recovery logic
   storage/
     interface.ts            # StorageBackend interface (credits, invoices, claims)
@@ -48,7 +47,7 @@ src/
     lnd.ts                  # LND Lightning backend (REST API)
     cln.ts                  # Core Lightning backend (clnrest API)
     lnbits.ts               # LNbits Lightning backend (REST API)
-    nwc.ts                  # Nostr Wallet Connect (NIP-47) backend
+    nwc.ts                  # Merchant Nostr Wallet Connect backend
     conformance.ts          # Shared backend conformance test factory
   e2e/                      # End-to-end integration tests
 examples/

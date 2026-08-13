@@ -27,9 +27,8 @@ src/
     toll-booth.ts           # TollBoothEngine: framework-agnostic L402 payment flow
     create-invoice.ts       # POST /create-invoice handler (tier support)
     invoice-status.ts       # GET /invoice-status/:paymentHash handler
-    nwc-pay.ts              # NWC (Nostr Wallet Connect) payment handler
     cashu-redeem.ts         # Cashu token redemption with lease/recovery logic
-    types.ts                # Core request/result types (TollBoothRequest, NwcPayRequest, etc.)
+    types.ts                # Core request/result types
   storage/
     interface.ts            # StorageBackend interface (credits, invoices, claims)
     sqlite.ts               # SQLite implementation (better-sqlite3, WAL mode)
@@ -44,7 +43,7 @@ src/
     lnd.ts                  # LND Lightning backend (REST API)
     cln.ts                  # Core Lightning backend (clnrest API)
     lnbits.ts               # LNbits Lightning backend (REST API)
-    nwc.ts                  # Nostr Wallet Connect (NIP-47) backend
+    nwc.ts                  # Merchant Nostr Wallet Connect backend
     conformance.ts          # Shared backend conformance test factory
   core/
     security.test.ts        # Security hardening tests (header injection, entropy, validation)
@@ -81,17 +80,17 @@ Backend conformance tests (`conformance.ts`) export a shared factory; each backe
 5. Client sends `Authorization: L402 <macaroon>:<preimage>`
 6. Macaroon verified, credit granted, request proxied upstream with `X-Credit-Balance` header
 
-**Booth class** is a facade that wires together the engine, storage, and adapter. Constructor takes `adapter: 'express' | 'web-standard' | 'hono'` to select framework integration. One `new Booth(config)` call exposes `.middleware`, `.invoiceStatusHandler`, `.createInvoiceHandler`, and optional `.nwcPayHandler` / `.cashuRedeemHandler`. For Hono, use `createHonoTollBooth()` directly for more idiomatic integration (auth middleware + payment route sub-app).
+**Booth class** is a facade that wires together the engine, storage, and adapter. Constructor takes `adapter: 'express' | 'web-standard' | 'hono'` to select framework integration. One `new Booth(config)` call exposes `.middleware`, `.invoiceStatusHandler`, `.createInvoiceHandler`, and optional `.cashuRedeemHandler`. For Hono, use `createHonoTollBooth()` directly for more idiomatic integration (auth middleware + payment route sub-app).
 
-**Hono adapter** (`createHonoTollBooth()`) provides an auth middleware and a `createPaymentApp()` factory that returns a Hono sub-app with `/create-invoice`, `/invoice-status/:paymentHash`, and optional `/nwc-pay` and `/cashu-redeem` routes. Context variables (`TollBoothEnv`) expose payment state to downstream handlers.
+**Hono adapter** (`createHonoTollBooth()`) provides an auth middleware and a `createPaymentApp()` factory that returns a Hono sub-app with `/create-invoice`, `/invoice-status/:paymentHash`, and optional `/cashu-redeem` routes. Context variables (`TollBoothEnv`) expose payment state to downstream handlers.
 
-**Core engine** (`createTollBooth()`) is framework-agnostic — adapters translate between framework requests and `TollBoothRequest`/`TollBoothResult`. Core handlers (`handleCreateInvoice`, `handleNwcPay`, `handleCashuRedeem`) follow the same pattern.
+**Core engine** (`createTollBooth()`) is framework-agnostic — adapters translate between framework requests and `TollBoothRequest`/`TollBoothResult`. Core handlers (`handleCreateInvoice`, `handleCashuRedeem`) follow the same pattern.
 
 **Storage** is abstracted via `StorageBackend` interface. SQLite (WAL mode, better-sqlite3) is the default; `memoryStorage()` available for tests. Three tables: `credits` (balance ledger), `invoices`, `cashu_claims` (redemption leases).
 
 **Backends:** Phoenixd, LND, CLN, LNbits, and NWC. All implement `LightningBackend` interface. Cashu-only mode works without any Lightning backend.
 
-**Wallet adapters:** Optional NWC + Cashu payment methods (pluggable via `nwcPayInvoice` and `redeemCashu` callbacks). Cashu includes lease-based crash recovery.
+**Payment connectors:** NWC is an operator-owned Lightning backend. Cashu redemption is an optional client payment method via `redeemCashu` and includes lease-based crash recovery. Never accept a payer NWC URI over HTTP.
 
 **Volume discounts:** Credit tiers (e.g. pay 10k sats, get 11.1k credits).
 

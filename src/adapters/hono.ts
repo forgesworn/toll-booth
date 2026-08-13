@@ -3,7 +3,7 @@ import { Hono } from 'hono'
 import type { Context, MiddlewareHandler } from 'hono'
 import type { ContentfulStatusCode } from 'hono/utils/http-status'
 import type { TollBoothEngine } from '../core/toll-booth.js'
-import type { TollBoothRequest, CreateInvoiceRequest, NwcPayRequest, CashuRedeemRequest } from '../core/types.js'
+import type { TollBoothRequest, CreateInvoiceRequest, CashuRedeemRequest } from '../core/types.js'
 import { PAYMENT_HASH_RE } from '../core/types.js'
 import type { LightningBackend, CreditTier } from '../types.js'
 import type { StorageBackend } from '../storage/interface.js'
@@ -11,8 +11,6 @@ import { handleCreateInvoice } from '../core/create-invoice.js'
 import type { CreateInvoiceDeps } from '../core/create-invoice.js'
 import { handleInvoiceStatus, renderInvoiceStatusHtml } from '../core/invoice-status.js'
 import type { InvoiceStatusDeps } from '../core/invoice-status.js'
-import { handleNwcPay } from '../core/nwc-pay.js'
-import type { NwcPayDeps } from '../core/nwc-pay.js'
 import { handleCashuRedeem } from '../core/cashu-redeem.js'
 import type { CashuRedeemDeps } from '../core/cashu-redeem.js'
 import { applySecurityHeaders, appendVary, parseForwardedIp } from './proxy-headers.js'
@@ -123,7 +121,6 @@ export interface PaymentAppConfig {
   defaultAmount: number
   backend?: LightningBackend
   maxPendingPerIp?: number
-  nwcPay?: NwcPayDeps['nwcPay']
   cashuRedeem?: CashuRedeemDeps['redeem']
   getClientIp?: (c: Context) => string
   /** Human-readable service name for invoice descriptions. Defaults to 'toll-booth'. */
@@ -224,7 +221,6 @@ export function createHonoTollBooth(config: HonoTollBoothConfig): HonoTollBooth 
       backend: paymentConfig.backend,
       storage: paymentConfig.storage,
       tiers: paymentConfig.tiers,
-      nwcEnabled: paymentConfig.nwcPay !== undefined,
       cashuEnabled: paymentConfig.cashuRedeem !== undefined,
     }
 
@@ -300,29 +296,6 @@ export function createHonoTollBooth(config: HonoTollBoothConfig): HonoTollBooth 
         return c.json({ error: 'Failed to check invoice status' }, 502)
       }
     })
-
-    // POST /nwc-pay (optional)
-    if (paymentConfig.nwcPay) {
-      const nwcDeps: NwcPayDeps = {
-        nwcPay: paymentConfig.nwcPay,
-        storage: paymentConfig.storage,
-      }
-
-      app.post('/nwc-pay', async (c) => {
-        const body = await safeParseJson<NwcPayRequest>(c)
-        if (body === undefined) {
-          noStore(c)
-          return c.json({ error: 'Invalid JSON body' }, 400)
-        }
-
-        const result = await handleNwcPay(nwcDeps, body)
-        noStore(c)
-        if (result.success) {
-          return c.json({ preimage: result.preimage })
-        }
-        return c.json({ error: result.error }, result.status as 400 | 500)
-      })
-    }
 
     // POST /cashu-redeem (optional)
     if (paymentConfig.cashuRedeem) {

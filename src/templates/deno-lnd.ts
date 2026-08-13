@@ -6,6 +6,8 @@ import {
   generateEnvExample,
   generateReadme,
   generateGitignore,
+  TOLL_BOOTH_DENO_PACKAGE,
+  tollBoothDenoSubpath,
 } from './shared.js'
 
 function generateServer(ctx: TemplateContext): string {
@@ -61,8 +63,8 @@ function generateDenoJson(_ctx: TemplateContext): string {
       dev: 'deno run --watch --allow-net --allow-env --allow-read server.ts',
     },
     imports: {
-      '@forgesworn/toll-booth': 'npm:@forgesworn/toll-booth@latest',
-      '@forgesworn/toll-booth/backends/lnd': 'npm:@forgesworn/toll-booth@latest/backends/lnd',
+      '@forgesworn/toll-booth': TOLL_BOOTH_DENO_PACKAGE,
+      '@forgesworn/toll-booth/backends/lnd': tollBoothDenoSubpath('backends/lnd'),
     },
   }
 

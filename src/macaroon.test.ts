@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import { importMacaroon } from 'macaroon'
-import { mintMacaroon, verifyMacaroon, parseCaveats } from './macaroon.js'
+import { mintMacaroon, verifyMacaroon, parseCaveats, serializeMacaroonV2 } from './macaroon.js'
 
 /** Appends a first-party caveat to a valid macaroon (simulates attacker). */
 function appendCaveat(macaroonBase64: string, caveat: string): string {
   const m = importMacaroon(new Uint8Array(Buffer.from(macaroonBase64, 'base64')))
   m.addFirstPartyCaveat(caveat)
-  return Buffer.from(m.exportBinary()).toString('base64')
+  return Buffer.from(serializeMacaroonV2(m)).toString('base64')
 }
 
 describe('mintMacaroon', () => {
@@ -108,6 +108,18 @@ describe('mintMacaroon with caveats', () => {
     const longCaveat = `key = ${'x'.repeat(1020)}`
     expect(() => mintMacaroon(rootKey, paymentHash, 1000, [longCaveat]))
       .toThrow(/exceeds maximum length/)
+  })
+
+  it('rejects duplicate custom keys at mint time', () => {
+    expect(() => mintMacaroon(rootKey, paymentHash, 1000, ['plan = basic', 'plan = premium']))
+      .toThrow(/Duplicate caveat key/)
+  })
+
+  it('serializes the full bounded caveat set without patched dependencies', () => {
+    const caveats = Array.from({ length: 16 }, (_, i) => `key${i} = val${i}`)
+    const macaroon = mintMacaroon(rootKey, paymentHash, 1000, caveats)
+    expect(parseCaveats(macaroon)).toMatchObject({ key0: 'val0', key15: 'val15' })
+    expect(verifyMacaroon(rootKey, macaroon).valid).toBe(true)
   })
 })
 
@@ -275,12 +287,7 @@ describe('credit balance bounds checking', () => {
   })
 
   it('rejects negative credit_balance', () => {
-    // Use appendCaveat to forge a macaroon with negative credit_balance.
-    // This won't pass signature verification in real use (duplicate caveat rejection),
-    // but tests the parsing path in isolation.
-    const mac = mintMacaroon(rootKey, paymentHash, -1)
-    const result = verifyMacaroon(rootKey, mac)
-    expect(result.valid).toBe(false)
+    expect(() => mintMacaroon(rootKey, paymentHash, -1)).toThrow(/non-negative/)
   })
 
   it('accepts zero credit_balance', () => {

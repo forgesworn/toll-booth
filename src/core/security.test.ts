@@ -436,7 +436,9 @@ describe('x402 X-Payment header size limit', () => {
 describe('NWC backend paymentHash validation', () => {
   it('returns unpaid for malformed payment hash', async () => {
     const { nwcBackend } = await import('../backends/nwc.js')
-    const backend = nwcBackend({ nwcUrl: 'nostr+walletconnect://test' })
+    const backend = nwcBackend({
+      nwcUrl: `nostr+walletconnect://818b1ff78425c45464e7400d764ffc980dfdf522787e0c0309036b52933fece4?relay=${encodeURIComponent('wss://relay.example')}&secret=${'c1'.repeat(32)}`,
+    })
     const result = await backend.checkInvoice('not-a-valid-hash')
     expect(result.paid).toBe(false)
   })

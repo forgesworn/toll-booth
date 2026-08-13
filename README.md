@@ -791,7 +791,7 @@ The five most common options:
 | `upstream` | `string` | URL to proxy authorised requests to |
 | `freeTier` | `{ requestsPerDay: number }` or `{ creditsPerDay: number }` | Daily free allowance per IP (request-count or sats-budget) |
 
-See [docs/configuration.md](docs/configuration.md) for the full reference including `rootKey`, `creditTiers`, `trustProxy`, `nwcPayInvoice`, `redeemCashu`, and all other options.
+See [docs/configuration.md](docs/configuration.md) for the full reference including `rootKey`, `creditTiers`, `trustProxy`, `redeemCashu`, and all other options. NWC is available as a merchant-owned Lightning backend, not as a client payment rail.
 
 ---
 

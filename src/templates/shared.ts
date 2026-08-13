@@ -4,6 +4,20 @@ export interface GeneratedProject {
   files: Record<string, string>
 }
 
+export const TOLL_BOOTH_DEPENDENCY_VERSION = '^6.0.0'
+export const TOLL_BOOTH_DENO_PACKAGE = `npm:@forgesworn/toll-booth@${TOLL_BOOTH_DEPENDENCY_VERSION}`
+
+export function tollBoothDenoSubpath(subpath: string): string {
+  return `${TOLL_BOOTH_DENO_PACKAGE}/${subpath}`
+}
+
+const RUNTIME_DEPENDENCY_VERSIONS: Readonly<Record<string, string>> = Object.freeze({
+  '@forgesworn/toll-booth': TOLL_BOOTH_DEPENDENCY_VERSION,
+  express: '^5.2.1',
+  hono: '^4.13.1',
+  '@hono/node-server': '^2.1.0',
+})
+
 /**
  * Generate a package.json string for a scaffolded project.
  */
@@ -14,16 +28,21 @@ export function generatePackageJson(
 ): string {
   const dependencies: Record<string, string> = {}
   for (const dep of deps) {
-    dependencies[dep] = 'latest'
+    const version = RUNTIME_DEPENDENCY_VERSIONS[dep]
+    if (!version) throw new Error(`No tested scaffold dependency range is configured for ${dep}`)
+    dependencies[dep] = version
   }
 
   const devDependencies: Record<string, string> = {
-    typescript: '^5.0.0',
-    '@types/node': '^20.0.0',
+    typescript: '^6.0.3',
+    '@types/node': '^24.13.3',
   }
 
   if (deps.includes('express')) {
-    devDependencies['@types/express'] = '^5.0.0'
+    devDependencies['@types/express'] = '^5.0.6'
+  }
+  if (_framework === 'bun') {
+    devDependencies['@types/bun'] = '^1.3.14'
   }
 
   const scripts: Record<string, string> = {
@@ -122,7 +141,7 @@ dist/
 /**
  * Generate a standard tsconfig.json for ESM Node16 projects.
  */
-export function generateTsConfig(): string {
+export function generateTsConfig(framework: string = 'node'): string {
   const config = {
     compilerOptions: {
       target: 'ES2022',
@@ -134,6 +153,7 @@ export function generateTsConfig(): string {
       esModuleInterop: true,
       skipLibCheck: true,
       declaration: true,
+      types: framework === 'bun' ? ['node', 'bun'] : ['node'],
     },
     include: ['server.ts'],
   }
