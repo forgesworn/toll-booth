@@ -39,6 +39,10 @@ fi
 
 git -C "$SOURCE_REPO" fetch --force --tags origin
 DEPLOY_COMMIT="$(git -C "$SOURCE_REPO" rev-parse --verify "refs/tags/$DEPLOY_REF^{commit}")"
+if [[ ! "$DEPLOY_COMMIT" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "Release tag did not resolve to a full Git commit" >&2
+  exit 1
+fi
 RELEASE_DIR="$RUNTIME_DIR/releases/$DEPLOY_COMMIT"
 
 install -d -m 700 "$RUNTIME_DIR/releases" "$RUNTIME_DIR/data"
