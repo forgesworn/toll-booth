@@ -45,7 +45,10 @@ if [[ ! "$DEPLOY_COMMIT" =~ ^[0-9a-f]{40}$ ]]; then
 fi
 RELEASE_DIR="$RUNTIME_DIR/releases/$DEPLOY_COMMIT"
 
-install -d -m 700 "$RUNTIME_DIR/releases" "$RUNTIME_DIR/data"
+install -d -m 700 "$RUNTIME_DIR/releases"
+if [[ ! -d "$RUNTIME_DIR/data" ]]; then
+  install -d -m 700 "$RUNTIME_DIR/data"
+fi
 if [[ -d "$RELEASE_DIR" ]]; then
   if [[ "$(git -C "$RELEASE_DIR" rev-parse HEAD)" != "$DEPLOY_COMMIT" ]] ||
      [[ -n "$(git -C "$RELEASE_DIR" status --porcelain)" ]]; then

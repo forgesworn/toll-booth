@@ -24,6 +24,7 @@ describe('production Jokes deployment', () => {
   it('pins deployment and records proof without a credential fallback', () => {
     expect(source).toContain('refs/tags/$DEPLOY_REF^{commit}')
     expect(source).toContain('worktree add --detach')
+    expect(source).toContain('if [[ ! -d "$RUNTIME_DIR/data" ]]')
     expect(source).toContain('--env-file')
     expect(source).toContain('deployed-commit')
     expect(source).toContain('rollback')
