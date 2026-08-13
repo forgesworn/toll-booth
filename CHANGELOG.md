@@ -78,6 +78,14 @@ Security-hardening release following a full review of the payment flow. Every fi
 
 # [4.5.0](https://github.com/forgesworn/toll-booth/compare/v4.4.2...v4.5.0) (2026-03-28)
 
+## 6.0.1 (2026-08-13)
+
+### Bug Fixes
+
+- pin negotiated deploy host key (#77)
+
+
+
 ## 6.0.0 (2026-08-13)
 
 ### Breaking Changes
