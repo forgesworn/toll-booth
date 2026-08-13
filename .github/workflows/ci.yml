@@ -46,16 +46,3 @@ jobs:
 
       - name: Run integration tests (Lightning + Cashu)
         run: npm run test:integration
-
-  deploy-jokes:
-    needs: integration
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    steps:
-      - name: Deploy sats-for-laughs to jokes.trotters.dev
-        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
-        with:
-          host: 95.217.39.110
-          username: deploy
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          script: /opt/sats-for-laughs/deploy.sh
