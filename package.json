@@ -124,7 +124,7 @@
     "@cashu/cashu-ts": "^4.7.2",
     "@forgesworn/nwc-kit": "0.1.1",
     "better-sqlite3": "^13.0.2",
-    "farrier-kit": "^1.1.1",
+    "farrier-kit": "1.1.2",
     "macaroon": "^3.0.4",
     "qrcode": "^1.5.4"
   },
