@@ -38,6 +38,7 @@ jobs:
           host: 95.217.39.110
           username: deploy
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          fingerprint: SHA256:ptjKUi+4n8CHpJL8Fbx72eSBrwdLzUZx4Jvn7K2hMjs
+          # drone-ssh's Go client negotiates this host's ECDSA key first.
+          fingerprint: SHA256:2LOW4yEepg8esCvpx3ddiN4c73V++MujSyPT+cDrNow
           envs: DEPLOY_REF
           script: /opt/sats-for-laughs/deploy.sh
