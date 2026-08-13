@@ -56,19 +56,31 @@ else
   git -C "$SOURCE_REPO" worktree add --detach "$RELEASE_DIR" "$DEPLOY_COMMIT"
 fi
 
-PHOENIXD_PASSWORD="$(
+PHOENIXD_LIMITED_PASSWORD="$(
   docker exec "$PHOENIXD_CONTAINER" sh -c \
-    "sed -n 's/^http-password=//p' /phoenix/.phoenix/phoenix.conf" |
+    "sed -n 's/^http-password-limited-access=//p' /phoenix/.phoenix/phoenix.conf" |
     head -n 1 | tr -d '[:space:]'
 )"
-if [[ ! "$PHOENIXD_PASSWORD" =~ ^[A-Za-z0-9_-]{32,256}$ ]]; then
-  echo "Could not read a valid Phoenixd password; refusing fallback" >&2
+if [[ ! "$PHOENIXD_LIMITED_PASSWORD" =~ ^[A-Za-z0-9_-]{32,256}$ ]]; then
+  echo "Could not read a valid limited-access Phoenixd password; refusing fallback" >&2
   exit 1
 fi
 
 ROOT_KEY_FILE="$RUNTIME_DIR/.root-key"
 if [[ ! -f "$ROOT_KEY_FILE" ]]; then
-  openssl rand -hex 32 >"$ROOT_KEY_FILE"
+  if docker container inspect "$CONTAINER_NAME" >/dev/null 2>&1; then
+    CURRENT_ROOT_KEY="$(
+      docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$CONTAINER_NAME" |
+        sed -n 's/^ROOT_KEY=//p' | head -n 1 | tr -d '[:space:]'
+    )"
+    if [[ ! "$CURRENT_ROOT_KEY" =~ ^[0-9a-f]{64}$ ]]; then
+      echo "Existing deployment has no recoverable macaroon root key; refusing identity replacement" >&2
+      exit 1
+    fi
+    printf '%s\n' "$CURRENT_ROOT_KEY" >"$ROOT_KEY_FILE"
+  else
+    openssl rand -hex 32 >"$ROOT_KEY_FILE"
+  fi
   chmod 600 "$ROOT_KEY_FILE"
 fi
 ROOT_KEY="$(tr -d '[:space:]' <"$ROOT_KEY_FILE")"
@@ -90,7 +102,7 @@ trap 'rm -f "$ENV_FILE"' EXIT
 {
   printf 'MOCK=false\n'
   printf 'PHOENIXD_URL=http://localhost:9740\n'
-  printf 'PHOENIXD_PASSWORD=%s\n' "$PHOENIXD_PASSWORD"
+  printf 'PHOENIXD_PASSWORD=%s\n' "$PHOENIXD_LIMITED_PASSWORD"
   printf 'ROOT_KEY=%s\n' "$ROOT_KEY"
   printf 'PORT=3001\n'
   printf 'DATA_DIR=/data\n'
