@@ -122,7 +122,7 @@
   },
   "dependencies": {
     "@cashu/cashu-ts": "^4.7.2",
-    "@forgesworn/nwc-kit": "0.1.1",
+    "@forgesworn/nwc-kit": "^0.1.7",
     "better-sqlite3": "^13.0.2",
     "farrier-kit": "1.1.2",
     "macaroon": "^3.0.4",
