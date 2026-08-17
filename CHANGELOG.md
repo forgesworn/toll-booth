@@ -78,6 +78,14 @@ Security-hardening release following a full review of the payment flow. Every fi
 
 # [4.5.0](https://github.com/forgesworn/toll-booth/compare/v4.4.2...v4.5.0) (2026-03-28)
 
+## 6.1.1 (2026-08-17)
+
+### Bug Fixes
+
+- pin cashu-ts to the version its patch targets
+
+
+
 ## 6.1.0 (2026-08-17)
 
 ### Features
