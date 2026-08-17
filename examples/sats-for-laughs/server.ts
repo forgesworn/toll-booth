@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import express from 'express'
 import { Booth, memoryStorage } from '@forgesworn/toll-booth'
 import { phoenixdBackend } from '@forgesworn/toll-booth/backends/phoenixd'
+import { nwcBackend } from '@forgesworn/toll-booth/backends/nwc'
 import type { LightningBackend, Invoice, InvoiceStatus, StorageBackend } from '@forgesworn/toll-booth'
 import type { Announcement } from '402-announce'
 
@@ -105,13 +106,22 @@ if (attestationEventId) {
   })
 }
 
+// NWC_URI_FILE points at a file holding a nostr+walletconnect:// URI, which is
+// how this server reaches a wallet on another machine. A file rather than an env
+// var because the URI is a bearer credential and env vars show up in the process
+// table; the same reason 402-mcp reads NWC_URI_FILE. Restricted to make_invoice
+// and lookup_invoice, it lets this box take payments while being unable to spend
+// what it collects, so a compromise here cannot reach the wallet.
+const nwcUriFile = process.env.NWC_URI_FILE
 const mockStorage = MOCK ? memoryStorage() : undefined
 const backend = MOCK
   ? createMockBackend(mockStorage!)
-  : phoenixdBackend({
-      url: process.env.PHOENIXD_URL ?? 'http://localhost:9740',
-      password: process.env.PHOENIXD_PASSWORD ?? '',
-    })
+  : nwcUriFile
+    ? nwcBackend({ nwcUrl: readFileSync(nwcUriFile, 'utf-8').trim() })
+    : phoenixdBackend({
+        url: process.env.PHOENIXD_URL ?? 'http://localhost:9740',
+        password: process.env.PHOENIXD_PASSWORD ?? '',
+      })
 
 const booth = new Booth({
   adapter: 'express',

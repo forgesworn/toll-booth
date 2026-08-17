@@ -1,16 +1,27 @@
 // examples/valhalla-proxy/server.ts
+import { readFileSync } from 'node:fs'
 import express from 'express'
 import cors from 'cors'
 import { Booth } from '@forgesworn/toll-booth'
 import { phoenixdBackend } from '@forgesworn/toll-booth/backends/phoenixd'
+import { nwcBackend } from '@forgesworn/toll-booth/backends/nwc'
 
 const app = express()
 const trustProxy = (process.env.TRUST_PROXY ?? 'false') === 'true'
 
-const backend = phoenixdBackend({
-  url: process.env.PHOENIXD_URL ?? 'http://localhost:9740',
-  password: process.env.PHOENIXD_PASSWORD ?? '',
-})
+// NWC_URI_FILE points at a file holding a nostr+walletconnect:// URI, which is
+// how this server reaches a wallet that lives on another machine. The file
+// rather than an env var because the URI is a bearer credential and env vars
+// show up in the process table; the same reason 402-mcp reads NWC_URI_FILE.
+// A URI restricted to make_invoice and lookup_invoice lets this box take
+// payments while being unable to spend a sat of what it collects.
+const nwcUriFile = process.env.NWC_URI_FILE
+const backend = nwcUriFile
+  ? nwcBackend({ nwcUrl: readFileSync(nwcUriFile, 'utf8').trim() })
+  : phoenixdBackend({
+      url: process.env.PHOENIXD_URL ?? 'http://localhost:9740',
+      password: process.env.PHOENIXD_PASSWORD ?? '',
+    })
 
 app.use(cors({
   origin: '*',
