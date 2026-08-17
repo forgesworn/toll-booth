@@ -121,7 +121,7 @@
     "prepare": "patch-package"
   },
   "dependencies": {
-    "@cashu/cashu-ts": "^4.7.2",
+    "@cashu/cashu-ts": "4.7.2",
     "@forgesworn/nwc-kit": "0.1.2",
     "better-sqlite3": "^13.0.2",
     "farrier-kit": "1.1.2",
