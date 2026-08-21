@@ -6,7 +6,7 @@
 // ownership to this server, and burns the presented secret, so a replayed
 // note fails at the mint rather than at a local replay table.
 
-import { randomBytes } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import {
   fetchNoteInfo,
   hashK1,
@@ -20,7 +20,7 @@ import {
 } from 'lnurlcash-kit'
 import type { TollBoothRequest } from './types.js'
 import type { PaymentRail, PriceInfo, ChallengeFragment, RailVerifyResult } from './payment-rail.js'
-import { encodeJCS } from './ietf-payment.js'
+import { canonicalJSON, encodeJCS } from './ietf-payment.js'
 import type { LnurlcashRailConfig } from '../types.js'
 import type { StorageBackend } from '../storage/interface.js'
 
@@ -30,12 +30,64 @@ const FAIL: RailVerifyResult = { authenticated: false, paymentId: '', mode: 'cre
 export const LNURLCASH_REQUEST_PREFIX = 'lnurlcashreq1'
 
 /**
+ * The request object a challenge names, in the one shape that prefix means.
+ *
+ * There was briefly a second, shorter shape under the same prefix, with the
+ * amount as a NUMBER and no version or id. Two schemas under one prefix
+ * cannot both be right, and this is the one the conformance vectors pin and
+ * the one the published JSON Schemas validate, which actively reject a
+ * numeric amount. So this is what goes out.
+ *
+ * `id` is a handle on the charge, not a nonce: nothing verifies it coming
+ * back, since a payment is identified by the note it burns. It is derived
+ * rather than drawn at random so the same charge always names itself the
+ * same way, and derived from the SHORT form's canonical bytes so that it
+ * agrees with the id lnurlcash-kit gives a short-form request it reads.
+ */
+export function buildLnurlcashCharge(
+  amountSats: number,
+  unit: 'sat',
+  mints: string[],
+): Record<string, unknown> {
+  return {
+    amount: String(amountSats),
+    currency: unit,
+    methodDetails: { mints },
+  }
+}
+
+/**
+ * The same charge as a payment request: what the header carries.
+ *
+ * A payment request is self-describing, so it adds the two things a bare
+ * charge has no room for. `v` says which schema this is. `id` is a handle
+ * on the charge, not a nonce, since nothing verifies it coming back: a
+ * payment is identified by the note it burns. It is derived rather than
+ * drawn at random so the same charge always names itself the same way, and
+ * derived from the SHORT form's canonical bytes so it agrees with the id
+ * lnurlcash-kit gives a short-form request it reads.
+ */
+export function buildLnurlcashRequest(
+  amountSats: number,
+  unit: 'sat',
+  mints: string[],
+): Record<string, unknown> {
+  const id = createHash('sha256')
+    .update(canonicalJSON({ a: amountSats, u: unit, m: mints }))
+    .digest('hex')
+    .slice(0, 16)
+  return { v: 1, id, ...buildLnurlcashCharge(amountSats, unit, mints) }
+}
+
+/**
  * Encode a payment request for the `X-LNURLcash` challenge header:
- * `lnurlcashreq1` + base64url(JCS JSON). Deliberately the same shape the
- * kit's request encoder will produce, so moving to it is not a wire change.
+ * `lnurlcashreq1` + base64url(JCS JSON).
+ *
+ * TODO: delegate to lnurlcash-kit's `encodePaymentRequest` once 0.2.0 is on
+ * the registry. It produces exactly this, and one definition beats two.
  */
 export function encodeLnurlcashRequest(amountSats: number, unit: 'sat', mints: string[]): string {
-  return LNURLCASH_REQUEST_PREFIX + encodeJCS({ a: amountSats, u: unit, m: mints })
+  return LNURLCASH_REQUEST_PREFIX + encodeJCS(buildLnurlcashRequest(amountSats, unit, mints))
 }
 
 /**
@@ -80,12 +132,19 @@ export function createLnurlcashRail(config: LnurlcashRailConfig, storage?: Stora
     },
 
     async challenge(_route: string, price: PriceInfo): Promise<ChallengeFragment> {
-      const amount = price.sats!
+      // Two carriers, each in its own settled shape, describing one charge.
+      // The body is the charge request the published JSON Schema for this
+      // method validates, which forbids anything beyond amount, currency and
+      // methodDetails. The header is that same charge as a payment request,
+      // which is what `lnurlcashreq1` means and what lnurlcash-kit decodes,
+      // so it also carries the version and the handle a bare charge has no
+      // room for.
       return {
-        headers: { 'X-LNURLcash': encodeLnurlcashRequest(amount, unit, hosts) },
-        body: {
-          lnurlcash: { amount, unit, mints: hosts },
+        headers: {
+          'X-LNURLcash':
+            LNURLCASH_REQUEST_PREFIX + encodeJCS(buildLnurlcashRequest(price.sats!, unit, hosts)),
         },
+        body: { lnurlcash: buildLnurlcashCharge(price.sats!, unit, hosts) },
       }
     },
 

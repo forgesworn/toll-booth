@@ -109,8 +109,13 @@ export function verifyChallengeId(
  * JCS = JSON Canonicalisation Scheme (RFC 8785). Recursively sorts
  * keys at every level for deterministic output.
  */
+/** The canonical bytes themselves, for anything that needs to hash them. */
+export function canonicalJSON(obj: Record<string, unknown>): string {
+  return JSON.stringify(sortKeys(obj))
+}
+
 export function encodeJCS(obj: Record<string, unknown>): string {
-  return Buffer.from(JSON.stringify(sortKeys(obj))).toString('base64url')
+  return Buffer.from(canonicalJSON(obj)).toString('base64url')
 }
 
 function sortKeys(value: unknown): unknown {

@@ -54,10 +54,12 @@ describe('lnurlcash rail wiring', () => {
     if (result.action !== 'challenge') return
     expect(result.status).toBe(402)
     expect(result.headers['X-LNURLcash'].startsWith(LNURLCASH_REQUEST_PREFIX)).toBe(true)
+    // The body is the charge request the published schema for this method
+    // validates: amount as a decimal string, and nothing beyond these three.
     expect(result.body.lnurlcash).toEqual({
-      amount: 10,
-      unit: 'sat',
-      mints: [`127.0.0.1:${mint.port}`],
+      amount: '10',
+      currency: 'sat',
+      methodDetails: { mints: [`127.0.0.1:${mint.port}`] },
     })
   })
 

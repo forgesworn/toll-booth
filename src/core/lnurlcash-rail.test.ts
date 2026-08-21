@@ -98,21 +98,63 @@ describe('lnurlcash-rail', () => {
       const decoded = JSON.parse(
         Buffer.from(header.slice(LNURLCASH_REQUEST_PREFIX.length), 'base64url').toString(),
       )
-      expect(decoded).toEqual({ a: 10, m: [`127.0.0.1:${mint.port}`], u: 'sat' })
+      // The amount is a decimal STRING. The published charge-request schema
+      // for this method rejects a numeric one, and the conformance vectors
+      // pin the same shape, so this is what the prefix means.
+      expect(decoded).toEqual({
+        v: 1,
+        id: expect.stringMatching(/^[0-9a-f]{16}$/),
+        amount: '10',
+        currency: 'sat',
+        methodDetails: { mints: [`127.0.0.1:${mint.port}`] },
+      })
     })
 
-    it('includes amount, unit and mints in the challenge body', async () => {
+    it('names the same charge the same way every time', async () => {
+      const rail = createLnurlcashRail(config)
+      const idOf = async (): Promise<string> => {
+        const fragment = await rail.challenge('/api', { sats: 10 })
+        const header = fragment.headers['X-LNURLcash']
+        return JSON.parse(
+          Buffer.from(header.slice(LNURLCASH_REQUEST_PREFIX.length), 'base64url').toString(),
+        ).id
+      }
+      expect(await idOf()).toBe(await idOf())
+      const other = createLnurlcashRail(config)
+      const fragment = await other.challenge('/api', { sats: 11 })
+      const id = JSON.parse(
+        Buffer.from(
+          fragment.headers['X-LNURLcash'].slice(LNURLCASH_REQUEST_PREFIX.length),
+          'base64url',
+        ).toString(),
+      ).id
+      expect(id).not.toBe(await idOf())
+    })
+
+    it('describes one charge in both carriers, each in its own shape', async () => {
       const rail = createLnurlcashRail(config)
       const fragment = await rail.challenge('/api', { sats: 10 })
-      expect(fragment.body).toMatchObject({
-        lnurlcash: { amount: 10, unit: 'sat', mints: [`127.0.0.1:${mint.port}`] },
-      })
+      const decoded = JSON.parse(
+        Buffer.from(
+          fragment.headers['X-LNURLcash'].slice(LNURLCASH_REQUEST_PREFIX.length),
+          'base64url',
+        ).toString(),
+      )
+      // The body is the charge request the published schema validates, which
+      // admits nothing beyond these three. The header is that same charge as
+      // a payment request, so it adds the version and the handle.
+      const { v, id, ...charge } = decoded
+      expect(v).toBe(1)
+      expect(typeof id).toBe('string')
+      expect(fragment.body).toEqual({ lnurlcash: charge })
     })
 
     it('normalises a configured mint URL down to its host', async () => {
       const rail = createLnurlcashRail({ mints: ['https://mint.example.com/.well-known/lnurlw/mint'] })
       const fragment = await rail.challenge('/api', { sats: 10 })
-      expect(fragment.body).toMatchObject({ lnurlcash: { mints: ['mint.example.com'] } })
+      expect(fragment.body).toMatchObject({
+        lnurlcash: { methodDetails: { mints: ['mint.example.com'] } },
+      })
     })
   })
 

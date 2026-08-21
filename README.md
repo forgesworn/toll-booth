@@ -297,7 +297,7 @@ X-LNURLcash: lnurlw://mint.example.com/w?k1=<64 hex>&amount=21000
 X-LNURLcash: https://mint.example.com/w?k1=<64 hex>&amount=21000
 ```
 
-An unpaid request is answered with `402` and an `X-LNURLcash` payment request (`lnurlcashreq1` + base64url JSON carrying the amount, the unit and the accepted mints), plus an `lnurlcash` section in the body.
+An unpaid request is answered with `402` carrying the same charge twice, each in its own settled shape. The body's `lnurlcash` section is the charge request the published JSON Schema for this payment method validates: `amount` as a decimal string of sats, `currency`, and `methodDetails.mints`. The `X-LNURLcash` header is that same charge as a payment request, `lnurlcashreq1` followed by unpadded base64url of its RFC 8785 canonical JSON, so it also carries `v` and an `id` handle that a bare charge request has no room for. That is the form `lnurlcash-kit` decodes and the conformance vectors pin.
 
 The booth settles a note by **rotating** it at the mint: it generates a fresh secret of its own, sends only that secret's hash, and the mint moves the note's value onto it. That single call does three jobs at once - it proves the note is live, it burns the secret the client presented, and it makes the booth the sole owner of the replacement. There is no local replay table to keep, because a replayed note is refused by the mint. The mint is also the authority on what a note is worth: the `amount` in the URL is a hint and is never trusted.
 
@@ -797,11 +797,32 @@ A challenge from a booth running the lnurlcash rail carries an `X-LNURLcash` hea
 
 ```json
 {
-  "lnurlcash": { "amount": 10, "unit": "sat", "mints": ["mint.example.com"] },
+  "lnurlcash": {
+    "amount": "10",
+    "currency": "sat",
+    "methodDetails": { "mints": ["mint.example.com"] }
+  },
   "message": "Payment required.",
   "auth_hint": "Present a LUD-25 bearer note URL in X-LNURLcash"
 }
 ```
+
+The header alongside it decodes to the same charge with `v` and `id` added:
+
+```json
+{
+  "v": 1,
+  "id": "0b86351d2cbdd44a",
+  "amount": "10",
+  "currency": "sat",
+  "methodDetails": { "mints": ["mint.example.com"] }
+}
+```
+
+The `id` is a handle on the charge, not a nonce: nothing verifies it coming
+back, because a payment is identified by the note it burns. It is derived
+rather than drawn at random, so the same charge always names itself the same
+way.
 
 ### Volume discount tiers in the 402 body
 
