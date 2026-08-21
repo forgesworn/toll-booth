@@ -108,6 +108,49 @@ export interface XCashuConfig {
 }
 
 /**
+ * A bearer note this booth has taken as payment. `url` is the note as it
+ * stands after settlement: a fresh secret only this booth holds.
+ */
+export interface ReceivedNote {
+  /** The settled note, ready to hold, melt or forward. */
+  url: string
+  /** The note's spend secret (32 bytes hex). */
+  k1: string
+  /** What the mint says the note is worth, in millisats. */
+  amountMsat: number
+  /** The mint that issued it, e.g. `mint.example.com`. */
+  host: string
+}
+
+/**
+ * Configuration for the lnurlcash (LUD-25) payment rail.
+ */
+export interface LnurlcashRailConfig {
+  /**
+   * Accepted mints (1+). Each entry is a host (`mint.example.com`,
+   * `127.0.0.1:8899`) or any URL on that host; both are normalised to the
+   * host, and a note is only accepted when it was issued by one of them.
+   */
+  mints: string[]
+  /** Currency unit. Notes are sat-denominated; 'sat' is the only value. */
+  unit?: 'sat'
+  /**
+   * Require the note URL to carry a `sig` that verifies against the mint's
+   * advertised pubkey. Off by default: a mint with no funding source of its
+   * own issues unsigned notes, and the rotate is the check that matters.
+   */
+  requireSignature?: boolean
+  /** Timeout for calls to the mint, in milliseconds. Default: 10000. */
+  timeoutMs?: number
+  /**
+   * Called after a note has been settled, with the replacement note this
+   * booth now owns. Fire-and-forget: the rail does NOT await this callback.
+   * Use it to melt, persist or forward the note.
+   */
+  onNoteReceived?: (note: ReceivedNote) => void | Promise<void>
+}
+
+/**
  * Configuration for the IETF Payment authentication rail.
  * Implements draft-ryan-httpauth-payment-01 with Lightning charge intent.
  */
@@ -241,6 +284,13 @@ export interface BoothConfig {
    * Proofs are swapped at the configured mint(s) using cashu-ts.
    */
   xcashu?: XCashuConfig
+
+  /**
+   * lnurlcash (LUD-25) config: accept a bearer note URL via the
+   * `X-LNURLcash` header. The note is settled with one rotate at the mint,
+   * which is both the double-spend check and the transfer of ownership.
+   */
+  lnurlcash?: LnurlcashRailConfig
 
   /**
    * IETF Payment authentication rail (draft-ryan-httpauth-payment-01).

@@ -882,6 +882,23 @@ describe('Booth', () => {
       })).toThrow(/At least one payment method required/)
     })
 
+    it('accepts an lnurlcash-only config with no backend', async () => {
+      const booth = new Booth({
+        adapter: 'web-standard',
+        pricing: { '/route': 10 },
+        upstream: 'http://localhost',
+        rootKey: ROOT_KEY,
+        storage: memoryStorage(),
+        lnurlcash: { mints: ['mint.example.com'] },
+        getClientIp: () => '127.0.0.1',
+      })
+
+      const response = await booth.middleware(new Request('http://localhost/route', { method: 'POST' }))
+      expect(response!.status).toBe(402)
+      expect(response!.headers.get('X-LNURLcash')).toMatch(/^lnurlcashreq1/)
+      booth.close()
+    })
+
     it('accepts Cashu-only config with redeemCashu but no backend', () => {
       const booth = new Booth({
         adapter: 'web-standard',

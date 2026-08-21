@@ -10,6 +10,7 @@ import { createTollBooth } from './core/toll-booth.js'
 import { createL402Rail } from './core/l402-rail.js'
 import { createX402Rail } from './core/x402-rail.js'
 import { createXCashuRail } from './core/xcashu-rail.js'
+import { createLnurlcashRail } from './core/lnurlcash-rail.js'
 import { createIETFPaymentRail } from './core/ietf-payment.js'
 import { sqliteStorage } from './storage/sqlite.js'
 import { StatsCollector } from './stats.js'
@@ -87,8 +88,8 @@ export class Booth {
   private closed = false
 
   constructor(config: BoothOptions & EventHandler) {
-    if (!config.backend && !config.redeemCashu && !config.x402 && !config.xcashu) {
-      throw new Error('At least one payment method required: provide a Lightning backend, redeemCashu callback, x402 config, or xcashu config')
+    if (!config.backend && !config.redeemCashu && !config.x402 && !config.xcashu && !config.lnurlcash) {
+      throw new Error('At least one payment method required: provide a Lightning backend, redeemCashu callback, x402 config, xcashu config, or lnurlcash config')
     }
 
     let rootKeyInput: string
@@ -143,6 +144,10 @@ export class Booth {
 
     if (config.xcashu) {
       rails.push(createXCashuRail(config.xcashu, this.storage))
+    }
+
+    if (config.lnurlcash) {
+      rails.push(createLnurlcashRail(config.lnurlcash, this.storage))
     }
 
     if (config.ietfPayment) {
