@@ -125,6 +125,7 @@
     "@forgesworn/nwc-kit": "0.1.2",
     "better-sqlite3": "^13.0.2",
     "farrier-kit": "1.1.2",
+    "lnurlcash-kit": "0.1.2",
     "macaroon": "^3.0.4",
     "qrcode": "^1.5.4"
   },
@@ -147,6 +148,7 @@
     "@types/qrcode": "^1.5.6",
     "express": "^5.2.1",
     "hono": "^4.12.8",
+    "lnurlcash-conformance": "0.1.2",
     "nostr-tools": "^2.24.1",
     "patch-package": "^8.0.1",
     "tsx": "^4.21.0",

@@ -8,7 +8,7 @@ An honest comparison of toll-booth against every alternative we know of. We beli
 
 | Feature | toll-booth | Aperture | x402 v2 | Fewsats | Routstr |
 |---------|-----------|----------|---------|---------|---------|
-| **Payment rails** | L402, x402, Cashu, xcashu (NUT-24), IETF Payment | L402 | x402 (stablecoins) | L402 | Cashu |
+| **Payment rails** | L402, x402, Cashu, xcashu (NUT-24), LNURLcash (LUD-25), IETF Payment | L402 | x402 (stablecoins) | L402 | Cashu |
 | **Lightning backends** | 5 (Phoenixd, LND, CLN, LNbits, NWC) | 1 (LND) | 0 | 0 (hosted) | 0 |
 | **Framework support** | Express, Web Standard, Hono | Standalone proxy | Express (TS), Flask (Python), Gin (Go), Spring (Java) | Hosted API | N/A |
 | **Credit/balance system** | Yes - persistent ledger (SQLite) | No | Yes - sessions via sign-in-with-x | Yes - account-based | No |
@@ -44,7 +44,7 @@ Choose x402 when you want stablecoin payments, value the backing of a large corp
 
 ## When to use toll-booth
 
-toll-booth is designed for developers who want full control over their payment infrastructure. It embeds directly into your application (Express, Hono, Deno, Bun, Cloudflare Workers) or runs as a gateway in front of any HTTP service in any language. Five Lightning backends, Cashu ecash, xcashu (NUT-24), x402 stablecoins, and IETF Payment all run simultaneously; clients choose whichever rail they prefer. The credit ledger, volume discount tiers, and free tier work identically regardless of how the client paid.
+toll-booth is designed for developers who want full control over their payment infrastructure. It embeds directly into your application (Express, Hono, Deno, Bun, Cloudflare Workers) or runs as a gateway in front of any HTTP service in any language. Five Lightning backends, Cashu ecash, xcashu (NUT-24), LNURLcash bearer notes (LUD-25), x402 stablecoins, and IETF Payment all run simultaneously; clients choose whichever rail they prefer. The credit ledger, volume discount tiers, and free tier work identically regardless of how the client paid.
 
 The trade-off is ecosystem size. toll-booth is a single TypeScript library maintained by a small team. It does not have Aperture's years of production mileage at Lightning Labs, x402's corporate coalition, or Fewsats' integrated client ecosystem with credit card fallback. If you need credit card payments as a fallback rail, toll-booth does not offer that today.
 

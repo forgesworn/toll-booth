@@ -115,6 +115,7 @@ curl -H "Authorization: L402 <macaroon>:<preimage>" https://jokes.trotters.dev/a
 - **L402 protocol** - industry-standard HTTP 402 payment flow with macaroon credentials
 - **Multiple Lightning backends** - Phoenixd, LND, CLN, LNbits, NWC (any Nostr Wallet Connect wallet)
 - **Alternative payment methods** - Cashu ecash tokens and xcashu (NUT-24) direct-header payments
+- **LNURLcash bearer notes** - accepts a [LUD-25](https://github.com/lnurl/luds) note URL in an `X-LNURLcash` header. One rotate at the mint is the verification, the double-spend check and the transfer of ownership.
 - **IETF Payment authentication** - implements [draft-ryan-httpauth-payment-01](https://datatracker.ietf.org/doc/draft-ryan-httpauth-payment/), the emerging standard for HTTP payment authentication. HMAC-bound stateless challenges with Lightning settlement.
 - **x402 stablecoin payments** - accepts [x402](https://x402.org) on-chain stablecoin payments (USDC on Base, Polygon) alongside Lightning and Cashu simultaneously
 - **Cashu-only mode** - no Lightning node required; ideal for serverless and edge deployments
@@ -267,6 +268,53 @@ Clients pay by sending `X-Cashu: cashuB...` tokens in the request header. Proofs
 
 Unlike the `redeemCashu` callback (which integrates Cashu into the L402 payment-and-redeem flow), `xcashu` is a self-contained payment rail: the client attaches a token directly to the API request and gets access in one step — no separate redeem endpoint required. Both rails can run simultaneously; the 402 challenge will include both `WWW-Authenticate` (L402) and `X-Cashu` headers.
 
+### LNURLcash (bearer notes via LUD-25)
+
+```typescript
+import { Booth, meltNoteToLightning } from '@forgesworn/toll-booth'
+
+const booth = new Booth({
+  adapter: 'web-standard',
+  lnurlcash: {
+    mints: ['mint.example.com'],
+    // Optional: sweep every note you take straight onto your own node.
+    onNoteReceived: async note => {
+      await meltNoteToLightning({
+        noteUrl: note.url,
+        createInvoice: sats => myNode.createInvoice(sats),
+      })
+    },
+  },
+  pricing: { '/api': 10 },
+  upstream: 'http://localhost:3000',
+})
+```
+
+Clients pay by sending a bearer note URL in the request header, in either spelling:
+
+```
+X-LNURLcash: lnurlw://mint.example.com/w?k1=<64 hex>&amount=21000
+X-LNURLcash: https://mint.example.com/w?k1=<64 hex>&amount=21000
+```
+
+An unpaid request is answered with `402` carrying the same charge twice, each in its own settled shape. The body's `lnurlcash` section is the charge request the published JSON Schema for this payment method validates: `amount` as a decimal string of sats, `currency`, and `methodDetails.mints`. The `X-LNURLcash` header is that same charge as a payment request, `lnurlcashreq1` followed by unpadded base64url of its RFC 8785 canonical JSON, so it also carries `v` and an `id` handle that a bare charge request has no room for. That is the form `lnurlcash-kit` decodes and the conformance vectors pin.
+
+The booth settles a note by **rotating** it at the mint: it generates a fresh secret of its own, sends only that secret's hash, and the mint moves the note's value onto it. That single call does three jobs at once - it proves the note is live, it burns the secret the client presented, and it makes the booth the sole owner of the replacement. There is no local replay table to keep, because a replayed note is refused by the mint. The mint is also the authority on what a note is worth: the `amount` in the URL is a hint and is never trusted.
+
+Configuration:
+
+| Option | Description |
+|---|---|
+| `mints` | Accepted mints (1+), each a host or any URL on that host. Notes from anywhere else are refused before any network call. |
+| `unit` | `'sat'` (the only value; notes are sat-denominated). |
+| `requireSignature` | Require the note URL's `sig` to verify against the mint's advertised pubkey. Off by default - a mint with no funding source of its own issues unsigned notes. |
+| `timeoutMs` | Leash on calls to the mint, default `10000`. Verification happens on the request path, so a slow mint must not hold your caller open. |
+| `onNoteReceived` | Fire-and-forget callback handed the settled note (`{url, k1, amountMsat, host}`). Melt it, persist it, or forward it. |
+
+A note pays for the request and the surplus becomes credit against that settlement, reported in `X-Credit-Balance`. The payer cannot spend that surplus later, so a client should present a note close to the price - splitting one at the mint first if it needs to.
+
+No Lightning node is required. `meltNoteToLightning({noteUrl, createInvoice})` sweeps a note onto your own node when you do have one; it returns as soon as the mint accepts the melt, with a LUD-21 `verifyUrl` to poll, because the note is only burned once the outgoing payment actually settles.
+
 ### IETF Payment (draft-ryan-httpauth-payment-01)
 
 ```typescript
@@ -331,11 +379,12 @@ Each backend implements the `LightningBackend` interface (`createInvoice` + `che
 |---|---|---|
 | **Language** | Go binary | TypeScript middleware |
 | **Deployment** | Standalone reverse proxy | Embeds in your app, or runs as a gateway in front of any HTTP service |
-| **Lightning node** | Requires LND | Phoenixd, LND, CLN, LNbits, NWC, or none (Cashu-only) |
-| **Payment rails** | Lightning only | Lightning, Cashu ecash, xcashu (NUT-24), x402 stablecoins, IETF Payment - simultaneously |
+| **Lightning node** | Requires LND | Phoenixd, LND, CLN, LNbits, NWC, or none (ecash-only) |
+| **Payment rails** | Lightning only | Lightning, Cashu ecash, xcashu (NUT-24), LNURLcash bearer notes (LUD-25), x402 stablecoins, IETF Payment - simultaneously |
 | **IETF Payment** | No | Yes - [draft-ryan-httpauth-payment-01](https://datatracker.ietf.org/doc/draft-ryan-httpauth-payment/) with stateless HMAC challenges |
 | **x402 stablecoins** | No | Yes - USDC on Base, Polygon via pluggable facilitator |
 | **Cashu ecash** | No | Yes - redeemCashu callback + xcashu (NUT-24) direct-header rail |
+| **LNURLcash notes** | No | Yes - LUD-25 bearer notes in an `X-LNURLcash` header, settled with one rotate |
 | **Credit system** | No | Pre-paid balance with volume discount tiers |
 | **Framework adapters** | N/A (standalone proxy) | Express, Web Standard (Deno/Bun/Workers), Hono |
 | **Serverless** | No - long-running process | Yes - Web Standard adapter runs on Cloudflare Workers, Deno, Bun |
@@ -742,7 +791,38 @@ The 402 response body will include:
 }
 ```
 
-When multiple payment rails are active (e.g. L402 + x402 + xcashu), the body includes sections for each rail, and `auth_hint` becomes an array of instructions.
+When multiple payment rails are active (e.g. L402 + x402 + xcashu + lnurlcash), the body includes sections for each rail, and `auth_hint` becomes an array of instructions.
+
+A challenge from a booth running the lnurlcash rail carries an `X-LNURLcash` header alongside the body section:
+
+```json
+{
+  "lnurlcash": {
+    "amount": "10",
+    "currency": "sat",
+    "methodDetails": { "mints": ["mint.example.com"] }
+  },
+  "message": "Payment required.",
+  "auth_hint": "Present a LUD-25 bearer note URL in X-LNURLcash"
+}
+```
+
+The header alongside it decodes to the same charge with `v` and `id` added:
+
+```json
+{
+  "v": 1,
+  "id": "0b86351d2cbdd44a",
+  "amount": "10",
+  "currency": "sat",
+  "methodDetails": { "mints": ["mint.example.com"] }
+}
+```
+
+The `id` is a handle on the charge, not a nonce: nothing verifies it coming
+back, because a payment is identified by the note it burns. It is derived
+rather than drawn at random, so the same charge always names itself the same
+way.
 
 ### Volume discount tiers in the 402 body
 
@@ -770,6 +850,7 @@ The 402 body will include a `credit_tiers` array with the tier options.
 |-------|---------------|-------------|
 | `message` | Yes | `"Payment required."` |
 | `l402` | When L402 rail is active | Invoice, macaroon, payment hash, amount, payment URL |
+| `lnurlcash` | When the lnurlcash rail is active | `{ amount, unit, mints }` - the price and which mints' notes are accepted |
 | `booth` | When `serviceName` is set | `{ name, description }` service metadata |
 | `auth_hint` | When `serviceName` is set | Human/agent-readable instructions for each active payment rail |
 | `tiers` | For tiered-pricing routes | Available pricing tiers for the requested route |

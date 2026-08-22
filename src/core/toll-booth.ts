@@ -205,6 +205,9 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
           if (activeTypes.includes('xcashu')) {
             hints.push('Cashu: Send token via \u2014 X-Cashu header')
           }
+          if (activeTypes.includes('lnurlcash')) {
+            hints.push('Present a LUD-25 bearer note URL in X-LNURLcash')
+          }
           if (activeTypes.includes('ietf-session')) {
             hints.push('IETF Session: Deposit for streaming \u2014 Authorization: Payment <base64url session credential>')
           }
