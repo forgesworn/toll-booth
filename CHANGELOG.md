@@ -78,6 +78,14 @@ Security-hardening release following a full review of the payment flow. Every fi
 
 # [4.5.0](https://github.com/forgesworn/toll-booth/compare/v4.4.2...v4.5.0) (2026-03-28)
 
+## 6.2.0 (2026-08-22)
+
+### Features
+
+- accept LUD-25 bearer notes in an X-LNURLcash header (#83) (rails)
+
+
+
 ## 6.1.2 (2026-08-17)
 
 ### Bug Fixes
