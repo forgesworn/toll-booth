@@ -121,10 +121,10 @@
     "prepare": "patch-package"
   },
   "dependencies": {
-    "@cashu/cashu-ts": "4.7.2",
-    "@forgesworn/nwc-kit": "0.1.2",
+    "@cashu/cashu-ts": "4.9.0",
+    "@forgesworn/nwc-kit": "0.1.7",
     "better-sqlite3": "^13.0.2",
-    "farrier-kit": "1.1.2",
+    "farrier-kit": "1.1.3",
     "lnurlcash-kit": "0.1.2",
     "macaroon": "^3.0.4",
     "qrcode": "^1.5.4"
