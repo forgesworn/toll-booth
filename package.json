@@ -148,7 +148,7 @@
     "@types/qrcode": "^1.5.6",
     "express": "^5.2.1",
     "hono": "^4.12.8",
-    "lnurlcash-conformance": "0.1.2",
+    "lnurlcash-conformance": "0.4.0",
     "nostr-tools": "^2.24.1",
     "patch-package": "^8.0.1",
     "tsx": "^4.21.0",
