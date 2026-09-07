@@ -35,10 +35,13 @@ jobs:
       - name: Deploy Toll Booth production demo
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         with:
-          host: 95.217.39.110
+          # `stall`: the routing host that replaced the retired 95.217.39.110
+          # box after it was cancelled ~2026-08-27. A cancelled address gets
+          # reassigned, so the old target was both dead and unsafe to keep.
+          host: 62.238.98.53
           username: deploy
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           # drone-ssh's Go client negotiates this host's ECDSA key first.
-          fingerprint: SHA256:2LOW4yEepg8esCvpx3ddiN4c73V++MujSyPT+cDrNow
+          fingerprint: SHA256:CrlC1NmWHcFQLuhM49DYW/pDg38csYXJRhGtKyA+9yE
           envs: DEPLOY_REF
           script: /opt/sats-for-laughs/deploy.sh
