@@ -78,6 +78,14 @@ Security-hardening release following a full review of the payment flow. Every fi
 
 # [4.5.0](https://github.com/forgesworn/toll-booth/compare/v4.4.2...v4.5.0) (2026-03-28)
 
+## 6.2.2 (2026-09-07)
+
+### Bug Fixes
+
+- bump qs to 6.16.0 so npm audit passes (deps)
+
+
+
 ## 6.2.1 (2026-09-07)
 
 ### Bug Fixes
