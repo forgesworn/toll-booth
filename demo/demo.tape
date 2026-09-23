@@ -18,11 +18,9 @@ Set TypingSpeed 40ms
 Set Padding 24
 Set PlaybackSpeed 1
 
-# Hidden: set up PATH and cd
+# Hidden: run `vhs demo/demo.tape` from the repository root with node on PATH
 Hide
-Type `export PATH="/Users/darren/.nvm/versions/node/v22.17.0/bin:$PATH"`
-Enter
-Type "cd /Users/darren/WebstormProjects/toll-booth && clear"
+Type "clear"
 Enter
 Sleep 1s
 Show
