@@ -1201,3 +1201,22 @@ describe('IETF charge credential route binding', () => {
     expect(replay.action).toBe('challenge')
   })
 })
+
+describe('authenticated result without a paymentId', () => {
+  for (const mode of ['credit', 'per-request', 'session'] as const) {
+    it(`refuses a ${mode} credential with an empty paymentId instead of skipping the debit`, async () => {
+      const rail = {
+        type: 'custom',
+        creditSupported: true,
+        detect: () => true,
+        challenge: async () => ({ headers: {}, body: {} }),
+        verify: () => ({ authenticated: true, paymentId: '', mode, creditBalance: 100, currency: 'sat' as const }),
+      }
+      const engine = createTollBooth(makeConfig({ rails: [rail] }))
+      for (let i = 0; i < 3; i++) {
+        const result = await engine.handle(makeRequest())
+        expect(result.action).toBe('challenge')
+      }
+    })
+  }
+})

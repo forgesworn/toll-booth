@@ -299,6 +299,13 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
         if (rail.detect(normReq)) {
           const result = await Promise.resolve(rail.verify(normReq, priceInfo))
 
+          // Every debit, settlement and replay check is keyed on paymentId.
+          // An authenticated result without one would skip them all and
+          // let the credential be reused forever, so refuse it.
+          if (result.authenticated && (typeof result.paymentId !== 'string' || result.paymentId === '')) {
+            break  // fall through to challenge
+          }
+
           if (result.authenticated) {
             // Pick cost in the rail's currency. If the route has no price in
             // the authenticating rail's currency, reject with a fresh

@@ -484,3 +484,31 @@ describe('X402Rail', () => {
     })
   })
 })
+
+describe('X402Rail empty txHash (reusable payment)', () => {
+  for (const txHash of ['', '   ', 'a\r\nb', undefined as unknown as string]) {
+    it(`rejects a valid facilitator result with txHash ${JSON.stringify(txHash)}`, async () => {
+      const storage = memoryStorage()
+      const rail = createX402Rail({
+        receiverAddress: '0xreceiver', network: 'base', facilitator: mockFacilitator({ txHash }), storage,
+      })
+      const result = await rail.verify(makeRequest({ 'payment-signature': encodeV2Payment() }), { usd: 500 })
+      expect(result.authenticated).toBe(false)
+    })
+  }
+
+  it('cannot be replayed through the engine when the facilitator omits the txHash', async () => {
+    const { createTollBooth } = await import('./toll-booth.js')
+    const storage = memoryStorage()
+    const rail = createX402Rail({
+      receiverAddress: '0xreceiver', network: 'base', facilitator: mockFacilitator({ txHash: '' }), storage,
+    })
+    const engine = createTollBooth({
+      storage, pricing: { '/api/test': { usd: 100 } }, upstream: 'http://u.test', rootKey: 'a'.repeat(64), rails: [rail],
+    })
+    for (let i = 0; i < 3; i++) {
+      const res = await engine.handle(makeRequest({ 'payment-signature': encodeV2Payment() }))
+      expect(res.action).not.toBe('proxy')
+    }
+  })
+})
