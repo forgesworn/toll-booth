@@ -15,6 +15,34 @@ import type { SessionChallengeRequest, SessionOpenPayload, SessionBearerPayload,
 const HMAC_SECRET = randomBytes(32).toString('hex')
 const REALM = 'test.example.com'
 
+/** BOLT-11 spec vector: an amountless mainnet invoice. */
+const AMOUNTLESS_INVOICE = 'lnbc1pvjluezpp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqdpl2pkx2ctnv5sxxmmwwd5kgetjypeh2ursdae8g6twvus8g6rfwvs8qun0dfjkxaq8rkx3yf5tcsyz3d73gafnh3cax9rn449d9p5uxz9ezhhypd0elx87sjle52x86fux2ypatgddc6k63n7erqz25le42c4u4ecky03ylcqca784w'
+/** Checksum-valid unsigned mainnet invoice for 2500u (250,000 sats). */
+const INVOICE_2500U = 'lnbc2500u1pj48ugqpp55xs6rgdp5xs6rgdp5xs6rgdp5xs6rgdp5xs6rgdp5xs6rgdp5xssqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqju7u8g'
+
+const BECH32_CHARSET = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l'
+
+function bech32Polymod(values: number[]): number {
+  const gen = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3]
+  let chk = 1
+  for (const v of values) {
+    const top = chk >>> 25
+    chk = ((chk & 0x1ffffff) << 5) ^ v
+    for (let i = 0; i < 5; i++) if ((top >>> i) & 1) chk ^= gen[i]
+  }
+  return chk
+}
+
+/** Re-issue INVOICE_2500U with another human-readable amount, e.g. 'lnbc5u'. */
+function invoiceWithHrp(hrp: string): string {
+  const data = INVOICE_2500U.slice(INVOICE_2500U.lastIndexOf('1') + 1, -6)
+  const values = [...data].map(c => BECH32_CHARSET.indexOf(c))
+  const expanded = [...[...hrp].map(c => c.charCodeAt(0) >> 5), 0, ...[...hrp].map(c => c.charCodeAt(0) & 31)]
+  const mod = bech32Polymod([...expanded, ...values, 0, 0, 0, 0, 0, 0]) ^ 1
+  const checksum = [0, 1, 2, 3, 4, 5].map(i => BECH32_CHARSET[(mod >>> (5 * (5 - i))) & 31]).join('')
+  return `${hrp}1${data}${checksum}`
+}
+
 function makePreimage(): { preimage: string; paymentHash: string } {
   const preimage = randomBytes(32).toString('hex')
   const paymentHash = createHash('sha256').update(Buffer.from(preimage, 'hex')).digest('hex')
@@ -174,7 +202,7 @@ describe('IETF Session Rail', () => {
         payload: {
           action: 'open',
           preimage: entry.preimage,
-          returnInvoice: 'lnbc1testreturn',
+          returnInvoice: AMOUNTLESS_INVOICE,
         } satisfies SessionOpenPayload,
       }
 
@@ -424,7 +452,7 @@ describe('IETF Session Rail', () => {
         payload: {
           action: 'open',
           preimage: entry.preimage,
-          returnInvoice: 'lnbc1testreturn',
+          returnInvoice: AMOUNTLESS_INVOICE,
         } satisfies SessionOpenPayload,
       }
 
@@ -724,7 +752,7 @@ describe('IETF Session Rail', () => {
         payload: {
           action: 'open',
           preimage: entry.preimage,
-          returnInvoice: 'lnbc1testreturn',
+          returnInvoice: AMOUNTLESS_INVOICE,
         } satisfies SessionOpenPayload,
       }
 
@@ -977,5 +1005,123 @@ describe('IETF Session Rail', () => {
       const unique = new Set(tokens)
       expect(unique.size).toBe(5)
     })
+  })
+})
+
+describe('IETF Session refunds', () => {
+  const sessionConfig: SessionConfig = { maxSessionDurationMs: 60_000, maxDepositSats: 10_000 }
+
+  async function setup(returnInvoice: string, sendPayment: LightningBackend['sendPayment']) {
+    const storage = memoryStorage()
+    const invoiceMap = new Map<string, { preimage: string; paymentHash: string }>()
+    const backend = { ...createMockBackend(invoiceMap), sendPayment }
+    const events: Array<{ type: string; refundStatus?: string }> = []
+    const rail = createIETFSessionRail({
+      hmacSecret: HMAC_SECRET, realm: REALM, backend, storage, session: sessionConfig,
+      onSessionEvent: e => events.push(e),
+    })
+
+    async function freshChallenge() {
+      const wwwAuth = (await rail.challenge('/api/test', { sats: 500 })).headers['WWW-Authenticate']
+      const request = wwwAuth.match(/request="([^"]+)"/)![1]
+      return {
+        challenge: {
+          id: wwwAuth.match(/id="([^"]+)"/)![1], realm: REALM, method: 'lightning', intent: 'session',
+          request, expires: wwwAuth.match(/expires="([^"]+)"/)![1],
+        },
+        sessionRequest: JSON.parse(Buffer.from(request, 'base64url').toString()) as SessionChallengeRequest,
+      }
+    }
+
+    const open = await freshChallenge()
+    const entry = invoiceMap.get(open.sessionRequest.deposit.paymentHash)!
+    const opened = await rail.verify(makeRequest(encodeCredential({
+      challenge: open.challenge,
+      payload: { action: 'open', preimage: entry.preimage, returnInvoice } satisfies SessionOpenPayload,
+    } as IETFCredential)))
+    expect(opened.authenticated).toBe(true)
+    const sessionToken = opened.customCaveats!['X-Session-Token']
+    const sessionId = opened.customCaveats!['X-Session-Id']
+
+    const close = async () => rail.verify(makeRequest(encodeCredential({
+      challenge: (await freshChallenge()).challenge,
+      payload: { action: 'close', sessionToken } satisfies SessionClosePayload,
+    } as IETFCredential)))
+    const bearer = () => rail.verify(makeRequest(encodeCredential({
+      challenge: { id: '', realm: '', method: '', intent: '', request: '' },
+      payload: { action: 'bearer', sessionToken } satisfies SessionBearerPayload,
+    } as IETFCredential)))
+
+    return { rail, storage, events, sessionId, close, bearer }
+  }
+
+  it('refuses an upper-case invoice whose amount exceeds the balance', async () => {
+    const sendPayment = vi.fn().mockResolvedValue({ preimage: 'a'.repeat(64) })
+    // 2500u = 250,000 sats against a 500 sat balance
+    const { close, events } = await setup(INVOICE_2500U.toUpperCase(), sendPayment)
+    const closed = await close()
+    expect(closed.customCaveats?.['X-Refund-Status']).toBe('amount-mismatch')
+    expect(sendPayment).not.toHaveBeenCalled()
+    expect(events.at(-1)?.refundStatus).toBe('amount-mismatch')
+  })
+
+  it('refuses an invoice that does not decode', async () => {
+    const sendPayment = vi.fn().mockResolvedValue({ preimage: 'a'.repeat(64) })
+    const { close } = await setup('lnbc1testreturn', sendPayment)
+    expect((await close()).customCaveats?.['X-Refund-Status']).toBe('amount-mismatch')
+    expect(sendPayment).not.toHaveBeenCalled()
+  })
+
+  it('pays an invoice for exactly the remaining balance, compared in msat', async () => {
+    const sendPayment = vi.fn().mockResolvedValue({ preimage: 'b'.repeat(64) })
+    const { close, storage, sessionId } = await setup(invoiceWithHrp('lnbc5u'), sendPayment) // 500 sats
+    const closed = await close()
+    expect(closed.customCaveats?.['X-Refund-Status']).toBe('settled')
+    expect(sendPayment).toHaveBeenCalledTimes(1)
+    expect(storage.getSession(sessionId)?.refundPreimage).toBe('b'.repeat(64))
+  })
+
+  it('refuses an invoice that is off by one msat', async () => {
+    const sendPayment = vi.fn().mockResolvedValue({ preimage: 'b'.repeat(64) })
+    // 4999990p = 499,999 msat, one msat short of the 500 sat balance
+    const { close } = await setup(invoiceWithHrp('lnbc4999990p'), sendPayment)
+    expect((await close()).customCaveats?.['X-Refund-Status']).toBe('amount-mismatch')
+    expect(sendPayment).not.toHaveBeenCalled()
+  })
+
+  it('closes the session before paying, so it serves no requests during the refund', async () => {
+    let release!: (v: { preimage: string }) => void
+    const sendPayment = vi.fn(() => new Promise<{ preimage: string }>(r => { release = r }))
+    const { close, bearer, storage, sessionId } = await setup(AMOUNTLESS_INVOICE, sendPayment)
+
+    const closing = close()
+    await vi.waitFor(() => expect(sendPayment).toHaveBeenCalledTimes(1))
+
+    // Refund in flight: the session is already closed.
+    expect(storage.getSession(sessionId)?.closedAt).not.toBeNull()
+    expect((await bearer()).authenticated).toBe(false)
+    expect(() => storage.deductSession(sessionId, 1)).toThrow()
+
+    // A concurrent close cannot trigger a second refund.
+    expect((await close()).authenticated).toBe(false)
+
+    release({ preimage: 'c'.repeat(64) })
+    expect((await closing).customCaveats?.['X-Refund-Status']).toBe('settled')
+    expect(sendPayment).toHaveBeenCalledTimes(1)
+  })
+
+  it('a sweep racing a close does not refund twice', async () => {
+    let release!: (v: { preimage: string }) => void
+    const sendPayment = vi.fn(() => new Promise<{ preimage: string }>(r => { release = r }))
+    const { close, rail, storage, sessionId } = await setup(AMOUNTLESS_INVOICE, sendPayment)
+    const closing = close()
+    await vi.waitFor(() => expect(sendPayment).toHaveBeenCalledTimes(1))
+    // Force the session to look expired to the sweep while the close is paying.
+    const session = storage.getSession(sessionId)!
+    vi.spyOn(storage, 'getExpiredSessions').mockReturnValue([{ ...session, closedAt: null }])
+    expect(await rail.sweepExpired()).toBe(0)
+    release({ preimage: 'c'.repeat(64) })
+    await closing
+    expect(sendPayment).toHaveBeenCalledTimes(1)
   })
 })

@@ -51,9 +51,9 @@ export function normalisePricingTable(table: PricingTable): Record<string, Price
  * engine so all adapters behave identically, preventing path-variant
  * paywall bypasses such as '/api/joke/' or '/api//joke'.
  *
- * Matching stays case-sensitive on purpose: HTTP paths are case-sensitive
- * (RFC 9110 §4.2.3), so '/API/joke' is a different resource from
- * '/api/joke' and is NOT silently mapped onto it.
+ * This does not decode or resolve anything; adapters first run the raw
+ * path through `canonicalisePath` (src/core/request-path.ts). The engine
+ * then matches pricing routes case-insensitively.
  */
 export function normalisePath(path: string): string {
   const collapsed = path.replace(/\/{2,}/g, '/').replace(/\/+$/, '')

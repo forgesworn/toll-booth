@@ -1,5 +1,5 @@
 import { createHash, timingSafeEqual, randomBytes } from 'node:crypto'
-import { mintMacaroon, verifyMacaroon } from '../macaroon.js'
+import { assertValidRootKey, mintMacaroon, verifyMacaroon } from '../macaroon.js'
 import type { StorageBackend } from '../storage/interface.js'
 import type { LightningBackend } from '../types.js'
 import type { TollBoothRequest } from './types.js'
@@ -15,6 +15,7 @@ export interface L402RailConfig {
 }
 
 export function createL402Rail(config: L402RailConfig): PaymentRail {
+  assertValidRootKey(config.rootKey)
   const { rootKey, storage, defaultAmount, backend } = config
   const label = config.serviceName ?? 'toll-booth'
 

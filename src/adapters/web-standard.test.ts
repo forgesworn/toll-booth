@@ -523,7 +523,7 @@ describe('Web Standard adapter', () => {
       }
     })
 
-    it('forwards X-Toll-Tier header from engine result to response', async () => {
+    it('forwards X-Toll-Tier header from engine result to the upstream only', async () => {
       const backend = mockBackend()
       const storage = memoryStorage()
       const engine = createTollBooth({
@@ -552,7 +552,9 @@ describe('Web Standard adapter', () => {
         const handler = createWebStandardMiddleware(engine, 'http://upstream.test')
         const res = await handler(new Request('http://localhost/route?tier=premium', { method: 'GET' }))
         expect(res.status).toBe(200)
-        expect(res.headers.get('x-toll-tier')).toBe('premium')
+        const sent = new Headers((fetchSpy.mock.calls[0][1] as RequestInit).headers)
+        expect(sent.get('x-toll-tier')).toBe('premium')
+        expect(res.headers.get('x-toll-tier')).toBeNull()
       } finally {
         handleSpy.mockRestore()
         fetchSpy.mockRestore()
@@ -585,5 +587,112 @@ describe('Web Standard adapter', () => {
     )
 
     expect(res.status).toBe(400)
+  })
+})
+
+describe('Web Standard adapter canonical path (paywall bypass)', () => {
+  const exploitPaths = [
+    '/x/../api/paid',
+    '/x/%2e%2e/api/paid',
+    '//evil.example/api/paid',
+    '/API/paid',
+    '/api/%70aid',
+    '/api%2Fpaid',
+    '/api/%5Cpaid',
+  ]
+
+  for (const path of exploitPaths) {
+    it(`never forwards ${path} to the paid upstream route unpaid`, async () => {
+      const engine = createTollBooth({
+        backend: mockBackend(),
+        storage: memoryStorage(),
+        pricing: { '/api/paid': 100 },
+        upstream: 'http://upstream.test',
+        rootKey: ROOT_KEY,
+      })
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('ok', { status: 200 }))
+      try {
+        const handler = createWebStandardMiddleware({ engine, upstream: 'http://upstream.test' })
+        const res = await handler(new Request(`http://localhost${path}`))
+        if (res.status === 200) {
+          const target = new URL(fetchSpy.mock.calls[0][0] as string)
+          expect(target.pathname.toLowerCase()).not.toBe('/api/paid')
+        } else {
+          expect([400, 402]).toContain(res.status)
+          expect(fetchSpy).not.toHaveBeenCalled()
+        }
+      } finally {
+        fetchSpy.mockRestore()
+      }
+    })
+  }
+
+  it('forwards exactly the canonical path that was priced', async () => {
+    const engine = createTollBooth({
+      backend: mockBackend(),
+      storage: memoryStorage(),
+      pricing: {},
+      upstream: 'http://upstream.test',
+      rootKey: ROOT_KEY,
+    })
+    const handle = vi.spyOn(engine, 'handle')
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('ok', { status: 200 }))
+    try {
+      const handler = createWebStandardMiddleware({ engine, upstream: 'http://upstream.test' })
+      await handler(new Request('http://localhost//evil.example/%7Euser?q=1'))
+      expect(handle.mock.calls[0][0].path).toBe('/evil.example/~user')
+      expect(fetchSpy.mock.calls[0][0]).toBe('http://upstream.test/evil.example/~user?q=1')
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+})
+
+describe('Web Standard adapter toll headers (caveat forgery)', () => {
+  it('sends verified caveats to the upstream and strips client-forged toll headers', async () => {
+    const { createHash } = await import('node:crypto')
+    const { mintMacaroon } = await import('../macaroon.js')
+    const storage = memoryStorage()
+    const engine = createTollBooth({
+      backend: mockBackend(),
+      storage,
+      pricing: { '/api/paid': 10 },
+      upstream: 'http://upstream.test',
+      rootKey: ROOT_KEY,
+    })
+    const preimage = randomBytes(32).toString('hex')
+    const paymentHash = createHash('sha256').update(Buffer.from(preimage, 'hex')).digest('hex')
+    const macaroon = mintMacaroon(ROOT_KEY, paymentHash, 1000, ['model = llama3'])
+    storage.settleWithCredit(paymentHash, 1000, randomBytes(32).toString('hex'))
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response('ok', { status: 200 }))
+    try {
+      const handler = createWebStandardMiddleware({ engine, upstream: 'http://upstream.test' })
+      const res = await handler(new Request('http://localhost/api/paid', {
+        headers: {
+          Authorization: `L402 ${macaroon}:${preimage}`,
+          'X-Toll-Caveat-Model': 'gpt-5',
+          'X-Toll-Caveat-Admin': 'true',
+          'X-Credit-Balance': '999999',
+        },
+      }))
+      expect(res.status).toBe(200)
+      const sent = new Headers((fetchSpy.mock.calls[0][1] as RequestInit).headers)
+      expect(sent.get('x-toll-caveat-model')).toBe('llama3')
+      expect(sent.get('x-toll-caveat-admin')).toBeNull()
+      expect(sent.get('x-credit-balance')).toBe('990')
+      expect(res.headers.get('x-credit-balance')).toBe('990')
+      expect(res.headers.get('x-toll-caveat-model')).toBeNull()
+
+      const unpaid = await handler(new Request('http://localhost/api/unpriced', {
+        headers: { 'X-Toll-Caveat-Role': 'admin', 'X-Credit-Balance': '5', 'X-Toll-Tier': 'premium' },
+      }))
+      expect(unpaid.status).toBe(200)
+      const sent2 = new Headers((fetchSpy.mock.calls[1][1] as RequestInit).headers)
+      expect(sent2.get('x-toll-caveat-role')).toBeNull()
+      expect(sent2.get('x-credit-balance')).toBeNull()
+      expect(sent2.get('x-toll-tier')).toBeNull()
+    } finally {
+      fetchSpy.mockRestore()
+    }
   })
 })

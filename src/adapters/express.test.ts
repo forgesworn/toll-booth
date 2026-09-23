@@ -1,9 +1,10 @@
 // src/adapters/express.test.ts
 import { describe, it, expect, vi } from 'vitest'
-import { randomBytes } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import express from 'express'
 import { createTollBooth } from '../core/toll-booth.js'
 import { memoryStorage } from '../storage/memory.js'
+import { mintMacaroon } from '../macaroon.js'
 import {
   createExpressMiddleware,
   createExpressCreateInvoiceHandler,
@@ -60,6 +61,33 @@ async function requestRaw(app: express.Express, requestText: string): Promise<st
   } finally {
     server.close()
   }
+}
+
+interface RecordedRequest { url: string; headers: Record<string, string | undefined> }
+
+async function startRecordingUpstream(): Promise<{ port: number; close: () => void; received: RecordedRequest[] }> {
+  const { createServer: createHttpServer } = await import('node:http')
+  const received: RecordedRequest[] = []
+  const upstream = createHttpServer((req, res) => {
+    const headers: Record<string, string | undefined> = {}
+    for (const [key, value] of Object.entries(req.headers)) {
+      headers[key] = Array.isArray(value) ? value.join(', ') : value
+    }
+    received.push({ url: req.url ?? '', headers })
+    res.writeHead(200, { 'Content-Type': 'text/plain' })
+    res.end('ok')
+  })
+  await new Promise<void>((r) => upstream.listen(0, '127.0.0.1', r))
+  const port = (upstream.address() as { port: number }).port
+  return { port, close: () => upstream.close(), received }
+}
+
+function rawGet(target: string, extraHeaders = ''): string {
+  return `GET ${target} HTTP/1.1\r\nHost: localhost\r\n${extraHeaders}Connection: close\r\n\r\n`
+}
+
+function statusOf(rawResponse: string): number {
+  return parseInt(rawResponse.slice(9, 12), 10)
 }
 
 describe('Express adapter', () => {
@@ -604,11 +632,169 @@ describe('Express adapter', () => {
       try {
         const res = await request(app, '/route?tier=premium', { method: 'GET' })
         expect(res.status).toBe(200)
-        // The engine result headers are set on the client response
-        expect(res.headers.get('x-toll-tier')).toBe('premium')
+        // The resolved tier goes to the upstream, not back to the client
+        expect(upstream.receivedHeaders()['x-toll-tier']).toBe('premium')
+        expect(res.headers.get('x-toll-tier')).toBeNull()
       } finally {
         upstream.close()
         handleSpy.mockRestore()
+      }
+    })
+  })
+
+  describe('toll headers (caveat forgery)', () => {
+    async function setup() {
+      const upstream = await startRecordingUpstream()
+      const storage = memoryStorage()
+      const engine = createTollBooth({
+        backend: mockBackend(),
+        storage,
+        pricing: { '/api/paid': 10, '/api/free': 0 },
+        upstream: `http://127.0.0.1:${upstream.port}`,
+        rootKey: ROOT_KEY,
+      })
+      const app = express()
+      app.use(createExpressMiddleware(engine, `http://127.0.0.1:${upstream.port}`))
+      return { upstream, storage, app }
+    }
+
+    it('sends verified caveats and balance to the upstream, not the client', async () => {
+      const { upstream, storage, app } = await setup()
+      const preimage = randomBytes(32).toString('hex')
+      const paymentHash = createHash('sha256').update(Buffer.from(preimage, 'hex')).digest('hex')
+      const macaroon = mintMacaroon(ROOT_KEY, paymentHash, 1000, ['model = llama3'])
+      storage.settleWithCredit(paymentHash, 1000, randomBytes(32).toString('hex'))
+      try {
+        const res = await request(app, '/api/paid', {
+          headers: {
+            Authorization: `L402 ${macaroon}:${preimage}`,
+            'X-Toll-Caveat-Model': 'gpt-5',
+            'X-Toll-Caveat-Admin': 'true',
+            'X-Credit-Balance': '999999',
+          },
+        })
+        expect(res.status).toBe(200)
+        const sent = upstream.received[0].headers
+        expect(sent['x-toll-caveat-model']).toBe('llama3')
+        expect(sent['x-toll-caveat-admin']).toBeUndefined()
+        expect(sent['x-credit-balance']).toBe('990')
+        expect(res.headers.get('x-credit-balance')).toBe('990')
+        expect(res.headers.get('x-toll-caveat-model')).toBeNull()
+      } finally {
+        upstream.close()
+      }
+    })
+
+    it('strips client-forged toll headers from unauthenticated pass-through requests', async () => {
+      const { upstream, app } = await setup()
+      try {
+        const res = await request(app, '/api/unpriced', {
+          headers: {
+            'X-Toll-Caveat-Role': 'admin',
+            'X-Toll-Tier': 'premium',
+            'X-Credit-Balance': '999999',
+            'X-Free-Remaining': '100',
+          },
+        })
+        expect(res.status).toBe(200)
+        const sent = upstream.received[0].headers
+        expect(sent['x-toll-caveat-role']).toBeUndefined()
+        expect(sent['x-toll-tier']).toBeUndefined()
+        expect(sent['x-credit-balance']).toBeUndefined()
+        expect(sent['x-free-remaining']).toBeUndefined()
+      } finally {
+        upstream.close()
+      }
+    })
+  })
+
+  describe('canonical path (paywall bypass)', () => {
+    const exploitPaths = [
+      '/x/../api/paid',
+      '/x/%2e%2e/api/paid',
+      '/x/.%2E/api/paid',
+      '//evil.example/api/paid',
+      '/API/paid',
+      '/api/%70aid',
+      '/api%2Fpaid',
+      '/api/free/..%2Fpaid',
+      '/x\\..\\api/paid',
+    ]
+
+    for (const path of exploitPaths) {
+      it(`never forwards ${path} to the paid upstream route unpaid`, async () => {
+        const upstream = await startRecordingUpstream()
+        const engine = createTollBooth({
+          backend: mockBackend(),
+          storage: memoryStorage(),
+          pricing: { '/api/paid': 100 },
+          upstream: `http://127.0.0.1:${upstream.port}`,
+          rootKey: ROOT_KEY,
+        })
+        const app = express()
+        app.use(createExpressMiddleware(engine, `http://127.0.0.1:${upstream.port}`))
+        try {
+          const raw = await requestRaw(app, rawGet(path))
+          const status = statusOf(raw)
+          if (status === 200) {
+            // Unpriced canonical path: forwarded, but never as the paid route.
+            expect(upstream.received).toHaveLength(1)
+            expect(upstream.received[0].url.toLowerCase()).not.toBe('/api/paid')
+          } else {
+            expect([400, 402]).toContain(status)
+            expect(upstream.received).toHaveLength(0)
+          }
+        } finally {
+          upstream.close()
+        }
+      })
+    }
+
+    it('forwards exactly the canonical path that was priced', async () => {
+      const upstream = await startRecordingUpstream()
+      const engine = createTollBooth({
+        backend: mockBackend(),
+        storage: memoryStorage(),
+        pricing: {},
+        upstream: `http://127.0.0.1:${upstream.port}`,
+        rootKey: ROOT_KEY,
+      })
+      const handle = vi.spyOn(engine, 'handle')
+      const app = express()
+      app.use(createExpressMiddleware(engine, `http://127.0.0.1:${upstream.port}`))
+      try {
+        await requestRaw(app, rawGet('//evil.example/a/./b/../%7Euser?q=1'))
+        expect(handle.mock.calls[0][0].path).toBe('/evil.example/a/~user')
+        expect(upstream.received[0].url).toBe('/evil.example/a/~user?q=1')
+      } finally {
+        upstream.close()
+      }
+    })
+
+    it('rejects a macaroon route caveat escape via dot segments', async () => {
+      const upstream = await startRecordingUpstream()
+      const storage = memoryStorage()
+      const engine = createTollBooth({
+        backend: mockBackend(),
+        storage,
+        pricing: { '/api/free/x': 1, '/api/paid': 100 },
+        upstream: `http://127.0.0.1:${upstream.port}`,
+        rootKey: ROOT_KEY,
+      })
+      const preimage = randomBytes(32).toString('hex')
+      const paymentHash = createHash('sha256').update(Buffer.from(preimage, 'hex')).digest('hex')
+      const macaroon = mintMacaroon(ROOT_KEY, paymentHash, 1000, ['route = /api/free/*'])
+      storage.settleWithCredit(paymentHash, 1000, randomBytes(32).toString('hex'))
+      const app = express()
+      app.use(createExpressMiddleware(engine, `http://127.0.0.1:${upstream.port}`))
+      const auth = `Authorization: L402 ${macaroon}:${preimage}\r\n`
+      try {
+        expect(statusOf(await requestRaw(app, rawGet('/api/free/x', auth)))).toBe(200)
+        expect(statusOf(await requestRaw(app, rawGet('/api/free/../paid', auth)))).toBe(402)
+        expect(statusOf(await requestRaw(app, rawGet('/api/free/%2e%2e/paid', auth)))).toBe(400)
+        expect(upstream.received.map(r => r.url)).toEqual(['/api/free/x'])
+      } finally {
+        upstream.close()
       }
     })
   })

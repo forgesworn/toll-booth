@@ -31,8 +31,23 @@ const MAX_CAVEAT_LENGTH = 1024
 const MAX_MACAROON_BYTES = 24_576
 const HEX_32_BYTES = /^[0-9a-f]{64}$/i
 
+/**
+ * Throws unless `rootKey` is exactly 64 hex characters (32 bytes).
+ *
+ * An empty or malformed key must never reach the HMAC: `hexToBytes('')` is
+ * an empty key, with which anyone can mint a macaroon that verifies.
+ * Generate a key with `openssl rand -hex 32`.
+ */
+export function assertValidRootKey(rootKey: unknown, name = 'rootKey'): asserts rootKey is string {
+  if (typeof rootKey !== 'string' || !HEX_32_BYTES.test(rootKey)) {
+    throw new Error(
+      `${name} must be exactly 64 hex characters (32 bytes); generate one with \`openssl rand -hex 32\``,
+    )
+  }
+}
+
 export function mintMacaroon(rootKey: string, paymentHash: string, creditBalanceSats: number, caveats?: string[], currency?: string): string {
-  if (!HEX_32_BYTES.test(rootKey)) throw new Error('Root key must be exactly 32 bytes of hex')
+  assertValidRootKey(rootKey)
   if (!HEX_32_BYTES.test(paymentHash)) throw new Error('Payment hash must be exactly 32 bytes of hex')
   if (!Number.isSafeInteger(creditBalanceSats) || creditBalanceSats < 0) {
     throw new Error('Credit balance must be a non-negative safe integer')
@@ -159,6 +174,9 @@ export interface VerifyResult {
  * @returns A VerifyResult indicating validity and parsed caveat values.
  */
 export function verifyMacaroon(rootKey: string, macaroonBase64: string, context?: VerifyContext): VerifyResult {
+  // Configuration error, not a bad credential: fail loudly rather than
+  // verifying against a forgeable key.
+  assertValidRootKey(rootKey)
   try {
     const keyBytes = hexToBytes(rootKey)
     const m = importMacaroon(base64ToUint8(macaroonBase64))

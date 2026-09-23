@@ -48,6 +48,17 @@ function parsePayment(req: TollBoothRequest): X402Payment | undefined {
   }
 }
 
+/**
+ * A facilitator-reported transaction hash usable as a settlement key:
+ * non-empty, bounded, and free of whitespace or control characters.
+ * EVM hashes (0x + 64 hex) and base58 signatures both pass.
+ */
+const TX_HASH_RE = /^[A-Za-z0-9:_.-]{8,256}$/
+
+function isValidTxHash(txHash: unknown): txHash is string {
+  return typeof txHash === 'string' && TX_HASH_RE.test(txHash)
+}
+
 export function createX402Rail(config: X402RailConfig): PaymentRail {
   const {
     receiverAddress,
@@ -158,6 +169,13 @@ export function createX402Rail(config: X402RailConfig): PaymentRail {
         const result = await facilitator.verify(payload, requirements)
         if (!result.valid) {
           return { authenticated: false, paymentId: result.txHash || '', mode: 'per-request', currency: 'usd' }
+        }
+
+        // The txHash keys replay protection and the credit balance. A
+        // facilitator that reports success without one must not produce a
+        // reusable credential.
+        if (!isValidTxHash(result.txHash)) {
+          return unauthenticated
         }
 
         // Post-verification: the settled amount must cover the route price.

@@ -64,6 +64,20 @@ export function generatePackageJson(
 }
 
 /**
+ * Generated code that reads ROOT_KEY and stops the server with a clear
+ * message unless it is exactly 64 hex characters. An empty key would let
+ * anyone forge macaroons, so the templates never fall back to one.
+ */
+export function rootKeyGuard(runtime: 'node' | 'deno'): string {
+  const read = runtime === 'deno' ? "Deno.env.get('ROOT_KEY')" : 'process.env.ROOT_KEY'
+  return `const rootKey = ${read}
+if (!rootKey || !/^[0-9a-fA-F]{64}$/.test(rootKey)) {
+  throw new Error('ROOT_KEY must be set to 64 hex characters (32 bytes). Generate one with: openssl rand -hex 32')
+}
+`
+}
+
+/**
  * Generate a .env.example file from a map of variable names to descriptions.
  */
 export function generateEnvExample(envVars: Record<string, string>): string {
@@ -74,6 +88,11 @@ export function generateEnvExample(envVars: Record<string, string>): string {
       lines.push(`${key}=3000`)
     } else if (key === 'FREE_TIER_REQUESTS') {
       lines.push(`${key}=10`)
+    } else if (key === 'ROOT_KEY') {
+      // Deliberately blank: the server refuses to start until it is set.
+      lines.push('# Required. Generate with: openssl rand -hex 32')
+      lines.push('# The server will not start while this is empty.')
+      lines.push(`${key}=`)
     } else {
       lines.push(`${key}=`)
     }

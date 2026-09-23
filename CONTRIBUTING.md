@@ -15,7 +15,7 @@ npm test            # vitest (unit tests)
 npm run typecheck   # tsc --noEmit
 ```
 
-Node 18+ is required. The project is ESM-only (`"type": "module"`).
+Node 22+ is required, and the project builds with TypeScript 6. The project is ESM-only (`"type": "module"`).
 
 ## Project structure
 

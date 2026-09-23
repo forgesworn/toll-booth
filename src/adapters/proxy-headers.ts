@@ -12,17 +12,59 @@ const BASE_HOP_BY_HOP_HEADERS = new Set([
 
 type HeaderSource = Headers | Record<string, string> | Array<[string, string]>
 
+/**
+ * Headers that toll-booth derives from a verified payment: `X-Toll-*`
+ * (caveats, tier), `X-Credit-Balance`, `X-Free-Remaining` and
+ * `X-Session-Balance`. Only the engine may set these on a proxied request;
+ * any copy supplied by the client is stripped, so an upstream that reads
+ * them sees the engine's values or nothing.
+ */
+export function isTollHeader(name: string): boolean {
+  const n = name.toLowerCase()
+  return n.startsWith('x-toll-')
+    || n === 'x-credit-balance'
+    || n === 'x-free-remaining'
+    || n === 'x-session-balance'
+}
+
 export function stripProxyRequestHeaders(source: HeaderSource): Headers {
   const headers = new Headers(source)
   const disallowed = collectDisallowedHeaders(headers)
   disallowed.add('authorization')
   disallowed.add('host')
+  headers.forEach((_value, name) => {
+    if (isTollHeader(name)) disallowed.add(name)
+  })
 
   for (const name of disallowed) {
     headers.delete(name)
   }
 
   return headers
+}
+
+/**
+ * Copy the engine-derived toll headers from a proxy/pass result onto the
+ * request headers sent upstream. Call after {@link stripProxyRequestHeaders}.
+ */
+export function applyUpstreamTollHeaders(headers: Headers, engineHeaders: Record<string, string>): Headers {
+  for (const [key, value] of Object.entries(engineHeaders)) {
+    if (isTollHeader(key)) headers.set(key, value)
+  }
+  return headers
+}
+
+/**
+ * The subset of engine result headers returned to the client: balance,
+ * free-tier and session counters, receipts and cache directives. Caveat and
+ * tier headers (`X-Toll-*`) are for the upstream only.
+ */
+export function clientResponseHeaders(engineHeaders: Record<string, string>): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const [key, value] of Object.entries(engineHeaders)) {
+    if (!key.toLowerCase().startsWith('x-toll-')) out[key] = value
+  }
+  return out
 }
 
 export function stripProxyResponseHeaders(source: HeaderSource): Headers {

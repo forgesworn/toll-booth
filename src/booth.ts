@@ -8,6 +8,7 @@ import type { CreateInvoiceDeps } from './core/create-invoice.js'
 import type { InvoiceStatusDeps } from './core/invoice-status.js'
 import { createTollBooth } from './core/toll-booth.js'
 import { createL402Rail } from './core/l402-rail.js'
+import { assertValidRootKey } from './macaroon.js'
 import { createX402Rail } from './core/x402-rail.js'
 import { createXCashuRail } from './core/xcashu-rail.js'
 import { createLnurlcashRail } from './core/lnurlcash-rail.js'
@@ -92,8 +93,10 @@ export class Booth {
       throw new Error('At least one payment method required: provide a Lightning backend, redeemCashu callback, x402 config, xcashu config, or lnurlcash config')
     }
 
+    // Auto-generate only when no key is given at all. A supplied key,
+    // including an empty string from an unset ROOT_KEY= line, is validated.
     let rootKeyInput: string
-    if (config.rootKey) {
+    if (config.rootKey !== undefined) {
       rootKeyInput = config.rootKey
     } else {
       rootKeyInput = randomBytes(32).toString('hex')
@@ -102,9 +105,7 @@ export class Booth {
         'All macaroons will be invalidated on restart. Set ROOT_KEY for production use.',
       )
     }
-    if (!/^[0-9a-fA-F]{64}$/.test(rootKeyInput)) {
-      throw new Error('rootKey must be exactly 64 hex characters (32 bytes)')
-    }
+    assertValidRootKey(rootKeyInput)
     this.rootKey = rootKeyInput.toLowerCase()
 
     // Warn on trivially weak keys

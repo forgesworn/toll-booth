@@ -562,7 +562,7 @@ const myBackend: LightningBackend = {
 
 ## IETF Payment Rail
 
-toll-booth implements draft-ryan-httpauth-payment-01, the emerging standard for HTTP-native payment authentication. This is the only known implementation of the IETF draft.
+toll-booth implements draft-ryan-httpauth-payment-01, an expired IETF Internet-Draft for HTTP-native payment authentication.
 
 ### IETFPaymentConfig
 

@@ -345,6 +345,10 @@ export function sqliteStorage(config?: SqliteStorageConfig): StorageBackend {
     "UPDATE sessions SET closed_at = datetime('now'), refund_preimage = ? WHERE session_id = ? AND closed_at IS NULL"
   )
 
+  const stmtRecordSessionRefund = db.prepare(
+    'UPDATE sessions SET refund_preimage = ? WHERE session_id = ? AND closed_at IS NOT NULL AND refund_preimage IS NULL'
+  )
+
   const stmtGetExpiredSessions = db.prepare(
     "SELECT session_id, payment_hash, balance_sats, deposit_sats, return_invoice, bearer_token, created_at, expires_at, closed_at, refund_preimage FROM sessions WHERE closed_at IS NULL AND expires_at < datetime('now')"
   )
@@ -601,8 +605,12 @@ export function sqliteStorage(config?: SqliteStorageConfig): StorageBackend {
       return txnTopUpSessionWithSettlement(sessionId, amount, paymentHash)
     },
 
-    closeSession(sessionId: string, refundPreimage?: string): void {
-      stmtCloseSession.run(refundPreimage ?? null, sessionId)
+    closeSession(sessionId: string, refundPreimage?: string): boolean {
+      return stmtCloseSession.run(refundPreimage ?? null, sessionId).changes > 0
+    },
+
+    recordSessionRefund(sessionId: string, refundPreimage: string): void {
+      stmtRecordSessionRefund.run(refundPreimage, sessionId)
     },
 
     getExpiredSessions(): Session[] {

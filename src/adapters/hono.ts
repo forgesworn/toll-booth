@@ -5,15 +5,17 @@ import type { ContentfulStatusCode } from 'hono/utils/http-status'
 import type { TollBoothEngine } from '../core/toll-booth.js'
 import type { TollBoothRequest, CreateInvoiceRequest, CashuRedeemRequest } from '../core/types.js'
 import { PAYMENT_HASH_RE } from '../core/types.js'
+import { canonicalisePath } from '../core/request-path.js'
 import type { LightningBackend, CreditTier } from '../types.js'
 import type { StorageBackend } from '../storage/interface.js'
 import { handleCreateInvoice } from '../core/create-invoice.js'
+import { assertValidRootKey } from '../macaroon.js'
 import type { CreateInvoiceDeps } from '../core/create-invoice.js'
 import { handleInvoiceStatus, renderInvoiceStatusHtml } from '../core/invoice-status.js'
 import type { InvoiceStatusDeps } from '../core/invoice-status.js'
 import { handleCashuRedeem } from '../core/cashu-redeem.js'
 import type { CashuRedeemDeps } from '../core/cashu-redeem.js'
-import { applySecurityHeaders, appendVary, parseForwardedIp } from './proxy-headers.js'
+import { applySecurityHeaders, appendVary, applyUpstreamTollHeaders, isTollHeader, parseForwardedIp } from './proxy-headers.js'
 
 const MAX_BODY_BYTES = 65_536
 
@@ -166,9 +168,20 @@ export function createHonoTollBooth(config: HonoTollBoothConfig): HonoTollBooth 
         : undefined)
       ?? '0.0.0.0'
 
+    // Hono routes on a percent-decoded path, so price on the canonical
+    // (decoded, dot-resolved) path rather than the raw one: otherwise
+    // `/api/%70aid` is priced as an unknown route yet routed to `/api/paid`.
+    const canonicalPath = canonicalisePath(new URL(req.url).pathname)
+    if (canonicalPath === null) {
+      c.header('Cache-Control', 'no-store')
+      c.header('Pragma', 'no-cache')
+      c.header('X-Content-Type-Options', 'nosniff')
+      return c.json({ error: 'Invalid request path' }, 400)
+    }
+
     const tollReq: TollBoothRequest = {
       method: req.method,
-      path: new URL(req.url).pathname,
+      path: canonicalPath,
       headers: Object.fromEntries(req.headers.entries()),
       ip,
       body: req.body,
@@ -201,10 +214,21 @@ export function createHonoTollBooth(config: HonoTollBoothConfig): HonoTollBooth 
     }
     c.set('tollBoothAction', result.action)
 
+    // Downstream handlers (and any proxy they perform) read toll headers from
+    // the request. Drop client-supplied copies and set the engine's verified
+    // values, so a client cannot forge X-Toll-Caveat-* or X-Credit-Balance.
+    const forwarded = new Headers(req.headers)
+    const forged: string[] = []
+    forwarded.forEach((_value, name) => { if (isTollHeader(name)) forged.push(name) })
+    for (const name of forged) forwarded.delete(name)
+    applyUpstreamTollHeaders(forwarded, result.headers)
+    c.req.raw = new Request(req, { headers: forwarded })
+
     await next()
   }
 
   function createPaymentApp(paymentConfig: PaymentAppConfig): Hono {
+    assertValidRootKey(paymentConfig.rootKey)
     const app = new Hono()
 
     const createInvoiceDeps: CreateInvoiceDeps = {

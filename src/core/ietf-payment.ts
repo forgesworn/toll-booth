@@ -4,6 +4,7 @@
 // Implements the Lightning charge intent alongside existing L402/x402/xcashu rails.
 
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto'
+import { assertValidRootKey } from '../macaroon.js'
 import type { StorageBackend } from '../storage/interface.js'
 import type { LightningBackend } from '../types.js'
 import type { TollBoothRequest } from './types.js'
@@ -171,6 +172,7 @@ const DEFAULT_EXPIRY_SECS = 900
 // --- Rail factory ---
 
 export function createIETFPaymentRail(config: IETFPaymentRailConfig): PaymentRail {
+  assertValidRootKey(config.hmacSecret, 'hmacSecret')
   const { hmacSecret, realm, backend, storage: _storage, description } = config
   const expirySecs = config.challengeExpirySecs ?? DEFAULT_EXPIRY_SECS
   const label = config.serviceName ?? 'toll-booth'

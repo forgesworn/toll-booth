@@ -375,4 +375,14 @@ describe('sqliteStorage session settlement', () => {
     // The marker must not be left behind by the failed transaction
     expect(storage.isSettled('ph3')).toBe(false)
   })
+
+  it('closeSession reports whether this call closed the session, and a refund preimage can be recorded after', () => {
+    storage = sqliteStorage()
+    storage.createSessionWithSettlement(session)
+    expect(storage.closeSession('s1')).toBe(true)
+    expect(storage.closeSession('s1')).toBe(false)
+    expect(storage.closeSession('missing')).toBe(false)
+    storage.recordSessionRefund!('s1', 'd'.repeat(64))
+    expect(storage.getSession('s1')?.refundPreimage).toBe('d'.repeat(64))
+  })
 })

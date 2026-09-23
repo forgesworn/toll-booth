@@ -218,18 +218,21 @@ export default app
 ```typescript
 // Client requests an invoice with caveats:
 // POST /create-invoice
-// { "amountSats": 1000, "caveats": ["model = llama3", "tier = premium", "expires = 2026-12-31T00:00:00Z"] }
+// { "amountSats": 1000, "caveats": ["model = llama3", "tier = basic", "expires = 2026-12-31T00:00:00Z"] }
 
 // toll-booth forwards them to your upstream as headers:
 // X-Toll-Caveat-Model: llama3
-// X-Toll-Caveat-Tier: premium
+// X-Toll-Caveat-Tier: basic
 
-// Your upstream reads and enforces them:
+// Your upstream reads and enforces them. Caveats are chosen by whoever
+// requested the invoice, so treat them as restrictions only; never grant
+// anything because a caveat is present. Client-sent X-Toll-* headers are
+// stripped before proxying.
 app.post('/api/generate', (req, res) => {
   const model = req.headers['x-toll-caveat-model'] as string | undefined
   const tier  = req.headers['x-toll-caveat-tier'] as string | undefined
   if (tier === 'basic' && req.body.stream) {
-    return res.status(403).json({ error: 'Streaming requires premium tier' })
+    return res.status(403).json({ error: 'Streaming not available on basic tier' })
   }
   // proceed with model routing...
 })

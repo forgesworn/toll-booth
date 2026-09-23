@@ -270,11 +270,20 @@ export function memoryStorage(): StorageBackend {
       return { newBalance: session.balanceSats }
     },
 
-    closeSession(sessionId: string, refundPreimage?: string): void {
+    closeSession(sessionId: string, refundPreimage?: string): boolean {
       const session = sessions.get(sessionId)
       if (session && session.closedAt === null) {
         session.closedAt = new Date().toISOString()
         session.refundPreimage = refundPreimage ?? null
+        return true
+      }
+      return false
+    },
+
+    recordSessionRefund(sessionId: string, refundPreimage: string): void {
+      const session = sessions.get(sessionId)
+      if (session && session.closedAt !== null && session.refundPreimage === null) {
+        session.refundPreimage = refundPreimage
       }
     },
 

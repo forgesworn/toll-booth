@@ -10,6 +10,7 @@ import {
   generateTsConfig,
   TOLL_BOOTH_DENO_PACKAGE,
   tollBoothDenoSubpath,
+  rootKeyGuard,
 } from './shared.js'
 
 function generateServer(ctx: TemplateContext): string {
@@ -51,6 +52,7 @@ function generateServer(ctx: TemplateContext): string {
     lines.push(ctx.backendImport)
   }
   lines.push('')
+  lines.push(rootKeyGuard(isDeno ? 'deno' : 'node'))
 
   if (ctx.backend === 'nwc') {
     lines.push('function loadNwcUri(): string {')
@@ -130,7 +132,7 @@ function generateServer(ctx: TemplateContext): string {
     lines.push(`  upstream: ${upstream},`)
     lines.push(`  freeTier: { requestsPerDay: parseInt(${envGet('FREE_TIER_REQUESTS', '10')}, 10) },`)
     lines.push('  defaultInvoiceAmount: 1000,')
-    lines.push(`  rootKey: process.env.ROOT_KEY,`)
+    lines.push('  rootKey,')
     lines.push('  trustProxy: true,')
     lines.push('})')
     lines.push('')
@@ -165,7 +167,7 @@ function generateServer(ctx: TemplateContext): string {
     lines.push(`  upstream: ${upstream},`)
     lines.push(`  freeTier: { requestsPerDay: parseInt(${envGet('FREE_TIER_REQUESTS', '10')}, 10) },`)
     lines.push('  defaultInvoiceAmount: 1000,')
-    lines.push(`  rootKey: Deno.env.get('ROOT_KEY'),`)
+    lines.push('  rootKey,')
     lines.push('  trustProxy: true,')
     lines.push('})')
     lines.push('')
@@ -193,7 +195,7 @@ function generateServer(ctx: TemplateContext): string {
     lines.push(`  upstream: ${upstream},`)
     lines.push('  defaultInvoiceAmount: 1000,')
     lines.push(`  freeTier: { requestsPerDay: parseInt(process.env.FREE_TIER_REQUESTS ?? '10', 10) },`)
-    lines.push("  rootKey: process.env.ROOT_KEY ?? '',")
+    lines.push('  rootKey,')
     if (isCashuOnly) {
       lines.push('  rails: [],')
     }
@@ -206,7 +208,7 @@ function generateServer(ctx: TemplateContext): string {
     lines.push('')
     lines.push('const paymentApp = createPaymentApp({')
     lines.push('  storage,')
-    lines.push("  rootKey: process.env.ROOT_KEY ?? '',")
+    lines.push('  rootKey,')
     lines.push('  tiers: [],')
     lines.push('  defaultAmount: 1000,')
     if (!isCashuOnly) {
@@ -238,7 +240,7 @@ function generateServer(ctx: TemplateContext): string {
     lines.push(`  upstream: ${upstream},`)
     lines.push(`  freeTier: { requestsPerDay: parseInt(process.env.FREE_TIER_REQUESTS ?? '10', 10) },`)
     lines.push('  defaultInvoiceAmount: 1000,')
-    lines.push('  rootKey: process.env.ROOT_KEY,')
+    lines.push('  rootKey,')
     lines.push('  trustProxy: true,')
     lines.push('})')
     lines.push('')

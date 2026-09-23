@@ -4,8 +4,10 @@ import { FreeTier, CreditFreeTier, type IFreeTier } from '../free-tier.js'
 import { isBlockedCountry } from '../geo-fence.js'
 import { createL402Rail } from './l402-rail.js'
 import { normalisePricing, normalisePricingTable, normalisePath, isTieredPricing } from './payment-rail.js'
+import { canonicalisePath } from './request-path.js'
 import type { Currency, PriceInfo, PricingEntry, TieredPricing } from './payment-rail.js'
 import { hashIp } from './types.js'
+import { assertValidRootKey } from '../macaroon.js'
 import type { TollBoothRequest, TollBoothResult, TollBoothCoreConfig, ReconcileResult } from './types.js'
 
 export interface TollBoothEngine {
@@ -33,7 +35,19 @@ function normaliseTiersMap(entry: TieredPricing): Record<string, PriceInfo> {
   return result
 }
 
+/**
+ * Lookup key for a pricing route: canonical path, trailing slash stripped,
+ * lower-cased. Matching is case-insensitive so that case-insensitive
+ * upstreams (Express, ASP.NET, IIS) cannot be reached for free through a
+ * differently-cased path; the request itself is forwarded with its case.
+ */
+function pricingKey(route: string): string {
+  return normalisePath(canonicalisePath(route) ?? route).toLowerCase()
+}
+
 export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
+  assertValidRootKey(config.rootKey)
+
   // Validate tiered pricing entries: each must have a 'default' key
   for (const [route, entry] of Object.entries(config.pricing ?? {})) {
     if (typeof entry === 'object' && !('sats' in entry) && !('usd' in entry)) {
@@ -66,13 +80,14 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
       serviceName: config.serviceName,
     }),
   ]
-  // Normalise pricing keys so path variants (trailing/duplicate slashes)
-  // resolve to the configured route. Keys that collide after normalisation
-  // are ambiguous configuration and rejected at startup.
+  // Normalise pricing keys so path variants (trailing/duplicate slashes,
+  // dot segments, encoded unreserved characters, letter case) resolve to the
+  // configured route. Keys that collide after normalisation are ambiguous
+  // configuration and rejected at startup.
   const pricingByPath: Record<string, PricingEntry> = {}
   const pricingKeySources = new Map<string, string>()
   for (const [route, entry] of Object.entries(config.pricing ?? {})) {
-    const key = normalisePath(route)
+    const key = pricingKey(route)
     const existing = pricingKeySources.get(key)
     if (existing !== undefined) {
       throw new Error(`Pricing routes "${existing}" and "${route}" collide after path normalisation — configure only one.`)
@@ -84,7 +99,7 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
   const rawNormalised = config.normalisedPricing ?? normalisePricingTable(pricingByPath)
   const normalisedPricing: Record<string, PriceInfo> = {}
   for (const [route, price] of Object.entries(rawNormalised)) {
-    normalisedPricing[normalisePath(route)] = price
+    normalisedPricing[pricingKey(route)] = price
   }
 
   // One-time startup warning: with strictPricing off (the default), requests
@@ -103,10 +118,17 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
 
     async handle(req: TollBoothRequest): Promise<TollBoothResult> {
       const start = Date.now()
-      // Normalise the path once so pricing lookups, challenge issuance and
-      // credential verification all see the same canonical path regardless
-      // of adapter (Express strips one trailing slash; others don't).
-      const path = normalisePath(req.path)
+      // Canonicalise the path once so pricing lookups, challenge issuance
+      // and credential verification (including macaroon route caveats) all
+      // see the same path. The bundled adapters already pass a canonical
+      // path and forward exactly that path upstream; this repeats the work
+      // for custom adapters that call the engine directly.
+      const canonical = canonicalisePath(req.path)
+      if (canonical === null) {
+        return { action: 'challenge', status: 400, headers: {}, body: { error: 'Invalid request path' } }
+      }
+      const path = normalisePath(canonical)
+      const priceKey = path.toLowerCase()
       const normReq = path === req.path ? req : { ...req, path }
 
       // Geo-fence: block requests from sanctioned/restricted countries
@@ -117,7 +139,7 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
         }
       }
 
-      const pricedEntry = pricingByPath[path]
+      const pricedEntry = pricingByPath[priceKey]
 
       // Inner helper: issue a multi-rail 402 challenge for this route
       async function issueChallenge(): Promise<TollBoothResult> {
@@ -141,7 +163,7 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
         const challengeHeaders: Record<string, string> = {}
         const challengeBody: Record<string, unknown> = {}
 
-        const normalisedPrice = normalisedPricing[path] ?? { sats: defaultAmount }
+        const normalisedPrice = normalisedPricing[priceKey] ?? { sats: defaultAmount }
 
         // HEAD requests return a lightweight price probe without creating
         // invoices or storing state. Useful for lnget --dry-run and indexers.
@@ -276,6 +298,13 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
       for (const rail of rails) {
         if (rail.detect(normReq)) {
           const result = await Promise.resolve(rail.verify(normReq, priceInfo))
+
+          // Every debit, settlement and replay check is keyed on paymentId.
+          // An authenticated result without one would skip them all and
+          // let the credential be reused forever, so refuse it.
+          if (result.authenticated && (typeof result.paymentId !== 'string' || result.paymentId === '')) {
+            break  // fall through to challenge
+          }
 
           if (result.authenticated) {
             // Pick cost in the rail's currency. If the route has no price in
@@ -428,7 +457,7 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
 
       // No rail authenticated — check free tier
       if (freeTier) {
-        const routeCost = normalisedPricing[path]?.sats ?? defaultAmount
+        const routeCost = normalisedPricing[priceKey]?.sats ?? defaultAmount
 
         // NOTE: Credit-based free tier does not reconcile. The route cost
         // is debited upfront. If actual usage is lower, the difference is

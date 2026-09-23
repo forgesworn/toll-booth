@@ -6,8 +6,8 @@
 [![MIT licence](https://img.shields.io/badge/licence-MIT-blue.svg)](./LICENSE)
 [![Nostr](https://img.shields.io/badge/Nostr-Zap%20me-purple)](https://primal.net/p/npub1mgvlrnf5hm9yf0n5mf9nqmvarhvxkc6remu5ec3vf8r0txqkuk7su0e7q2)
 [![npm](https://img.shields.io/npm/v/@forgesworn/toll-booth)](https://www.npmjs.com/package/@forgesworn/toll-booth)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue)](https://www.typescriptlang.org/)
-[![Node](https://img.shields.io/badge/Node-%3E%3D18-green)](https://nodejs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-6-blue)](https://www.typescriptlang.org/)
+[![Node](https://img.shields.io/badge/Node-%3E%3D22-green)](https://nodejs.org/)
 [![GitHub Sponsors](https://img.shields.io/github/sponsors/TheCryptoDonkey?logo=githubsponsors&color=ea4aaa&label=Sponsor)](https://github.com/sponsors/TheCryptoDonkey)
 
 **Monetise any API with one line of code.**
@@ -115,8 +115,8 @@ curl -H "Authorization: L402 <macaroon>:<preimage>" https://jokes.trotters.dev/a
 - **L402 protocol** - industry-standard HTTP 402 payment flow with macaroon credentials
 - **Multiple Lightning backends** - Phoenixd, LND, CLN, LNbits, NWC (any Nostr Wallet Connect wallet)
 - **Alternative payment methods** - Cashu ecash tokens and xcashu (NUT-24) direct-header payments
-- **LNURLcash bearer notes** - accepts a [LUD-25](https://github.com/lnurl/luds) note URL in an `X-LNURLcash` header. One rotate at the mint is the verification, the double-spend check and the transfer of ownership.
-- **IETF Payment authentication** - implements [draft-ryan-httpauth-payment-01](https://datatracker.ietf.org/doc/draft-ryan-httpauth-payment/), the emerging standard for HTTP payment authentication. HMAC-bound stateless challenges with Lightning settlement.
+- **LNURLcash bearer notes** - accepts a note URL as specified by the proposed [LUD-25 (lnurl/luds#301)](https://github.com/lnurl/luds/pull/301) in an `X-LNURLcash` header. One rotate at the mint is the verification, the double-spend check and the transfer of ownership.
+- **IETF Payment authentication** - implements [draft-ryan-httpauth-payment-01](https://datatracker.ietf.org/doc/draft-ryan-httpauth-payment/), an expired IETF Internet-Draft for HTTP payment authentication. HMAC-bound stateless challenges with Lightning settlement.
 - **x402 stablecoin payments** - accepts [x402](https://x402.org) on-chain stablecoin payments (USDC on Base, Polygon) alongside Lightning and Cashu simultaneously
 - **Cashu-only mode** - no Lightning node required; ideal for serverless and edge deployments
 - **Credit system** - pre-paid balance with volume discount tiers
@@ -268,7 +268,7 @@ Clients pay by sending `X-Cashu: cashuB...` tokens in the request header. Proofs
 
 Unlike the `redeemCashu` callback (which integrates Cashu into the L402 payment-and-redeem flow), `xcashu` is a self-contained payment rail: the client attaches a token directly to the API request and gets access in one step — no separate redeem endpoint required. Both rails can run simultaneously; the 402 challenge will include both `WWW-Authenticate` (L402) and `X-Cashu` headers.
 
-### LNURLcash (bearer notes via LUD-25)
+### LNURLcash (bearer notes via proposed LUD-25)
 
 ```typescript
 import { Booth, meltNoteToLightning } from '@forgesworn/toll-booth'
@@ -330,7 +330,7 @@ const booth = new Booth({
 })
 ```
 
-Implements the [IETF Payment authentication scheme](https://datatracker.ietf.org/doc/draft-ryan-httpauth-payment/) - the emerging standard for HTTP payment authentication. Challenges are stateless (HMAC-SHA256 bound, no database lookup on verify), with JCS-encoded charge requests and timing-safe validation. The 402 response includes a `WWW-Authenticate: Payment` header alongside the L402 challenge, so clients can use whichever scheme they support.
+Implements the [IETF Payment authentication scheme](https://datatracker.ietf.org/doc/draft-ryan-httpauth-payment/) from draft-ryan-httpauth-payment-01, an expired IETF Internet-Draft (not a standard). Challenges are stateless (HMAC-SHA256 bound, no database lookup on verify), with JCS-encoded charge requests and timing-safe validation. The 402 response includes a `WWW-Authenticate: Payment` header alongside the L402 challenge, so clients can use whichever scheme they support.
 
 ---
 
@@ -367,7 +367,7 @@ Each backend implements the `LightningBackend` interface (`createInvoice` + `che
 | LND | Stable | Industry standard |
 | CLN | Stable | Core Lightning REST API |
 | LNbits | Stable | Any LNbits instance - self-hosted or hosted |
-| NWC | Stable | Any Nostr Wallet Connect wallet (Alby Hub, Mutiny, Umbrel, Phoenix, etc.) — E2E encrypted via NIP-44 |
+| NWC | Stable | Any Nostr Wallet Connect wallet (Alby Hub, Umbrel, Phoenix, etc.) — E2E encrypted via NIP-44 |
 
 ---
 
@@ -380,11 +380,11 @@ Each backend implements the `LightningBackend` interface (`createInvoice` + `che
 | **Language** | Go binary | TypeScript middleware |
 | **Deployment** | Standalone reverse proxy | Embeds in your app, or runs as a gateway in front of any HTTP service |
 | **Lightning node** | Requires LND | Phoenixd, LND, CLN, LNbits, NWC, or none (ecash-only) |
-| **Payment rails** | Lightning only | Lightning, Cashu ecash, xcashu (NUT-24), LNURLcash bearer notes (LUD-25), x402 stablecoins, IETF Payment - simultaneously |
+| **Payment rails** | Lightning only | Lightning, Cashu ecash, xcashu (NUT-24), LNURLcash bearer notes (proposed LUD-25, lnurl/luds#301), x402 stablecoins, IETF Payment - simultaneously |
 | **IETF Payment** | No | Yes - [draft-ryan-httpauth-payment-01](https://datatracker.ietf.org/doc/draft-ryan-httpauth-payment/) with stateless HMAC challenges |
 | **x402 stablecoins** | No | Yes - USDC on Base, Polygon via pluggable facilitator |
 | **Cashu ecash** | No | Yes - redeemCashu callback + xcashu (NUT-24) direct-header rail |
-| **LNURLcash notes** | No | Yes - LUD-25 bearer notes in an `X-LNURLcash` header, settled with one rotate |
+| **LNURLcash notes** | No | Yes - proposed LUD-25 bearer notes in an `X-LNURLcash` header, settled with one rotate |
 | **Credit system** | No | Pre-paid balance with volume discount tiers |
 | **Framework adapters** | N/A (standalone proxy) | Express, Web Standard (Deno/Bun/Workers), Hono |
 | **Serverless** | No - long-running process | Yes - Web Standard adapter runs on Cloudflare Workers, Deno, Bun |
@@ -449,7 +449,7 @@ Deploy toll-booth as a sidecar (Docker Compose, Kubernetes) or as a standalone g
 - **Set a persistent `rootKey`** (64 hex chars / 32 bytes). Without it, a random key is generated per restart and all existing macaroons become invalid. Generate one with: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
 - Use a persistent `dbPath` (default: `./toll-booth.db`).
 - Enable `strictPricing: true` to prevent unpriced routes from bypassing billing.
-- Ensure your `pricing` keys match the paths the middleware actually sees (after mounting). Paths are normalised before lookup (duplicate slashes collapsed, trailing slashes stripped), but matching is **case-sensitive** — HTTP paths are case-sensitive, so `/API/joke` does not match `/api/joke`.
+- Ensure your `pricing` keys match the paths the middleware actually sees (after mounting). Each adapter computes one canonical path, prices the request on it and forwards exactly that path upstream: dot segments are resolved, percent-encoded unreserved characters are decoded, duplicate slashes are collapsed, and encoded `/`, `\` or `.` segments and literal backslashes are rejected with 400. Pricing lookups ignore a trailing slash and are **case-insensitive**, so `/API/joke` is charged as `/api/joke` (case-insensitive upstreams such as Express would otherwise serve it for free); the path is forwarded with its original case.
 - Set `trustProxy: true` when behind a reverse proxy, or provide a `getClientIp` callback for per-client free-tier isolation.
 - If you implement `redeemCashu`, make it idempotent for the same `paymentHash` - crash recovery depends on it.
 - Rate-limit `/create-invoice` at your reverse proxy - each call creates a real Lightning invoice.
@@ -598,7 +598,9 @@ const booth = new Booth({
 
 ## Custom macaroon caveats
 
-Add application-specific restrictions to macaroons via the `/create-invoice` endpoint. Custom caveats are forwarded to your upstream service as `X-Toll-Caveat-*` headers, so your API can enforce them.
+Add application-specific restrictions to macaroons via the `/create-invoice` endpoint. Custom caveats are forwarded to your upstream service as `X-Toll-Caveat-*` request headers, so your API can enforce them.
+
+> **Caveats restrict access; they never grant it.** Whoever requests the invoice chooses its caveats, so a caveat can only narrow what a macaroon may do. Never unlock anything because a caveat is present (for example, do not serve premium features because `X-Toll-Caveat-Tier` says `premium`); charge for that with tiered pricing (for example `{ default: 5, premium: 42 }`) instead. toll-booth strips any `X-Toll-*`, `X-Credit-Balance`, `X-Free-Remaining` or `X-Session-Balance` header the client sends, so the values your upstream sees always come from a verified macaroon.
 
 ```bash
 # Request an invoice with custom caveats
@@ -606,7 +608,7 @@ curl -X POST https://api.example.com/create-invoice \
   -H 'Content-Type: application/json' \
   -d '{
     "amountSats": 1000,
-    "caveats": ["model = llama3", "tier = premium", "expires = 2026-06-01T00:00:00Z"]
+    "caveats": ["model = llama3", "tier = basic", "expires = 2026-06-01T00:00:00Z"]
   }'
 ```
 
@@ -614,10 +616,10 @@ When the client authenticates with this macaroon, toll-booth parses the caveats 
 
 ```
 X-Toll-Caveat-Model: llama3
-X-Toll-Caveat-Tier: premium
+X-Toll-Caveat-Tier: basic
 ```
 
-Your upstream API reads these headers to enforce access control. Here's a complete Express example with validation and error handling:
+Your upstream API reads these headers to narrow what the request may do. Here's a complete Express example with validation and error handling:
 
 ```typescript
 app.get('/api/generate', (req, res) => {
@@ -626,31 +628,29 @@ app.get('/api/generate', (req, res) => {
   const tier = req.headers['x-toll-caveat-tier'] as string | undefined
   const balance = Number(req.headers['x-credit-balance'] ?? 0)
 
-  // Enforce model restriction
-  const allowedModels = ['llama3', 'mistral', 'gemma']
-  if (model && !allowedModels.includes(model)) {
-    return res.status(403).json({ error: `Model "${model}" not authorised for this macaroon` })
+  // A model caveat pins the macaroon to one model
+  const requested = req.body.model ?? 'llama3'
+  if (model && requested !== model) {
+    return res.status(403).json({ error: `This macaroon is restricted to model "${model}"` })
   }
 
-  // Enforce tier restriction
+  // A basic-tier caveat removes streaming; its absence grants nothing extra
   if (tier === 'basic' && req.body.stream) {
     return res.status(403).json({ error: 'Streaming not available on basic tier' })
   }
 
-  // Use the model caveat to route the request
-  const targetModel = model ?? 'llama3'  // default if no caveat
-  // ... proceed with generation using targetModel
+  // ... proceed with generation using `requested`
 })
 ```
 
-For Hono, custom caveats are available via context variables set by the auth middleware:
+For Hono, the auth middleware sets the same headers on the request seen by downstream handlers, alongside its context variables:
 
 ```typescript
 app.get('/api/generate', (c) => {
   const balance = c.get('tollBoothCreditBalance')
   const hash = c.get('tollBoothPaymentHash')
 
-  // Custom caveats are in the proxied request headers
+  // Verified caveats are on the request headers; client-sent copies are stripped
   const model = c.req.header('x-toll-caveat-model')
   // ... enforce as needed
 })
@@ -666,7 +666,7 @@ app.get('/api/generate', (c) => {
 | `expires = 2026-06-01T00:00:00Z` | Time-limited access. Rejected after the timestamp. | 30-day access pass |
 | `ip = 203.0.113.1` | Bind the macaroon to a specific client IP. | Prevent credential sharing |
 
-**Custom caveats** (any key not in the reserved list) are parsed by toll-booth and forwarded to your upstream as `X-Toll-Caveat-*` headers. Your upstream is responsible for enforcing them. Up to 16 custom caveats per macaroon, max 1024 characters each.
+**Custom caveats** (any key not in the reserved list) are parsed by toll-booth and forwarded to your upstream as `X-Toll-Caveat-*` request headers. Your upstream is responsible for enforcing them, as restrictions only. Up to 16 custom caveats per macaroon, max 1024 characters each.
 
 **Reserved caveat keys** (`payment_hash`, `credit_balance`, `currency`) cannot be set via the API; they are managed internally by toll-booth.
 
@@ -709,7 +709,7 @@ app.get('/api/resource', (c) => {
 
 ### Express / Web Standard - response headers
 
-Express and Web Standard adapters add headers to the response returned to the client:
+Express and Web Standard adapters add these headers to the response returned to the client (caveat and tier headers are sent to the upstream only):
 
 | Header | When | Value |
 |--------|------|-------|
@@ -725,7 +725,7 @@ const balance = Number(res.headers.get('X-Credit-Balance'))
 console.log(`Credits remaining: ${balance} sats`)
 ```
 
-For upstream services (behind the proxy), toll-booth adds `X-Credit-Balance` and any `X-Toll-Caveat-*` headers to the proxied request, so your backend can read the authenticated user's state.
+For upstream services (behind the proxy), toll-booth adds `X-Credit-Balance`, `X-Toll-Tier` and any `X-Toll-Caveat-*` headers to the proxied request, so your backend can read the authenticated user's state. The Hono middleware sets the same headers on the request its downstream handlers see. Any of these headers sent by the client are removed first.
 
 ---
 

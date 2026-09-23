@@ -95,7 +95,15 @@ export interface StorageBackend {
    * marker and balance update commit or roll back together.
    */
   topUpSessionWithSettlement(sessionId: string, amount: number, paymentHash: string): { newBalance: number } | null
-  closeSession(sessionId: string, refundPreimage?: string): void
+  /**
+   * Close a session if it is still open. Implementations should return
+   * true when this call closed it and false when it was already closed or
+   * missing, so exactly one caller wins the right to refund. (`void` is
+   * accepted for older custom backends, but loses that guarantee.)
+   */
+  closeSession(sessionId: string, refundPreimage?: string): boolean | void
+  /** Record the preimage of a refund paid after the session was closed. */
+  recordSessionRefund?(sessionId: string, refundPreimage: string): void
   getExpiredSessions(): Session[]
   pruneClosedSessions(maxAgeMs: number): number
   close(): void

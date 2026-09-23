@@ -8,6 +8,7 @@ import {
   generateReadme,
   generateGitignore,
   generateTsConfig,
+  rootKeyGuard,
 } from './shared.js'
 
 function generateServer(ctx: TemplateContext): string {
@@ -21,6 +22,7 @@ import { createHonoTollBooth, type TollBoothEnv } from '@forgesworn/toll-booth/h
 import { createTollBooth } from '@forgesworn/toll-booth'
 import { memoryStorage } from '@forgesworn/toll-booth'
 
+${rootKeyGuard('node')}
 const storage = memoryStorage()
 
 const engine = createTollBooth({
@@ -29,7 +31,7 @@ const engine = createTollBooth({
   upstream: ${upstream},
   defaultInvoiceAmount: 1000,
   freeTier: { requestsPerDay: parseInt(process.env.FREE_TIER_REQUESTS ?? '10', 10) },
-  rootKey: process.env.ROOT_KEY ?? '',
+  rootKey,
   rails: [],
 })
 
@@ -40,7 +42,7 @@ const { authMiddleware, createPaymentApp } = createHonoTollBooth({
 
 const paymentApp = createPaymentApp({
   storage,
-  rootKey: process.env.ROOT_KEY ?? '',
+  rootKey,
   tiers: [],
   defaultAmount: 1000,
 })
