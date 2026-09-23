@@ -6,7 +6,7 @@ import { createL402Rail } from './l402-rail.js'
 import { normalisePricing, normalisePricingTable, normalisePath, isTieredPricing } from './payment-rail.js'
 import { canonicalisePath } from './request-path.js'
 import type { Currency, PriceInfo, PricingEntry, TieredPricing } from './payment-rail.js'
-import { hashIp } from './types.js'
+import { deriveIpHashKey, hashIp } from './types.js'
 import { assertValidRootKey } from '../macaroon.js'
 import { isTollHeader } from '../adapters/proxy-headers.js'
 import type { TollBoothRequest, TollBoothResult, TollBoothCoreConfig, ReconcileResult } from './types.js'
@@ -69,6 +69,7 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
   }
 
   const defaultAmount = config.defaultInvoiceAmount ?? 1000
+  const ipHashKey = deriveIpHashKey(config.rootKey)
   const upstream = config.upstream.replace(/\/$/, '')
   let freeTier: IFreeTier | null = null
   if (config.freeTier) {
@@ -198,7 +199,7 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
         // already over the cap. Otherwise the LSP/Phoenixd mints an invoice
         // we immediately throw away.
         if (config.invoiceRateLimit?.maxPendingPerIp) {
-          const pending = storage.pendingInvoiceCount(hashIp(req.ip))
+          const pending = storage.pendingInvoiceCount(hashIp(req.ip, ipHashKey))
           if (pending >= config.invoiceRateLimit.maxPendingPerIp) {
             return {
               action: 'challenge',
@@ -291,7 +292,7 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
         const l402Data = challengeBody.l402 as Record<string, unknown> | undefined
         if (l402Data?.payment_hash) {
           const paymentHash = l402Data.payment_hash as string
-          const ipHash = hashIp(req.ip)
+          const ipHash = hashIp(req.ip, ipHashKey)
           const statusToken = randomBytes(32).toString('hex')
           storage.storeInvoice(
             paymentHash,
@@ -515,7 +516,7 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
         // is debited upfront. If actual usage is lower, the difference is
         // not refunded to the daily budget. This is intentional — the free
         // tier is a quota, not a wallet.
-        const check = freeTier.check(hashIp(req.ip), routeCost)
+        const check = freeTier.check(hashIp(req.ip, ipHashKey), routeCost)
 
         if (check.allowed) {
           config.onRequest?.({

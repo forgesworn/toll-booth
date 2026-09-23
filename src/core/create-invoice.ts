@@ -4,7 +4,7 @@ import QRCode from 'qrcode'
 import type { LightningBackend, CreditTier } from '../types.js'
 import type { StorageBackend } from '../storage/interface.js'
 import { mintMacaroon } from '../macaroon.js'
-import { hashIp } from './types.js'
+import { deriveIpHashKey, hashIp } from './types.js'
 import type { CreateInvoiceRequest, CreateInvoiceResult } from './types.js'
 
 /** Caveat keys that control monetary value and must not be set by clients. */
@@ -33,7 +33,7 @@ export async function handleCreateInvoice(
   request: CreateInvoiceRequest,
 ): Promise<CreateInvoiceResult> {
   try {
-    const ipHash = request.clientIp ? hashIp(request.clientIp) : undefined
+    const ipHash = request.clientIp ? hashIp(request.clientIp, deriveIpHashKey(deps.rootKey)) : undefined
     if (deps.maxPendingPerIp && ipHash) {
       const pending = deps.storage.pendingInvoiceCount(ipHash)
       if (pending >= deps.maxPendingPerIp) {
