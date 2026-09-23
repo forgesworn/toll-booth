@@ -71,4 +71,4 @@ If you are building a paid API, you probably do not need to write payment code a
 - **satgate:** [github.com/TheCryptoDonkey/satgate](https://github.com/TheCryptoDonkey/satgate)
 - **toll-booth:** [github.com/forgesworn/toll-booth](https://github.com/forgesworn/toll-booth)
 - **402-mcp:** [github.com/forgesworn/402-mcp](https://github.com/forgesworn/402-mcp)
-- **Live:** [satgate.trotters.dev](https://satgate.trotters.dev)
+- **Live:** [satgate.forgesworn.dev](https://satgate.forgesworn.dev)

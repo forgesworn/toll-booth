@@ -46,7 +46,7 @@ Scaffold a project: `npx @forgesworn/toll-booth init`
 
 - Repository: https://github.com/forgesworn/toll-booth
 - npm: https://www.npmjs.com/package/@forgesworn/toll-booth
-- Production showcase: [satgate.trotters.dev](https://satgate.trotters.dev) - AI inference gateway
+- Production showcase: [satgate.forgesworn.dev](https://satgate.forgesworn.dev) - AI inference gateway
 - [Comparison with alternatives](docs/comparison.md) - vs Aperture, x402, Fewsats, Routstr
 - Guides: [Express quickstart](docs/guides/express-quickstart.md), [AI agent payments](docs/guides/ai-agent-payments.md)
 - Full docs: llms-full.txt

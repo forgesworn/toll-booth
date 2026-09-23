@@ -59,7 +59,7 @@ src/
     conformance.ts          # Shared backend conformance test factory
   e2e/                      # End-to-end integration tests
 examples/
-  sats-for-laughs/          # Complete joke API deployment (live at jokes.trotters.dev)
+  sats-for-laughs/          # Complete joke API deployment (live at jokes.forgesworn.dev)
   valhalla-proxy/           # Docker Compose reference (Express + Phoenixd)
 ```
 
