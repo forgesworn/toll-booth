@@ -1135,6 +1135,17 @@ describe('path normalisation (paywall bypass)', () => {
     }
   })
 
+  it('rejects semicolon path parameters, literal or encoded, with 400', async () => {
+    // Upstreams such as Tomcat strip `;params` before routing, so these would
+    // otherwise be priced as unknown routes here and served as /api/paid there.
+    const engine = createTollBooth(makeConfig({ pricing: { '/api/paid': 10, '/api/free': 0 } }))
+    for (const path of ['/api/paid;x=1', '/api/paid;', '/api/free;/../paid', '/api/free/..;/paid', '/api;/paid', '/api/paid%3Bx=1', '/api/free/..%3b/paid']) {
+      const result = await engine.handle(makeRequest({ path }))
+      expect(result.action, path).toBe('challenge')
+      expect((result as { status: number }).status, path).toBe(400)
+    }
+  })
+
   it('checks macaroon route caveats against the canonical path', async () => {
     const storage = memoryStorage()
     const engine = createTollBooth(makeConfig({ storage, pricing: { '/api/free/x': 1, '/api/paid': 10 } }))

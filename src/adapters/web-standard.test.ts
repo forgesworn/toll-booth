@@ -601,6 +601,9 @@ describe('Web Standard adapter canonical path (paywall bypass)', () => {
     '/api/%70aid',
     '/api%2Fpaid',
     '/api/%5Cpaid',
+    '/api/paid;x=1',
+    '/api/free/..;/paid',
+    '/api/paid%3Bx=1',
   ]
 
   for (const path of exploitPaths) {
@@ -628,6 +631,27 @@ describe('Web Standard adapter canonical path (paywall bypass)', () => {
       }
     })
   }
+
+  it('rejects semicolon path parameters without contacting the upstream', async () => {
+    const engine = createTollBooth({
+      backend: mockBackend(),
+      storage: memoryStorage(),
+      pricing: { '/api/paid': 100 },
+      upstream: 'http://upstream.test',
+      rootKey: ROOT_KEY,
+    })
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('ok', { status: 200 }))
+    try {
+      const handler = createWebStandardMiddleware({ engine, upstream: 'http://upstream.test' })
+      for (const path of ['/api/paid;x=1', '/api/free/..;/paid', '/api/paid%3Bx=1']) {
+        const res = await handler(new Request(`http://localhost${path}`))
+        expect(res.status, path).toBe(400)
+      }
+      expect(fetchSpy).not.toHaveBeenCalled()
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
 
   it('forwards exactly the canonical path that was priced', async () => {
     const engine = createTollBooth({

@@ -454,6 +454,9 @@ describe('canonical path (paywall bypass)', () => {
     '/api/%70aid',
     '/%61pi/paid',
     '/api%2Fpaid',
+    '/api/paid;x=1',
+    '/api/free/..;/paid',
+    '/api/paid%3Bx=1',
   ]
 
   for (const path of exploitPaths) {
@@ -471,6 +474,17 @@ describe('canonical path (paywall bypass)', () => {
       if (res.status !== 200) expect([400, 402]).toContain(res.status)
     })
   }
+
+  it('rejects semicolon path parameters with 400', async () => {
+    const { engine } = createTestEngine({ pricing: { '/api/paid': 100 } })
+    const { authMiddleware } = createHonoTollBooth({ engine })
+    const app = new Hono<TollBoothEnv>()
+    app.use('*', authMiddleware)
+    app.get('*', (c) => c.text('reached'))
+    for (const path of ['/api/paid;x=1', '/api/free/..;/paid', '/api/paid%3Bx=1']) {
+      expect((await app.request(path)).status, path).toBe(400)
+    }
+  })
 
   it('prices the canonical path the router matched', async () => {
     const { engine } = createTestEngine({ pricing: {} })

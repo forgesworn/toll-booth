@@ -23,6 +23,10 @@ export const MAX_PATH_LENGTH = 8192
  *   upper-cases the hex digits of every other escape;
  * - rejects encoded `/` (`%2F`), encoded `\` (`%5C`), literal backslashes,
  *   malformed escapes, and dot segments spelt with an encoded dot (`%2e%2e`);
+ * - rejects `;` and its encoding `%3B`. Many upstreams (Tomcat, Jetty,
+ *   Spring, some proxies) strip `;` path parameters before routing, so
+ *   `/paid;x=1` or `/free/..;/paid` would be priced as one path here and
+ *   served as another there;
  * - resolves `.` and `..` segments (RFC 3986 section 5.2.4), never climbing
  *   above the root;
  * - collapses duplicate slashes.
@@ -42,6 +46,8 @@ export function canonicalisePath(rawPath: string): string | null {
   if (rawPath === '') return '/'
   if (!rawPath.startsWith('/')) return null
   if (rawPath.includes('\\')) return null
+  // Path parameters: see the note above. `%3B` is caught below.
+  if (rawPath.includes(';')) return null
 
   const rawSegments = rawPath.slice(1).split('/')
   const out: string[] = []
@@ -62,7 +68,7 @@ export function canonicalisePath(rawPath: string): string | null {
       const hex = raw.slice(i + 1, i + 3)
       if (!HEX_PAIR_RE.test(hex)) return null
       const code = parseInt(hex, 16)
-      if (code === 0x2f || code === 0x5c) return null
+      if (code === 0x2f || code === 0x5c || code === 0x3b) return null
       const decoded = String.fromCharCode(code)
       if (UNRESERVED_RE.test(decoded)) {
         if (decoded === '.') encodedDot = true
