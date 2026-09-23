@@ -15,7 +15,7 @@ import { handleInvoiceStatus, renderInvoiceStatusHtml } from '../core/invoice-st
 import type { InvoiceStatusDeps } from '../core/invoice-status.js'
 import { handleCashuRedeem } from '../core/cashu-redeem.js'
 import type { CashuRedeemDeps } from '../core/cashu-redeem.js'
-import { applySecurityHeaders, appendVary, applyUpstreamTollHeaders, isTollHeader, parseForwardedIp } from './proxy-headers.js'
+import { applySecurityHeaders, appendVary, applyUpstreamTollHeaders, clientResponseHeaders, isTollHeader, parseForwardedIp } from './proxy-headers.js'
 
 const MAX_BODY_BYTES = 65_536
 
@@ -225,6 +225,14 @@ export function createHonoTollBooth(config: HonoTollBoothConfig): HonoTollBooth 
     c.req.raw = new Request(req, { headers: forwarded })
 
     await next()
+
+    // Return the client-facing engine headers (balance, free-tier counter,
+    // receipts, session token, cache directives) on the downstream
+    // response, as the Express and Web Standard adapters do. Caveat and tier
+    // headers went to the downstream handler only.
+    for (const [key, value] of Object.entries(clientResponseHeaders(result.headers))) {
+      c.header(key, value)
+    }
   }
 
   function createPaymentApp(paymentConfig: PaymentAppConfig): Hono {

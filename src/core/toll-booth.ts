@@ -8,6 +8,7 @@ import { canonicalisePath } from './request-path.js'
 import type { Currency, PriceInfo, PricingEntry, TieredPricing } from './payment-rail.js'
 import { hashIp } from './types.js'
 import { assertValidRootKey } from '../macaroon.js'
+import { isTollHeader } from '../adapters/proxy-headers.js'
 import type { TollBoothRequest, TollBoothResult, TollBoothCoreConfig, ReconcileResult } from './types.js'
 
 export interface TollBoothEngine {
@@ -16,6 +17,9 @@ export interface TollBoothEngine {
   freeTier: IFreeTier | null
   upstream: string
 }
+
+/** RFC 9110 field-name token. */
+const HEADER_NAME_RE = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/
 
 /** Valid tier name: lowercase alphanumeric, hyphens, underscores; 1-32 chars. */
 const TIER_NAME_RE = /^[a-z0-9_-]{1,32}$/
@@ -406,6 +410,16 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
                 if (/^[a-zA-Z0-9_]+$/.test(key)) {
                   headers[`X-Toll-Caveat-${key.charAt(0).toUpperCase() + key.slice(1)}`] = value.replace(/[\r\n]/g, '')
                 }
+              }
+            }
+
+            // Client-facing headers from the rail (e.g. an IETF session
+            // token). Reserved toll header names are refused so a rail
+            // cannot spoof the engine's balance or caveat headers.
+            if (result.responseHeaders) {
+              for (const [key, value] of Object.entries(result.responseHeaders)) {
+                if (!HEADER_NAME_RE.test(key) || isTollHeader(key) || typeof value !== 'string') continue
+                headers[key] = value.replace(/[\r\n]/g, '')
               }
             }
 

@@ -77,7 +77,19 @@ export interface RailVerifyResult {
    * rejects per-request settlements where amountPaid is below the route price.
    */
   amountPaid?: number
+  /**
+   * Caveat values forwarded to the upstream as `X-Toll-Caveat-<Key>`.
+   * Keys must match `[A-Za-z0-9_]+`; others are dropped.
+   */
   customCaveats?: Record<string, string>
+  /**
+   * Headers returned to the client on the proxied response (for example an
+   * IETF Payment session token). They are never forwarded to the upstream.
+   * Names must be HTTP tokens and must not use the reserved toll header
+   * names (`X-Toll-*`, `X-Credit-Balance`, `X-Free-Remaining`,
+   * `X-Session-Balance`); values have CR and LF removed.
+   */
+  responseHeaders?: Record<string, string>
 }
 
 export interface SettleResult {

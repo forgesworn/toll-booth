@@ -218,15 +218,15 @@ describe('IETF Session Rail', () => {
       expect(result.authenticated).toBe(true)
       expect(result.mode).toBe('session')
       expect(result.creditBalance).toBe(500)
-      expect(result.customCaveats?.['X-Session-Token']).toBeDefined()
-      expect(result.customCaveats?.['X-Session-Id']).toBeDefined()
-      expect(result.customCaveats?.['X-Session-Expires']).toBeDefined()
+      expect(result.responseHeaders?.['X-Session-Token']).toBeDefined()
+      expect(result.responseHeaders?.['X-Session-Id']).toBeDefined()
+      expect(result.responseHeaders?.['X-Session-Expires']).toBeDefined()
     })
 
     it('authenticates with bearer token', async () => {
       const rail = createRail()
       const { result } = await openSession(rail)
-      const bearerToken = result.customCaveats!['X-Session-Token']
+      const bearerToken = result.responseHeaders!['X-Session-Token']
 
       // Use bearer token for a request
       const bearerCredential: IETFCredential = {
@@ -244,13 +244,13 @@ describe('IETF Session Rail', () => {
     it('deducts balance via storage on bearer auth', async () => {
       const rail = createRail()
       const { result } = await openSession(rail)
-      const sessionId = result.customCaveats!['X-Session-Id']
+      const sessionId = result.responseHeaders!['X-Session-Id']
 
       // Simulate a deduction (normally done by TollBoothEngine)
       storage.deductSession(sessionId, 100)
 
       // Check balance via bearer
-      const bearerToken = result.customCaveats!['X-Session-Token']
+      const bearerToken = result.responseHeaders!['X-Session-Token']
       const bearerCredential: IETFCredential = {
         challenge: { id: '', realm: '', method: '', intent: '', request: '' },
         payload: { action: 'bearer', sessionToken: bearerToken } satisfies SessionBearerPayload,
@@ -263,7 +263,7 @@ describe('IETF Session Rail', () => {
     it('closes session and triggers refund', async () => {
       const rail = createRail()
       const { result, sessionRequest } = await openSession(rail)
-      const bearerToken = result.customCaveats!['X-Session-Token']
+      const bearerToken = result.responseHeaders!['X-Session-Token']
 
       // Get a new challenge for the close action (reuse params from open)
       const fragment = await rail.challenge('/api/test', { sats: 500 })
@@ -296,15 +296,15 @@ describe('IETF Session Rail', () => {
 
       expect(closeResult.authenticated).toBe(true)
       expect(closeResult.creditBalance).toBe(0)
-      expect(closeResult.customCaveats?.['X-Session-Closed']).toBe('true')
-      expect(closeResult.customCaveats?.['X-Refund-Status']).toBe('settled')
+      expect(closeResult.responseHeaders?.['X-Session-Closed']).toBe('true')
+      expect(closeResult.responseHeaders?.['X-Refund-Status']).toBe('settled')
     })
 
     it('closes an already-closed session gracefully (close replay)', async () => {
       const rail = createRail()
       const { result } = await openSession(rail)
-      const bearerToken = result.customCaveats!['X-Session-Token']
-      const sessionId = result.customCaveats!['X-Session-Id']
+      const bearerToken = result.responseHeaders!['X-Session-Token']
+      const sessionId = result.responseHeaders!['X-Session-Id']
 
       // Close via storage directly
       storage.closeSession(sessionId)
@@ -369,7 +369,7 @@ describe('IETF Session Rail', () => {
 
       const openResult = await rail.verify(makeRequest(encodeCredential(openCredential)))
       expect(openResult.authenticated).toBe(true)
-      const bearerToken = openResult.customCaveats!['X-Session-Token']
+      const bearerToken = openResult.responseHeaders!['X-Session-Token']
 
       // Spy on sendPayment to ensure it is NOT called
       const sendPaymentSpy = vi.spyOn(backend, 'sendPayment' as any)
@@ -398,7 +398,7 @@ describe('IETF Session Rail', () => {
 
       const closeResult = await rail.verify(makeRequest(encodeCredential(closeCredential)))
       expect(closeResult.authenticated).toBe(true)
-      expect(closeResult.customCaveats?.['X-Session-Closed']).toBe('true')
+      expect(closeResult.responseHeaders?.['X-Session-Closed']).toBe('true')
       expect(sendPaymentSpy).not.toHaveBeenCalled()
 
       sendPaymentSpy.mockRestore()
@@ -458,7 +458,7 @@ describe('IETF Session Rail', () => {
 
       const openResult = await rail.verify(makeRequest(encodeCredential(openCredential)))
       expect(openResult.authenticated).toBe(true)
-      const bearerToken = openResult.customCaveats!['X-Session-Token']
+      const bearerToken = openResult.responseHeaders!['X-Session-Token']
 
       // Close the session — sendPayment will throw, but close should still succeed
       const closeFragment = await rail.challenge('/api/test', { sats: 500 })
@@ -485,17 +485,17 @@ describe('IETF Session Rail', () => {
       // Should not throw — close succeeds even though refund fails
       const closeResult = await rail.verify(makeRequest(encodeCredential(closeCredential)))
       expect(closeResult.authenticated).toBe(true)
-      expect(closeResult.customCaveats?.['X-Session-Closed']).toBe('true')
-      expect(closeResult.customCaveats?.['X-Refund-Status']).toBe('unknown')
+      expect(closeResult.responseHeaders?.['X-Session-Closed']).toBe('true')
+      expect(closeResult.responseHeaders?.['X-Refund-Status']).toBe('unknown')
       // No refund preimage since sendPayment failed
-      expect(closeResult.customCaveats?.['X-Refund-Preimage']).toBeUndefined()
+      expect(closeResult.responseHeaders?.['X-Refund-Preimage']).toBeUndefined()
       expect(events.at(-1)?.refundStatus).toBe('unknown')
     })
 
     it('accepts top-up with same preimage as deposit (different challenge)', async () => {
       const rail = createRail()
       const { result } = await openSession(rail)
-      const bearerToken = result.customCaveats!['X-Session-Token']
+      const bearerToken = result.responseHeaders!['X-Session-Token']
 
       // Get a new challenge for the top-up
       const topupFragment = await rail.challenge('/api/test', { sats: 200 })
@@ -534,8 +534,8 @@ describe('IETF Session Rail', () => {
     it('rejects a replayed top-up (same challenge + preimage)', async () => {
       const rail = createRail()
       const { result } = await openSession(rail)
-      const bearerToken = result.customCaveats!['X-Session-Token']
-      const sessionId = result.customCaveats!['X-Session-Id']
+      const bearerToken = result.responseHeaders!['X-Session-Token']
+      const sessionId = result.responseHeaders!['X-Session-Id']
 
       // Get a new challenge for the top-up
       const topupFragment = await rail.challenge('/api/test', { sats: 200 })
@@ -579,8 +579,8 @@ describe('IETF Session Rail', () => {
       const rail = createRail()
       const { result, credential } = await openSession(rail)
       expect(result.authenticated).toBe(true)
-      const bearerToken = result.customCaveats!['X-Session-Token']
-      const sessionId = result.customCaveats!['X-Session-Id']
+      const bearerToken = result.responseHeaders!['X-Session-Token']
+      const sessionId = result.responseHeaders!['X-Session-Id']
 
       // Reuse the ORIGINAL open challenge with a topup payload — the deposit
       // payment hash was consumed at open, so this must be rejected.
@@ -601,8 +601,8 @@ describe('IETF Session Rail', () => {
     it('rejects bearer token after close', async () => {
       const rail = createRail()
       const { result, sessionRequest } = await openSession(rail)
-      const bearerToken = result.customCaveats!['X-Session-Token']
-      const sessionId = result.customCaveats!['X-Session-Id']
+      const bearerToken = result.responseHeaders!['X-Session-Token']
+      const sessionId = result.responseHeaders!['X-Session-Id']
 
       // Close via storage directly
       storage.closeSession(sessionId)
@@ -681,7 +681,7 @@ describe('IETF Session Rail', () => {
 
       const openResult = await rail.verify(makeRequest(encodeCredential(openCredential)))
       expect(openResult.authenticated).toBe(true)
-      const bearerToken = openResult.customCaveats!['X-Session-Token']
+      const bearerToken = openResult.responseHeaders!['X-Session-Token']
 
       // Try to top up 5000 sats (would make 13000 > 10000 cap)
       const topupFragment = await rail.challenge('/api/test', { sats: 5000 })
@@ -948,7 +948,7 @@ describe('IETF Session Rail', () => {
 
       const openResult = await rail.verify(makeRequest(encodeCredential(credential)))
       expect(openResult.authenticated).toBe(true)
-      const bearerToken = openResult.customCaveats!['X-Session-Token']
+      const bearerToken = openResult.responseHeaders!['X-Session-Token']
 
       // Wait for session to expire
       await new Promise((r) => setTimeout(r, 10))
@@ -999,7 +999,7 @@ describe('IETF Session Rail', () => {
         }
 
         const result = await rail.verify(makeRequest(encodeCredential(credential)))
-        tokens.push(result.customCaveats!['X-Session-Token'])
+        tokens.push(result.responseHeaders!['X-Session-Token'])
       }
 
       const unique = new Set(tokens)
@@ -1040,8 +1040,8 @@ describe('IETF Session refunds', () => {
       payload: { action: 'open', preimage: entry.preimage, returnInvoice } satisfies SessionOpenPayload,
     } as IETFCredential)))
     expect(opened.authenticated).toBe(true)
-    const sessionToken = opened.customCaveats!['X-Session-Token']
-    const sessionId = opened.customCaveats!['X-Session-Id']
+    const sessionToken = opened.responseHeaders!['X-Session-Token']
+    const sessionId = opened.responseHeaders!['X-Session-Id']
 
     const close = async () => rail.verify(makeRequest(encodeCredential({
       challenge: (await freshChallenge()).challenge,
@@ -1060,7 +1060,7 @@ describe('IETF Session refunds', () => {
     // 2500u = 250,000 sats against a 500 sat balance
     const { close, events } = await setup(INVOICE_2500U.toUpperCase(), sendPayment)
     const closed = await close()
-    expect(closed.customCaveats?.['X-Refund-Status']).toBe('amount-mismatch')
+    expect(closed.responseHeaders?.['X-Refund-Status']).toBe('amount-mismatch')
     expect(sendPayment).not.toHaveBeenCalled()
     expect(events.at(-1)?.refundStatus).toBe('amount-mismatch')
   })
@@ -1068,7 +1068,7 @@ describe('IETF Session refunds', () => {
   it('refuses an invoice that does not decode', async () => {
     const sendPayment = vi.fn().mockResolvedValue({ preimage: 'a'.repeat(64) })
     const { close } = await setup('lnbc1testreturn', sendPayment)
-    expect((await close()).customCaveats?.['X-Refund-Status']).toBe('amount-mismatch')
+    expect((await close()).responseHeaders?.['X-Refund-Status']).toBe('amount-mismatch')
     expect(sendPayment).not.toHaveBeenCalled()
   })
 
@@ -1076,7 +1076,7 @@ describe('IETF Session refunds', () => {
     const sendPayment = vi.fn().mockResolvedValue({ preimage: 'b'.repeat(64) })
     const { close, storage, sessionId } = await setup(invoiceWithHrp('lnbc5u'), sendPayment) // 500 sats
     const closed = await close()
-    expect(closed.customCaveats?.['X-Refund-Status']).toBe('settled')
+    expect(closed.responseHeaders?.['X-Refund-Status']).toBe('settled')
     expect(sendPayment).toHaveBeenCalledTimes(1)
     expect(storage.getSession(sessionId)?.refundPreimage).toBe('b'.repeat(64))
   })
@@ -1085,7 +1085,7 @@ describe('IETF Session refunds', () => {
     const sendPayment = vi.fn().mockResolvedValue({ preimage: 'b'.repeat(64) })
     // 4999990p = 499,999 msat, one msat short of the 500 sat balance
     const { close } = await setup(invoiceWithHrp('lnbc4999990p'), sendPayment)
-    expect((await close()).customCaveats?.['X-Refund-Status']).toBe('amount-mismatch')
+    expect((await close()).responseHeaders?.['X-Refund-Status']).toBe('amount-mismatch')
     expect(sendPayment).not.toHaveBeenCalled()
   })
 
@@ -1106,7 +1106,7 @@ describe('IETF Session refunds', () => {
     expect((await close()).authenticated).toBe(false)
 
     release({ preimage: 'c'.repeat(64) })
-    expect((await closing).customCaveats?.['X-Refund-Status']).toBe('settled')
+    expect((await closing).responseHeaders?.['X-Refund-Status']).toBe('settled')
     expect(sendPayment).toHaveBeenCalledTimes(1)
   })
 

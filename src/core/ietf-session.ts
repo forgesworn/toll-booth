@@ -460,7 +460,7 @@ export function createIETFSessionRail(config: IETFSessionRailConfig): PaymentRai
           mode: 'session',
           creditBalance: depositSats,
           currency: 'sat',
-          customCaveats: {
+          responseHeaders: {
             'X-Session-Token': bearerToken,
             'X-Session-Expires': expiresAt,
             'X-Session-Id': sessionId,
@@ -544,7 +544,7 @@ export function createIETFSessionRail(config: IETFSessionRailConfig): PaymentRai
           mode: 'session',
           creditBalance: 0,
           currency: 'sat',
-          customCaveats: {
+          responseHeaders: {
             'X-Session-Closed': 'true',
             'X-Refund-Status': closed.status,
             ...(closed.preimage && { 'X-Refund-Preimage': closed.preimage }),
