@@ -14,7 +14,7 @@ import { handleInvoiceStatus, renderInvoiceStatusHtml } from '../core/invoice-st
 import type { InvoiceStatusDeps } from '../core/invoice-status.js'
 import { handleCashuRedeem } from '../core/cashu-redeem.js'
 import type { CashuRedeemDeps } from '../core/cashu-redeem.js'
-import { applySecurityHeaders, appendVary, parseForwardedIp } from './proxy-headers.js'
+import { applySecurityHeaders, appendVary, applyUpstreamTollHeaders, isTollHeader, parseForwardedIp } from './proxy-headers.js'
 
 const MAX_BODY_BYTES = 65_536
 
@@ -212,6 +212,16 @@ export function createHonoTollBooth(config: HonoTollBoothConfig): HonoTollBooth 
       c.set('tollBoothTier', result.tier)
     }
     c.set('tollBoothAction', result.action)
+
+    // Downstream handlers (and any proxy they perform) read toll headers from
+    // the request. Drop client-supplied copies and set the engine's verified
+    // values, so a client cannot forge X-Toll-Caveat-* or X-Credit-Balance.
+    const forwarded = new Headers(req.headers)
+    const forged: string[] = []
+    forwarded.forEach((_value, name) => { if (isTollHeader(name)) forged.push(name) })
+    for (const name of forged) forwarded.delete(name)
+    applyUpstreamTollHeaders(forwarded, result.headers)
+    c.req.raw = new Request(req, { headers: forwarded })
 
     await next()
   }

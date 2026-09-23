@@ -3,6 +3,8 @@ import {
   appendVary,
   applyNoStoreHeaders,
   applySecurityHeaders,
+  applyUpstreamTollHeaders,
+  clientResponseHeaders,
   isPlausibleIp,
   isTrustedProxyIp,
   parseForwardedIp,
@@ -11,6 +13,35 @@ import {
 } from './proxy-headers.js'
 
 describe('proxy header helpers', () => {
+  it('strips client-supplied toll headers and applies only engine values', () => {
+    const headers = applyUpstreamTollHeaders(stripProxyRequestHeaders({
+      'X-Toll-Caveat-Role': 'admin',
+      'x-toll-tier': 'premium',
+      'X-Credit-Balance': '999999',
+      'X-Free-Remaining': '100',
+      'X-Session-Balance': '100',
+      'X-Other': 'kept',
+    }), { 'X-Toll-Caveat-Model': 'llama3', 'X-Credit-Balance': '10', 'Payment-Receipt': 'r' })
+
+    expect(headers.get('x-toll-caveat-role')).toBeNull()
+    expect(headers.get('x-toll-tier')).toBeNull()
+    expect(headers.get('x-free-remaining')).toBeNull()
+    expect(headers.get('x-session-balance')).toBeNull()
+    expect(headers.get('x-credit-balance')).toBe('10')
+    expect(headers.get('x-toll-caveat-model')).toBe('llama3')
+    expect(headers.get('payment-receipt')).toBeNull()
+    expect(headers.get('x-other')).toBe('kept')
+  })
+
+  it('keeps caveat and tier headers off the client response', () => {
+    expect(clientResponseHeaders({
+      'X-Toll-Caveat-Model': 'llama3',
+      'X-Toll-Tier': 'premium',
+      'X-Credit-Balance': '10',
+      'Payment-Receipt': 'r',
+    })).toEqual({ 'X-Credit-Balance': '10', 'Payment-Receipt': 'r' })
+  })
+
   it('strips hop-by-hop request headers plus auth headers', () => {
     const headers = stripProxyRequestHeaders({
       Authorization: 'L402 secret',

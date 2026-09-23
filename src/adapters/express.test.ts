@@ -632,11 +632,78 @@ describe('Express adapter', () => {
       try {
         const res = await request(app, '/route?tier=premium', { method: 'GET' })
         expect(res.status).toBe(200)
-        // The engine result headers are set on the client response
-        expect(res.headers.get('x-toll-tier')).toBe('premium')
+        // The resolved tier goes to the upstream, not back to the client
+        expect(upstream.receivedHeaders()['x-toll-tier']).toBe('premium')
+        expect(res.headers.get('x-toll-tier')).toBeNull()
       } finally {
         upstream.close()
         handleSpy.mockRestore()
+      }
+    })
+  })
+
+  describe('toll headers (caveat forgery)', () => {
+    async function setup() {
+      const upstream = await startRecordingUpstream()
+      const storage = memoryStorage()
+      const engine = createTollBooth({
+        backend: mockBackend(),
+        storage,
+        pricing: { '/api/paid': 10, '/api/free': 0 },
+        upstream: `http://127.0.0.1:${upstream.port}`,
+        rootKey: ROOT_KEY,
+      })
+      const app = express()
+      app.use(createExpressMiddleware(engine, `http://127.0.0.1:${upstream.port}`))
+      return { upstream, storage, app }
+    }
+
+    it('sends verified caveats and balance to the upstream, not the client', async () => {
+      const { upstream, storage, app } = await setup()
+      const preimage = randomBytes(32).toString('hex')
+      const paymentHash = createHash('sha256').update(Buffer.from(preimage, 'hex')).digest('hex')
+      const macaroon = mintMacaroon(ROOT_KEY, paymentHash, 1000, ['model = llama3'])
+      storage.settleWithCredit(paymentHash, 1000, randomBytes(32).toString('hex'))
+      try {
+        const res = await request(app, '/api/paid', {
+          headers: {
+            Authorization: `L402 ${macaroon}:${preimage}`,
+            'X-Toll-Caveat-Model': 'gpt-5',
+            'X-Toll-Caveat-Admin': 'true',
+            'X-Credit-Balance': '999999',
+          },
+        })
+        expect(res.status).toBe(200)
+        const sent = upstream.received[0].headers
+        expect(sent['x-toll-caveat-model']).toBe('llama3')
+        expect(sent['x-toll-caveat-admin']).toBeUndefined()
+        expect(sent['x-credit-balance']).toBe('990')
+        expect(res.headers.get('x-credit-balance')).toBe('990')
+        expect(res.headers.get('x-toll-caveat-model')).toBeNull()
+      } finally {
+        upstream.close()
+      }
+    })
+
+    it('strips client-forged toll headers from unauthenticated pass-through requests', async () => {
+      const { upstream, app } = await setup()
+      try {
+        const res = await request(app, '/api/unpriced', {
+          headers: {
+            'X-Toll-Caveat-Role': 'admin',
+            'X-Toll-Tier': 'premium',
+            'X-Credit-Balance': '999999',
+            'X-Free-Remaining': '100',
+          },
+        })
+        expect(res.status).toBe(200)
+        const sent = upstream.received[0].headers
+        expect(sent['x-toll-caveat-role']).toBeUndefined()
+        expect(sent['x-toll-tier']).toBeUndefined()
+        expect(sent['x-credit-balance']).toBeUndefined()
+        expect(sent['x-free-remaining']).toBeUndefined()
+      } finally {
+        upstream.close()
       }
     })
   })

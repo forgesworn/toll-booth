@@ -170,12 +170,14 @@ describe('tiered pricing end-to-end (Express adapter)', () => {
       })
       expect(res.status).toBe(200)
 
-      const body = await res.json() as { ok: boolean }
+      const body = await res.json() as { ok: boolean; tollTier?: string }
       expect(body.ok).toBe(true)
 
       // 42 sats debited from 1000 = 958 remaining
       expect(res.headers.get('x-credit-balance')).toBe('958')
-      expect(res.headers.get('x-toll-tier')).toBe('premium')
+      // The resolved tier goes to the upstream, not back to the client
+      expect(body.tollTier).toBe('premium')
+      expect(res.headers.get('x-toll-tier')).toBeNull()
     } finally {
       stack.close()
     }
@@ -193,7 +195,7 @@ describe('tiered pricing end-to-end (Express adapter)', () => {
       })
       expect(res.status).toBe(200)
       expect(res.headers.get('x-credit-balance')).toBe('995') // 1000 - 5
-      expect(res.headers.get('x-toll-tier')).toBe('default')
+      expect((await res.json() as { tollTier?: string }).tollTier).toBe('default')
     } finally {
       stack.close()
     }
@@ -212,7 +214,7 @@ describe('tiered pricing end-to-end (Express adapter)', () => {
       })
       expect(res.status).toBe(200)
       expect(res.headers.get('x-credit-balance')).toBe('995') // 1000 - 5
-      expect(res.headers.get('x-toll-tier')).toBe('default')
+      expect((await res.json() as { tollTier?: string }).tollTier).toBe('default')
     } finally {
       stack.close()
     }

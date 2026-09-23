@@ -43,7 +43,7 @@ and at most 1024 characters per caveat.
 - **`route`** - restricts the macaroon to a specific path prefix
 - **`expires`** - Unix timestamp after which the macaroon is rejected
 - **`ip`** - restricts usage to a specific client IP
-- Custom caveats are forwarded as `X-Toll-Caveat-*` headers to the upstream
+- Custom caveats are forwarded as `X-Toll-Caveat-*` request headers to the upstream. The client chooses them when requesting the invoice, so they restrict access and never grant it. Client-supplied `X-Toll-*`, `X-Credit-Balance`, `X-Free-Remaining` and `X-Session-Balance` headers are stripped before proxying, so the upstream only sees engine-derived values
 
 **Hardening measures:**
 - Maximum 16 custom caveats per macaroon

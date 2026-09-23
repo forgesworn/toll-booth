@@ -13,6 +13,8 @@ import {
   appendVary,
   applyNoStoreHeaders,
   applySecurityHeaders,
+  applyUpstreamTollHeaders,
+  clientResponseHeaders,
   parseForwardedIp,
   stripProxyRequestHeaders,
   stripProxyResponseHeaders,
@@ -55,11 +57,19 @@ async function safeParseJson<T = Record<string, unknown>>(req: Request, maxBytes
   }
 }
 
-async function proxyUpstream(upstream: string, canonicalPath: string, req: Request, timeoutMs = 30_000): Promise<Response> {
+async function proxyUpstream(
+  upstream: string,
+  canonicalPath: string,
+  req: Request,
+  engineHeaders: Record<string, string>,
+  timeoutMs = 30_000,
+): Promise<Response> {
   const url = new URL(req.url)
   // Forward exactly the canonical path that was priced.
   const target = `${upstream}${canonicalPath}${url.search}`
-  const headers = stripProxyRequestHeaders(req.headers)
+  // Client-supplied X-Toll-* / X-Credit-Balance headers are stripped; only
+  // the engine's verified values reach the upstream.
+  const headers = applyUpstreamTollHeaders(stripProxyRequestHeaders(req.headers), engineHeaders)
 
   const init: RequestInit & { duplex?: string } = {
     method: req.method,
@@ -185,9 +195,9 @@ export function createWebStandardMiddleware(
 
     if (result.action === 'pass' || result.action === 'proxy') {
       try {
-        const res = await proxyUpstream(upstreamBase, canonicalPath, req, upstreamTimeout)
+        const res = await proxyUpstream(upstreamBase, canonicalPath, req, result.headers, upstreamTimeout)
         const responseHeaders = stripProxyResponseHeaders(res.headers)
-        for (const [key, value] of Object.entries(result.headers)) {
+        for (const [key, value] of Object.entries(clientResponseHeaders(result.headers))) {
           responseHeaders.set(key, value)
         }
         for (const [key, value] of Object.entries(extraHeaders)) {

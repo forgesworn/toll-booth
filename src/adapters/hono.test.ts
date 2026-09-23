@@ -505,3 +505,52 @@ describe('canonical path (paywall bypass)', () => {
     expect(await encoded.text()).not.toBe('paid content')
   })
 })
+
+describe('toll headers (caveat forgery)', () => {
+  it('exposes verified caveats to downstream handlers and strips client-forged toll headers', async () => {
+    const { engine, storage, rootKey } = createTestEngine({ pricing: { '/api/test': 10 } })
+    const { authMiddleware } = createHonoTollBooth({ engine })
+    const preimage = randomBytes(32).toString('hex')
+    const paymentHash = createHash('sha256').update(Buffer.from(preimage, 'hex')).digest('hex')
+    const macaroon = mintMacaroon(rootKey, paymentHash, 1000, ['model = llama3'])
+    storage.settleWithCredit(paymentHash, 1000, randomBytes(32).toString('hex'))
+
+    const app = new Hono<TollBoothEnv>()
+    app.use('*', authMiddleware)
+    app.all('*', (c) => c.json({
+      model: c.req.header('x-toll-caveat-model') ?? null,
+      admin: c.req.header('x-toll-caveat-admin') ?? null,
+      balance: c.req.header('x-credit-balance') ?? null,
+      tier: c.req.header('x-toll-tier') ?? null,
+    }))
+
+    const paid = await app.request('/api/test', {
+      headers: {
+        Authorization: `L402 ${macaroon}:${preimage}`,
+        'X-Toll-Caveat-Model': 'gpt-5',
+        'X-Toll-Caveat-Admin': 'true',
+        'X-Credit-Balance': '999999',
+      },
+    })
+    expect(paid.status).toBe(200)
+    expect(await paid.json()).toEqual({ model: 'llama3', admin: null, balance: '990', tier: null })
+
+    const unpaid = await app.request('/api/unpriced', {
+      method: 'POST',
+      body: 'hello',
+      headers: { 'X-Toll-Caveat-Admin': 'true', 'X-Credit-Balance': '5', 'X-Toll-Tier': 'premium' },
+    })
+    expect(unpaid.status).toBe(200)
+    expect(await unpaid.json()).toEqual({ model: null, admin: null, balance: null, tier: null })
+  })
+
+  it('still lets downstream handlers read the request body', async () => {
+    const { engine } = createTestEngine({ pricing: {} })
+    const { authMiddleware } = createHonoTollBooth({ engine })
+    const app = new Hono<TollBoothEnv>()
+    app.use('*', authMiddleware)
+    app.post('/echo', async (c) => c.text(await c.req.text()))
+    const res = await app.request('/echo', { method: 'POST', body: 'payload' })
+    expect(await res.text()).toBe('payload')
+  })
+})

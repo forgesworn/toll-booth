@@ -13,6 +13,8 @@ import {
   appendVary,
   applyNoStoreHeaders,
   applySecurityHeaders,
+  applyUpstreamTollHeaders,
+  clientResponseHeaders,
   parseForwardedIp,
   stripProxyRequestHeaders,
   stripProxyResponseHeaders,
@@ -177,7 +179,9 @@ export function createExpressMiddleware(
           const v = Array.isArray(value) ? value.join(', ') : value
           if (v) incomingHeaders.set(key, v)
         }
-        const fwdHeaders = stripProxyRequestHeaders(incomingHeaders)
+        // Client-supplied X-Toll-* / X-Credit-Balance headers are stripped;
+        // only the engine's verified values reach the upstream.
+        const fwdHeaders = applyUpstreamTollHeaders(stripProxyRequestHeaders(incomingHeaders), result.headers)
 
         const init: RequestInit & { duplex?: string } = {
           method: req.method,
@@ -202,8 +206,9 @@ export function createExpressMiddleware(
         responseHeaders.forEach((value, key) => {
           res.setHeader(key, value)
         })
-        // Set extra headers from engine result
-        for (const [key, value] of Object.entries(result.headers)) {
+        // Set the client-facing engine headers (balance, receipts); caveat
+        // and tier headers went to the upstream only.
+        for (const [key, value] of Object.entries(clientResponseHeaders(result.headers))) {
           res.setHeader(key, value)
         }
         for (const [key, value] of Object.entries(extraHeaders)) {
