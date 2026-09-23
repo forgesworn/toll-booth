@@ -10,6 +10,7 @@ import { createHash, randomBytes } from 'node:crypto'
 import {
   fetchNoteInfo,
   hashK1,
+  newSecretsOf,
   noteSignature,
   requireNoteK1,
   resolveNoteInput,
@@ -116,7 +117,13 @@ export function createLnurlcashRail(config: LnurlcashRailConfig, storage?: Stora
   const accepted = new Set(hosts)
   // A paywall verifies on the request path, so the mint gets a short leash:
   // the kit's own default is 30s, which would hold a caller open far too long.
-  const clientOptions = { timeoutMs: config.timeoutMs ?? 10_000 }
+  // lnurlcash-kit 0.7+ refuses an unsigned mint unless told otherwise, and a
+  // rotate it refuses has already spent the note. Opt out unless this booth
+  // requires signatures itself.
+  const clientOptions = {
+    timeoutMs: config.timeoutMs ?? 10_000,
+    requireSignatures: config.requireSignature === true,
+  }
 
   return {
     type: 'lnurlcash',
@@ -167,12 +174,32 @@ export function createLnurlcashRail(config: LnurlcashRailConfig, storage?: Stora
       const requiredSats = price?.sats
       if (requiredSats === undefined) return FAIL
 
+      // Fire-and-forget: hand the operator a note this booth now owns.
+      const handOver = (k1: string, amountMsat: number, signature?: string): void => {
+        if (!config.onNoteReceived) return
+        try {
+          const result = config.onNoteReceived({
+            url: withNewK1(noteUrl, k1, amountMsat, signature),
+            k1,
+            amountMsat,
+            host: serverOf(noteUrl),
+          })
+          if (result && typeof (result as Promise<void>).catch === 'function') {
+            (result as Promise<void>).catch(() => {})
+          }
+        } catch {
+          // Callback errors never block the payment flow.
+        }
+      }
+
+      let noteMsat: number | undefined
       try {
         const k1 = requireNoteK1(noteUrl)
 
         // The mint is the authority on what the note is worth, not the
         // `amount` the URL happens to declare.
         const info = await fetchNoteInfo(noteUrl, clientOptions)
+        noteMsat = info.maxWithdrawable
 
         if (config.requireSignature) {
           const signature = noteSignature(noteUrl)
@@ -186,7 +213,6 @@ export function createLnurlcashRail(config: LnurlcashRailConfig, storage?: Stora
         // made here and only its hash goes on the wire, so this server is the
         // sole holder of the new note. A spent note fails on this call.
         const rotated = await rotateNote(info.callback, k1, clientOptions)
-        const newUrl = withNewK1(noteUrl, rotated.k1, info.maxWithdrawable, rotated.signature)
 
         // The new secret is unique per settlement, so its hash is a payment
         // id that can never collide with an earlier one.
@@ -198,22 +224,7 @@ export function createLnurlcashRail(config: LnurlcashRailConfig, storage?: Stora
           storage.settleWithCredit(paymentId, creditedSats, randomBytes(32).toString('hex'), unit)
         }
 
-        // Fire-and-forget: hand the operator the note this booth now owns.
-        if (config.onNoteReceived) {
-          try {
-            const result = config.onNoteReceived({
-              url: newUrl,
-              k1: rotated.k1,
-              amountMsat: info.maxWithdrawable,
-              host: serverOf(noteUrl),
-            })
-            if (result && typeof (result as Promise<void>).catch === 'function') {
-              (result as Promise<void>).catch(() => {})
-            }
-          } catch {
-            // Callback errors never block the payment flow.
-          }
-        }
+        handOver(rotated.k1, info.maxWithdrawable, rotated.signature)
 
         return {
           authenticated: true,
@@ -226,6 +237,12 @@ export function createLnurlcashRail(config: LnurlcashRailConfig, storage?: Stora
         // Mint unreachable, note already spent, note unknown, or an
         // ambiguous rotate. All of them fail closed: no access is granted.
         logSettlementFailure(error)
+        // A rotate that landed unsigned, or may have landed, still moved the
+        // caller's value under a secret only this booth holds. Dropping it
+        // would destroy that value, so the operator gets it to reconcile.
+        if (noteMsat !== undefined) {
+          for (const k1 of newSecretsOf(error)) handOver(k1, noteMsat)
+        }
         return FAIL
       }
     },
