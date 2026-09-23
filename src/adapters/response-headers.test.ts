@@ -11,6 +11,7 @@ import express from 'express'
 import { Hono } from 'hono'
 import { createTollBooth, type TollBoothEngine } from '../core/toll-booth.js'
 import { createIETFSessionRail } from '../core/ietf-session.js'
+import { createIETFPaymentRail } from '../core/ietf-payment.js'
 import { memoryStorage } from '../storage/memory.js'
 import { createExpressMiddleware } from './express.js'
 import { createWebStandardMiddleware } from './web-standard.js'
@@ -43,7 +44,7 @@ afterAll(async () => {
   await once(upstream, 'close')
 })
 
-function sessionEngine(): { engine: TollBoothEngine; openCredential: () => Promise<string> } {
+function sessionEngine(chargeRailFirst = false): { engine: TollBoothEngine; openCredential: () => Promise<string> } {
   const invoices = new Map<string, string>()
   const backend: LightningBackend = {
     async createInvoice() {
@@ -73,7 +74,11 @@ function sessionEngine(): { engine: TollBoothEngine; openCredential: () => Promi
     storage,
     upstream: upstreamUrl,
     pricing: { '/api/paid': 100 },
-    rails: [rail],
+    // The charge rail also accepts `Authorization: Payment`; it must leave
+    // session credentials alone whatever the rail order.
+    rails: chargeRailFirst
+      ? [createIETFPaymentRail({ hmacSecret: HMAC_SECRET, realm: REALM, backend, storage }), rail]
+      : [rail],
   })
 
   async function openCredential(): Promise<string> {
@@ -147,6 +152,12 @@ describe('client response headers reach the client in every adapter', () => {
 
   it('Web Standard', async () => {
     const { engine, openCredential } = sessionEngine()
+    const handler = createWebStandardMiddleware({ engine, upstream: upstreamUrl })
+    await expectSessionHeaders((path, init) => handler(new Request(`http://booth.test${path}`, init)), openCredential)
+  })
+
+  it('Web Standard, with the charge rail registered before the session rail', async () => {
+    const { engine, openCredential } = sessionEngine(true)
     const handler = createWebStandardMiddleware({ engine, upstream: upstreamUrl })
     await expectSessionHeaders((path, init) => handler(new Request(`http://booth.test${path}`, init)), openCredential)
   })

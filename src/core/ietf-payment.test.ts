@@ -242,6 +242,17 @@ describe('IETF Payment rail — challenge', () => {
     expect(rail.detect({ method: 'GET', path: '/', headers: { authorization: 'L402 abc:def' }, ip: '127.0.0.1' })).toBe(false)
     expect(rail.detect({ method: 'GET', path: '/', headers: {}, ip: '127.0.0.1' })).toBe(false)
   })
+
+  it('detect leaves session credentials to the session rail', () => {
+    const { backend } = knownHashBackend()
+    const rail = createIETFPaymentRail({ hmacSecret, realm: 'test.com', backend, storage: memoryStorage() })
+    for (const action of ['bearer', 'open', 'topup', 'close']) {
+      const token = Buffer.from(JSON.stringify({ payload: { action, sessionToken: 'x' } })).toString('base64url')
+      expect(rail.detect({ method: 'GET', path: '/', headers: { authorization: `Payment ${token}` }, ip: '127.0.0.1' }), action).toBe(false)
+    }
+    const charge = Buffer.from(JSON.stringify({ payload: { preimage: 'ab' } })).toString('base64url')
+    expect(rail.detect({ method: 'GET', path: '/', headers: { authorization: `Payment ${charge}` }, ip: '127.0.0.1' })).toBe(true)
+  })
 })
 
 // --- Verify flow tests ---

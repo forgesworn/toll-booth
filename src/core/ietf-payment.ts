@@ -171,6 +171,18 @@ const DEFAULT_EXPIRY_SECS = 900
 
 // --- Rail factory ---
 
+const SESSION_ACTIONS = new Set(['bearer', 'open', 'topup', 'close'])
+
+/** True when a `Payment` credential carries an IETF session action. */
+function isSessionCredential(auth: string): boolean {
+  try {
+    const decoded = JSON.parse(Buffer.from(auth.replace(/^Payment\s+/i, ''), 'base64url').toString())
+    return SESSION_ACTIONS.has(decoded?.payload?.action)
+  } catch {
+    return false
+  }
+}
+
 export function createIETFPaymentRail(config: IETFPaymentRailConfig): PaymentRail {
   assertValidRootKey(config.hmacSecret, 'hmacSecret')
   const { hmacSecret, realm, backend, storage: _storage, description } = config
@@ -187,7 +199,10 @@ export function createIETFPaymentRail(config: IETFPaymentRailConfig): PaymentRai
 
     detect(req: TollBoothRequest): boolean {
       const auth = req.headers.authorization ?? req.headers.Authorization ?? ''
-      return /^Payment\s/i.test(auth)
+      if (!/^Payment\s/i.test(auth)) return false
+      // Leave session credentials (bearer, open, top-up, close) to the
+      // session rail, so it need not be registered ahead of this one.
+      return !isSessionCredential(auth)
     },
 
     async challenge(route: string, price: PriceInfo): Promise<ChallengeFragment> {
