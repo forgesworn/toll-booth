@@ -88,6 +88,11 @@ export function generateEnvExample(envVars: Record<string, string>): string {
       lines.push(`${key}=3000`)
     } else if (key === 'FREE_TIER_REQUESTS') {
       lines.push(`${key}=10`)
+    } else if (key === 'ROOT_KEY') {
+      // Deliberately blank: the server refuses to start until it is set.
+      lines.push('# Required. Generate with: openssl rand -hex 32')
+      lines.push('# The server will not start while this is empty.')
+      lines.push(`${key}=`)
     } else {
       lines.push(`${key}=`)
     }

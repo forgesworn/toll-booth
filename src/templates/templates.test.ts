@@ -89,6 +89,12 @@ describe('shared helpers', () => {
     expect(env).toContain('# Phoenixd HTTP endpoint')
   })
 
+  it('generateEnvExample tells users how to generate ROOT_KEY', () => {
+    const env = generateEnvExample({ ROOT_KEY: 'Macaroon signing key (64-char hex; 32 bytes)' })
+    expect(env).toContain('# Required. Generate with: openssl rand -hex 32')
+    expect(env).toMatch(/^ROOT_KEY=$/m)
+  })
+
   it('generateReadme includes project name and framework info', () => {
     const readme = generateReadme('my-api', 'Express', 'Phoenixd')
 
