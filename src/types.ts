@@ -146,6 +146,12 @@ export interface LnurlcashRailConfig {
    * Called after a note has been settled, with the replacement note this
    * booth now owns. Fire-and-forget: the rail does NOT await this callback.
    * Use it to melt, persist or forward the note.
+   *
+   * Also called when a rotate landed, or may have landed, but settlement
+   * could not be confirmed (no signature, or the answer was lost). Access
+   * is refused in that case, but the replacement secret is only held here,
+   * so it is handed over for the operator to reconcile rather than dropped.
+   * Such a note may turn out to be unspendable.
    */
   onNoteReceived?: (note: ReceivedNote) => void | Promise<void>
 }
