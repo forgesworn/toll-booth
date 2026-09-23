@@ -8,6 +8,7 @@ import { handleInvoiceStatus, renderInvoiceStatusHtml } from '../core/invoice-st
 import { handleCashuRedeem } from '../core/cashu-redeem.js'
 import type { CashuRedeemDeps } from '../core/cashu-redeem.js'
 import { PAYMENT_HASH_RE } from '../core/types.js'
+import { canonicalisePath, splitRequestTarget } from '../core/request-path.js'
 import {
   appendVary,
   applyNoStoreHeaders,
@@ -93,19 +94,17 @@ function htmlWithSensitiveHeaders(
   res.status(status).type('html').send(html)
 }
 
-function buildUpstreamTarget(upstreamBase: string, originalUrl: string): string {
-  const incoming = new URL(originalUrl, 'http://localhost')
+/**
+ * Build the upstream URL from the canonical path that was priced. The path
+ * is appended verbatim (it is already canonical) so the upstream receives
+ * exactly the path the engine priced; nothing is re-resolved here.
+ */
+function buildUpstreamTarget(upstreamBase: string, canonicalPath: string, search: string): string {
   const upstream = new URL(upstreamBase)
   const upstreamPath = upstream.pathname.endsWith('/')
     ? upstream.pathname.slice(0, -1)
     : upstream.pathname
-  const incomingPath = incoming.pathname.startsWith('/')
-    ? incoming.pathname
-    : `/${incoming.pathname}`
-
-  upstream.pathname = `${upstreamPath}${incomingPath}` || '/'
-  upstream.search = incoming.search
-  return upstream.href
+  return `${upstream.origin}${upstreamPath}${canonicalPath}${search}`
 }
 
 export function createExpressMiddleware(
@@ -147,8 +146,16 @@ export function createExpressMiddleware(
       headers[key] = Array.isArray(value) ? value.join(', ') : value
     }
 
+    // One canonical path for both pricing and forwarding. originalUrl is
+    // the raw request target, including any mount prefix.
+    const target = splitRequestTarget(req.originalUrl)
+    const canonicalPath = canonicalisePath(target.path)
+    if (canonicalPath === null) {
+      jsonWithSensitiveHeaders(res, { error: 'Invalid request path' }, 400)
+      return
+    }
+
     try {
-      const fullPath = (req.baseUrl + req.path).replace(/\/$/, '') || '/'
 
       const rawTier = req.query.tier
       const tier = (Array.isArray(rawTier) ? rawTier[0] : rawTier) as string | undefined
@@ -156,7 +163,7 @@ export function createExpressMiddleware(
 
       const result = await engine.handle({
         method: req.method,
-        path: fullPath,
+        path: canonicalPath,
         headers,
         ip,
         tier,
@@ -164,7 +171,7 @@ export function createExpressMiddleware(
 
       if (result.action === 'pass' || result.action === 'proxy') {
         // Proxy to upstream
-        const target = buildUpstreamTarget(upstreamBase, req.originalUrl)
+        const upstreamUrl = buildUpstreamTarget(upstreamBase, canonicalPath, target.search)
         const incomingHeaders = new Headers()
         for (const [key, value] of Object.entries(req.headers)) {
           const v = Array.isArray(value) ? value.join(', ') : value
@@ -190,7 +197,7 @@ export function createExpressMiddleware(
           }
         }
 
-        const upstream_res = await fetch(target, init as RequestInit)
+        const upstream_res = await fetch(upstreamUrl, init as RequestInit)
         const responseHeaders = stripProxyResponseHeaders(upstream_res.headers)
         responseHeaders.forEach((value, key) => {
           res.setHeader(key, value)

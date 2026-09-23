@@ -444,3 +444,64 @@ describe('Hono adapter integration', () => {
     expect(body.newBalance).toBe(995) // 1000 - 10 (estimated) + 5 (refund)
   })
 })
+
+describe('canonical path (paywall bypass)', () => {
+  const exploitPaths = [
+    '/x/../api/paid',
+    '/x/%2e%2e/api/paid',
+    '//evil.example/api/paid',
+    '/API/paid',
+    '/api/%70aid',
+    '/%61pi/paid',
+    '/api%2Fpaid',
+  ]
+
+  for (const path of exploitPaths) {
+    it(`never serves the paid handler for ${path} unpaid`, async () => {
+      const { engine } = createTestEngine({ pricing: { '/api/paid': 100 } })
+      const { authMiddleware } = createHonoTollBooth({ engine })
+      const app = new Hono<TollBoothEnv>()
+      app.use('*', authMiddleware)
+      app.get('/api/paid', (c) => c.text('paid content'))
+      app.get('*', (c) => c.text('other'))
+
+      const res = await app.request(path)
+      const body = await res.text()
+      expect(body).not.toBe('paid content')
+      if (res.status !== 200) expect([400, 402]).toContain(res.status)
+    })
+  }
+
+  it('prices the canonical path the router matched', async () => {
+    const { engine } = createTestEngine({ pricing: {} })
+    const handle = vi.spyOn(engine, 'handle')
+    const { authMiddleware } = createHonoTollBooth({ engine })
+    const app = new Hono<TollBoothEnv>()
+    app.use('*', authMiddleware)
+    app.get('*', (c) => c.text('ok'))
+
+    await app.request('/api/%70aid/%7Euser')
+    expect(handle.mock.calls[0][0].path).toBe('/api/paid/~user')
+  })
+
+  it('rejects a macaroon route caveat escape', async () => {
+    const { engine, storage, rootKey } = createTestEngine({ pricing: { '/api/free/x': 1, '/api/paid': 100 } })
+    const { authMiddleware } = createHonoTollBooth({ engine })
+    const preimage = randomBytes(32).toString('hex')
+    const paymentHash = createHash('sha256').update(Buffer.from(preimage, 'hex')).digest('hex')
+    const macaroon = mintMacaroon(rootKey, paymentHash, 1000, ['route = /api/free/*'])
+    storage.settleWithCredit(paymentHash, 1000, randomBytes(32).toString('hex'))
+
+    const app = new Hono<TollBoothEnv>()
+    app.use('*', authMiddleware)
+    app.get('/api/free/x', (c) => c.text('free'))
+    app.get('/api/paid', (c) => c.text('paid content'))
+    const headers = { Authorization: `L402 ${macaroon}:${preimage}` }
+
+    expect((await app.request('/api/free/x', { headers })).status).toBe(200)
+    const escaped = await app.request('/api/free/../%70aid', { headers })
+    expect(await escaped.text()).not.toBe('paid content')
+    const encoded = await app.request('/API/paid', { headers })
+    expect(await encoded.text()).not.toBe('paid content')
+  })
+})

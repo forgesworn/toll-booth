@@ -449,7 +449,7 @@ Deploy toll-booth as a sidecar (Docker Compose, Kubernetes) or as a standalone g
 - **Set a persistent `rootKey`** (64 hex chars / 32 bytes). Without it, a random key is generated per restart and all existing macaroons become invalid. Generate one with: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
 - Use a persistent `dbPath` (default: `./toll-booth.db`).
 - Enable `strictPricing: true` to prevent unpriced routes from bypassing billing.
-- Ensure your `pricing` keys match the paths the middleware actually sees (after mounting). Paths are normalised before lookup (duplicate slashes collapsed, trailing slashes stripped), but matching is **case-sensitive** — HTTP paths are case-sensitive, so `/API/joke` does not match `/api/joke`.
+- Ensure your `pricing` keys match the paths the middleware actually sees (after mounting). Each adapter computes one canonical path, prices the request on it and forwards exactly that path upstream: dot segments are resolved, percent-encoded unreserved characters are decoded, duplicate slashes are collapsed, and encoded `/`, `\` or `.` segments and literal backslashes are rejected with 400. Pricing lookups ignore a trailing slash and are **case-insensitive**, so `/API/joke` is charged as `/api/joke` (case-insensitive upstreams such as Express would otherwise serve it for free); the path is forwarded with its original case.
 - Set `trustProxy: true` when behind a reverse proxy, or provide a `getClientIp` callback for per-client free-tier isolation.
 - If you implement `redeemCashu`, make it idempotent for the same `paymentHash` - crash recovery depends on it.
 - Rate-limit `/create-invoice` at your reverse proxy - each call creates a real Lightning invoice.

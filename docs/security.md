@@ -188,7 +188,7 @@ Hardening applied to the stateless payment rails:
 ### Request validation
 
 - Authorization header format is strictly validated (`L402 <base64>:<hex64>`)
-- Request paths are normalised once in the engine before pricing lookup (duplicate slashes collapsed, trailing slashes stripped), so `/api/joke/`, `/api//joke` and `/api/joke` are priced identically across all adapters. Pricing keys are normalised at startup and key collisions throw.
+- Every adapter computes one canonical request path and uses it for both pricing and forwarding: dot segments resolved, percent-encoded unreserved characters decoded, duplicate slashes collapsed, and encoded `/`, `\` or `.` segments and backslashes rejected with 400. The upstream receives exactly the path that was priced, so `/x/../api/joke`, `/api/%6aoke` and `//host/api/joke` cannot reach a paid route unpriced, and macaroon `route` caveats are checked against the same path. Pricing lookups ignore trailing slashes and are case-insensitive (`/API/joke` is charged as `/api/joke`). Pricing keys are normalised at startup and key collisions throw.
 - Payment hashes are validated as 64-character hex strings
 - Invoice amounts are validated as positive integers within safe bounds
 - BOLT-11 strings and Cashu tokens have length limits enforced

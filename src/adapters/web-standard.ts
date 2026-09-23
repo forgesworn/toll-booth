@@ -8,6 +8,7 @@ import { handleInvoiceStatus, renderInvoiceStatusHtml } from '../core/invoice-st
 import { handleCashuRedeem } from '../core/cashu-redeem.js'
 import type { CashuRedeemDeps } from '../core/cashu-redeem.js'
 import { PAYMENT_HASH_RE } from '../core/types.js'
+import { canonicalisePath } from '../core/request-path.js'
 import {
   appendVary,
   applyNoStoreHeaders,
@@ -54,9 +55,10 @@ async function safeParseJson<T = Record<string, unknown>>(req: Request, maxBytes
   }
 }
 
-async function proxyUpstream(upstream: string, req: Request, timeoutMs = 30_000): Promise<Response> {
+async function proxyUpstream(upstream: string, canonicalPath: string, req: Request, timeoutMs = 30_000): Promise<Response> {
   const url = new URL(req.url)
-  const target = `${upstream}${url.pathname}${url.search}`
+  // Forward exactly the canonical path that was priced.
+  const target = `${upstream}${canonicalPath}${url.search}`
   const headers = stripProxyRequestHeaders(req.headers)
 
   const init: RequestInit & { duplex?: string } = {
@@ -163,9 +165,18 @@ export function createWebStandardMiddleware(
         : 'unknown'
     const headers = Object.fromEntries(req.headers.entries())
 
+    // One canonical path for both pricing and forwarding.
+    const canonicalPath = canonicalisePath(url.pathname)
+    if (canonicalPath === null) {
+      return Response.json(
+        { error: 'Invalid request path' },
+        { status: 400, headers: applyNoStoreHeaders(new Headers(extraHeaders)) },
+      )
+    }
+
     const result = await engine.handle({
       method: req.method,
-      path: url.pathname,
+      path: canonicalPath,
       headers,
       ip,
       body: req.body,
@@ -174,7 +185,7 @@ export function createWebStandardMiddleware(
 
     if (result.action === 'pass' || result.action === 'proxy') {
       try {
-        const res = await proxyUpstream(upstreamBase, req, upstreamTimeout)
+        const res = await proxyUpstream(upstreamBase, canonicalPath, req, upstreamTimeout)
         const responseHeaders = stripProxyResponseHeaders(res.headers)
         for (const [key, value] of Object.entries(result.headers)) {
           responseHeaders.set(key, value)

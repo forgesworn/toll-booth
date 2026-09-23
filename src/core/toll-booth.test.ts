@@ -1006,15 +1006,49 @@ describe('path normalisation (paywall bypass)', () => {
     expect(result2.action).toBe('challenge')
   })
 
-  it('keeps matching case-sensitive (HTTP paths are case-sensitive)', async () => {
+  it('matches pricing case-insensitively so case-insensitive upstreams are not reachable for free', async () => {
     const engine = createTollBooth(makeConfig())
-    // '/ROUTE' is a different resource — unpriced, so it passes (strictPricing off)
-    const result = await engine.handle(makeRequest({ path: '/ROUTE' }))
-    expect(result.action).toBe('pass')
-    // With strictPricing, it is charged instead
-    const strict = createTollBooth(makeConfig({ strictPricing: true }))
-    const strictResult = await strict.handle(makeRequest({ path: '/ROUTE' }))
-    expect(strictResult.action).toBe('challenge')
+    for (const path of ['/ROUTE', '/Route', '/rOuTe/']) {
+      const result = await engine.handle(makeRequest({ path }))
+      expect(result.action, path).toBe('challenge')
+    }
+  })
+
+  it('throws when pricing keys differ only by case', () => {
+    expect(() => createTollBooth(makeConfig({ pricing: { '/a': 1, '/A': 2 } })))
+      .toThrow(/collide/)
+  })
+
+  it('challenges dot-segment and percent-encoded variants of priced routes', async () => {
+    const engine = createTollBooth(makeConfig({ pricing: { '/api/paid': 10 } }))
+    for (const path of ['/x/../api/paid', '/api/./paid', '/api/%70aid', '/%61pi/paid', '/api/free/../paid']) {
+      const result = await engine.handle(makeRequest({ path }))
+      expect(result.action, path).toBe('challenge')
+    }
+  })
+
+  it('rejects encoded dot segments, encoded slashes and backslashes with 400', async () => {
+    const engine = createTollBooth(makeConfig({ pricing: { '/api/paid': 10 } }))
+    for (const path of ['/x/%2e%2e/api/paid', '/x/.%2E/api/paid', '/api%2Fpaid', '/api%5cpaid', '/x\\..\\api/paid', '/api/%zz']) {
+      const result = await engine.handle(makeRequest({ path }))
+      expect(result.action, path).toBe('challenge')
+      expect((result as { status: number }).status, path).toBe(400)
+    }
+  })
+
+  it('checks macaroon route caveats against the canonical path', async () => {
+    const storage = memoryStorage()
+    const engine = createTollBooth(makeConfig({ storage, pricing: { '/api/free/x': 1, '/api/paid': 10 } }))
+    const { preimage, paymentHash } = makePreimageAndHash()
+    const macaroon = mintMacaroon(ROOT_KEY, paymentHash, 100, ['route = /api/free/*'])
+    storage.settleWithCredit(paymentHash, 100, randomBytes(32).toString('hex'))
+    const auth = { authorization: `L402 ${macaroon}:${preimage}` }
+
+    const allowed = await engine.handle(makeRequest({ path: '/api/free/x', headers: auth }))
+    expect(allowed.action).toBe('proxy')
+
+    const escaped = await engine.handle(makeRequest({ path: '/api/free/../paid', headers: auth }))
+    expect(escaped.action).toBe('challenge')
   })
 
   it('normalises pricing table keys so configured trailing slashes still match', async () => {

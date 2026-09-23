@@ -5,6 +5,7 @@ import type { ContentfulStatusCode } from 'hono/utils/http-status'
 import type { TollBoothEngine } from '../core/toll-booth.js'
 import type { TollBoothRequest, CreateInvoiceRequest, CashuRedeemRequest } from '../core/types.js'
 import { PAYMENT_HASH_RE } from '../core/types.js'
+import { canonicalisePath } from '../core/request-path.js'
 import type { LightningBackend, CreditTier } from '../types.js'
 import type { StorageBackend } from '../storage/interface.js'
 import { handleCreateInvoice } from '../core/create-invoice.js'
@@ -166,9 +167,20 @@ export function createHonoTollBooth(config: HonoTollBoothConfig): HonoTollBooth 
         : undefined)
       ?? '0.0.0.0'
 
+    // Hono routes on a percent-decoded path, so price on the canonical
+    // (decoded, dot-resolved) path rather than the raw one: otherwise
+    // `/api/%70aid` is priced as an unknown route yet routed to `/api/paid`.
+    const canonicalPath = canonicalisePath(new URL(req.url).pathname)
+    if (canonicalPath === null) {
+      c.header('Cache-Control', 'no-store')
+      c.header('Pragma', 'no-cache')
+      c.header('X-Content-Type-Options', 'nosniff')
+      return c.json({ error: 'Invalid request path' }, 400)
+    }
+
     const tollReq: TollBoothRequest = {
       method: req.method,
-      path: new URL(req.url).pathname,
+      path: canonicalPath,
       headers: Object.fromEntries(req.headers.entries()),
       ip,
       body: req.body,
