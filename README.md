@@ -6,8 +6,8 @@
 [![MIT licence](https://img.shields.io/badge/licence-MIT-blue.svg)](./LICENSE)
 [![Nostr](https://img.shields.io/badge/Nostr-Zap%20me-purple)](https://primal.net/p/npub1mgvlrnf5hm9yf0n5mf9nqmvarhvxkc6remu5ec3vf8r0txqkuk7su0e7q2)
 [![npm](https://img.shields.io/npm/v/@forgesworn/toll-booth)](https://www.npmjs.com/package/@forgesworn/toll-booth)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue)](https://www.typescriptlang.org/)
-[![Node](https://img.shields.io/badge/Node-%3E%3D18-green)](https://nodejs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-6-blue)](https://www.typescriptlang.org/)
+[![Node](https://img.shields.io/badge/Node-%3E%3D22-green)](https://nodejs.org/)
 [![GitHub Sponsors](https://img.shields.io/github/sponsors/TheCryptoDonkey?logo=githubsponsors&color=ea4aaa&label=Sponsor)](https://github.com/sponsors/TheCryptoDonkey)
 
 **Monetise any API with one line of code.**
@@ -115,8 +115,8 @@ curl -H "Authorization: L402 <macaroon>:<preimage>" https://jokes.trotters.dev/a
 - **L402 protocol** - industry-standard HTTP 402 payment flow with macaroon credentials
 - **Multiple Lightning backends** - Phoenixd, LND, CLN, LNbits, NWC (any Nostr Wallet Connect wallet)
 - **Alternative payment methods** - Cashu ecash tokens and xcashu (NUT-24) direct-header payments
-- **LNURLcash bearer notes** - accepts a [LUD-25](https://github.com/lnurl/luds) note URL in an `X-LNURLcash` header. One rotate at the mint is the verification, the double-spend check and the transfer of ownership.
-- **IETF Payment authentication** - implements [draft-ryan-httpauth-payment-01](https://datatracker.ietf.org/doc/draft-ryan-httpauth-payment/), the emerging standard for HTTP payment authentication. HMAC-bound stateless challenges with Lightning settlement.
+- **LNURLcash bearer notes** - accepts a note URL as specified by the proposed [LUD-25 (lnurl/luds#301)](https://github.com/lnurl/luds/pull/301) in an `X-LNURLcash` header. One rotate at the mint is the verification, the double-spend check and the transfer of ownership.
+- **IETF Payment authentication** - implements [draft-ryan-httpauth-payment-01](https://datatracker.ietf.org/doc/draft-ryan-httpauth-payment/), an expired IETF Internet-Draft for HTTP payment authentication. HMAC-bound stateless challenges with Lightning settlement.
 - **x402 stablecoin payments** - accepts [x402](https://x402.org) on-chain stablecoin payments (USDC on Base, Polygon) alongside Lightning and Cashu simultaneously
 - **Cashu-only mode** - no Lightning node required; ideal for serverless and edge deployments
 - **Credit system** - pre-paid balance with volume discount tiers
@@ -268,7 +268,7 @@ Clients pay by sending `X-Cashu: cashuB...` tokens in the request header. Proofs
 
 Unlike the `redeemCashu` callback (which integrates Cashu into the L402 payment-and-redeem flow), `xcashu` is a self-contained payment rail: the client attaches a token directly to the API request and gets access in one step — no separate redeem endpoint required. Both rails can run simultaneously; the 402 challenge will include both `WWW-Authenticate` (L402) and `X-Cashu` headers.
 
-### LNURLcash (bearer notes via LUD-25)
+### LNURLcash (bearer notes via proposed LUD-25)
 
 ```typescript
 import { Booth, meltNoteToLightning } from '@forgesworn/toll-booth'
@@ -330,7 +330,7 @@ const booth = new Booth({
 })
 ```
 
-Implements the [IETF Payment authentication scheme](https://datatracker.ietf.org/doc/draft-ryan-httpauth-payment/) - the emerging standard for HTTP payment authentication. Challenges are stateless (HMAC-SHA256 bound, no database lookup on verify), with JCS-encoded charge requests and timing-safe validation. The 402 response includes a `WWW-Authenticate: Payment` header alongside the L402 challenge, so clients can use whichever scheme they support.
+Implements the [IETF Payment authentication scheme](https://datatracker.ietf.org/doc/draft-ryan-httpauth-payment/) from draft-ryan-httpauth-payment-01, an expired IETF Internet-Draft (not a standard). Challenges are stateless (HMAC-SHA256 bound, no database lookup on verify), with JCS-encoded charge requests and timing-safe validation. The 402 response includes a `WWW-Authenticate: Payment` header alongside the L402 challenge, so clients can use whichever scheme they support.
 
 ---
 
@@ -367,7 +367,7 @@ Each backend implements the `LightningBackend` interface (`createInvoice` + `che
 | LND | Stable | Industry standard |
 | CLN | Stable | Core Lightning REST API |
 | LNbits | Stable | Any LNbits instance - self-hosted or hosted |
-| NWC | Stable | Any Nostr Wallet Connect wallet (Alby Hub, Mutiny, Umbrel, Phoenix, etc.) — E2E encrypted via NIP-44 |
+| NWC | Stable | Any Nostr Wallet Connect wallet (Alby Hub, Umbrel, Phoenix, etc.) — E2E encrypted via NIP-44 |
 
 ---
 
@@ -380,11 +380,11 @@ Each backend implements the `LightningBackend` interface (`createInvoice` + `che
 | **Language** | Go binary | TypeScript middleware |
 | **Deployment** | Standalone reverse proxy | Embeds in your app, or runs as a gateway in front of any HTTP service |
 | **Lightning node** | Requires LND | Phoenixd, LND, CLN, LNbits, NWC, or none (ecash-only) |
-| **Payment rails** | Lightning only | Lightning, Cashu ecash, xcashu (NUT-24), LNURLcash bearer notes (LUD-25), x402 stablecoins, IETF Payment - simultaneously |
+| **Payment rails** | Lightning only | Lightning, Cashu ecash, xcashu (NUT-24), LNURLcash bearer notes (proposed LUD-25, lnurl/luds#301), x402 stablecoins, IETF Payment - simultaneously |
 | **IETF Payment** | No | Yes - [draft-ryan-httpauth-payment-01](https://datatracker.ietf.org/doc/draft-ryan-httpauth-payment/) with stateless HMAC challenges |
 | **x402 stablecoins** | No | Yes - USDC on Base, Polygon via pluggable facilitator |
 | **Cashu ecash** | No | Yes - redeemCashu callback + xcashu (NUT-24) direct-header rail |
-| **LNURLcash notes** | No | Yes - LUD-25 bearer notes in an `X-LNURLcash` header, settled with one rotate |
+| **LNURLcash notes** | No | Yes - proposed LUD-25 bearer notes in an `X-LNURLcash` header, settled with one rotate |
 | **Credit system** | No | Pre-paid balance with volume discount tiers |
 | **Framework adapters** | N/A (standalone proxy) | Express, Web Standard (Deno/Bun/Workers), Hono |
 | **Serverless** | No - long-running process | Yes - Web Standard adapter runs on Cloudflare Workers, Deno, Bun |

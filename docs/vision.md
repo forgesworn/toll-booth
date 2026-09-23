@@ -22,7 +22,7 @@ No accounts. No API keys. No OAuth dance. No PII exchanged. The client pays; the
 
 A single protocol. Multiple rails. The client picks how to pay.
 
-**Lightning** — the interoperability backbone. toll-booth speaks to five backends: Phoenixd (simplest self-hosted option), LND (industry standard), Core Lightning, LNbits (any instance — self-hosted or hosted), and NWC (any Nostr Wallet Connect wallet — Alby Hub, Mutiny, Umbrel, Phoenix, and more). Use what you already run. No vendor lock-in.
+**Lightning** — the interoperability backbone. toll-booth speaks to five backends: Phoenixd (simplest self-hosted option), LND (industry standard), Core Lightning, LNbits (any instance — self-hosted or hosted), and NWC (any Nostr Wallet Connect wallet — Alby Hub, Umbrel, Phoenix, and more). Use what you already run. No vendor lock-in.
 
 **Cashu** — ecash tokens. No Lightning node required. No channel liquidity. No routing failures. Mint tokens from any Cashu mint, redeem them at the toll booth, receive access. This is the edge computing play: a Cloudflare Worker can gate an API behind Cashu payments without a single piece of Lightning infrastructure. Instant, offline-capable, privacy-preserving.
 

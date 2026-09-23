@@ -1,3 +1,5 @@
+> **Historical report.** This audit covers v4.4.2 only. It predates the x402, LNURLcash and IETF session rails, and its findings do not describe the current release. See [SECURITY.md](./SECURITY.md) for the current security policy.
+
 # Security Audit Report: @forgesworn/toll-booth v4.4.2
 
 **Date:** 2026-03-27

@@ -44,7 +44,7 @@ At least one payment method is required. Multiple rails can be active simultaneo
 |--------|------|-------------|
 | `x402` | `X402RailConfig` | x402 stablecoin payments (USDC on Base, Polygon). Requires `receiverAddress`, `network`, and a `facilitator`. |
 | `xcashu` | `XCashuConfig` | xcashu (NUT-24) direct-header Cashu payments. Requires `mints` (array of accepted mint URLs). Optional `unit` (default `'sat'`) and `onProofsReceived` callback. |
-| `lnurlcash` | `LnurlcashRailConfig` | LNURLcash (LUD-25) bearer notes presented in an `X-LNURLcash` header. Requires `mints` (accepted mint hosts). Optional `unit` (default `'sat'`), `requireSignature` (default `false`), `timeoutMs` (default `10000`) and `onNoteReceived` callback. |
+| `lnurlcash` | `LnurlcashRailConfig` | LNURLcash bearer notes (proposed LUD-25, lnurl/luds#301) presented in an `X-LNURLcash` header. Requires `mints` (accepted mint hosts). Optional `unit` (default `'sat'`), `requireSignature` (default `false`), `timeoutMs` (default `10000`) and `onNoteReceived` callback. |
 | `ietfPayment` | `IETFPaymentConfig` | IETF Payment authentication (draft-ryan-httpauth-payment-01). Requires `realm`. Optional `hmacSecret` (auto-derived from rootKey), `challengeExpirySecs` (default 900), `description`. Requires a Lightning backend. |
 | `ietfSession` | `SessionConfig` | IETF Payment session intent for streaming payments. Requires `ietfPayment` and a Lightning backend with `sendPayment()`. Optional `maxSessionDurationMs`, `maxDepositSats`, `sessionPruneIntervalMs`. |
 | `redeemCashu` | `(token: string, paymentHash: string) => Promise<number>` | Cashu redemption callback. Returns credited amount in sats. Must be idempotent for crash recovery. Enables Cashu option on the payment page. |
