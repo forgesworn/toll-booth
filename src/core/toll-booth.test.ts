@@ -359,6 +359,105 @@ describe('reconcile', () => {
   })
 })
 
+describe('reconcile: one estimate per request', () => {
+  function credit(storage = memoryStorage(), balance = 1000) {
+    const { preimage, paymentHash } = makePreimageAndHash()
+    const macaroon = mintMacaroon(ROOT_KEY, paymentHash, balance)
+    return { storage, paymentHash, authorization: `L402 ${macaroon}:${preimage}` }
+  }
+
+  it('settles concurrent requests on one credential against their own price', async () => {
+    const { storage, paymentHash, authorization } = credit()
+    const engine = createTollBooth(makeConfig({ storage, pricing: { '/dear': 500, '/cheap': 1 } }))
+
+    const dear = await engine.handle(makeRequest({ path: '/dear', headers: { authorization } }))
+    const cheap = await engine.handle(makeRequest({ path: '/cheap', headers: { authorization } }))
+    if (dear.action !== 'proxy' || cheap.action !== 'proxy') throw new Error('expected proxy')
+    expect(storage.balance(paymentHash)).toBe(499)
+    expect(dear.reconcileId).toBeDefined()
+    expect(cheap.reconcileId).not.toBe(dear.reconcileId)
+
+    // The cheap request reports 10: it owes 9 more, not a 490 refund
+    // computed from the dear request's estimate.
+    const r1 = engine.reconcile(paymentHash, 10, cheap.reconcileId)
+    expect(r1.delta).toBe(-9)
+    expect(r1.newBalance).toBe(490)
+
+    const r2 = engine.reconcile(paymentHash, 500, dear.reconcileId)
+    expect(r2.adjusted).toBe(false)
+    expect(r2.newBalance).toBe(490)
+  })
+
+  it('refuses an ambiguous reconcile without a reconcile id', async () => {
+    const { storage, paymentHash, authorization } = credit()
+    const engine = createTollBooth(makeConfig({ storage, pricing: { '/dear': 500, '/cheap': 1 } }))
+    await engine.handle(makeRequest({ path: '/dear', headers: { authorization } }))
+    await engine.handle(makeRequest({ path: '/cheap', headers: { authorization } }))
+
+    const result = engine.reconcile(paymentHash, 0)
+    expect(result.adjusted).toBe(false)
+    expect(storage.balance(paymentHash)).toBe(499)
+  })
+
+  it('reconciles each request at most once', async () => {
+    const { storage, paymentHash, authorization } = credit()
+    const engine = createTollBooth(makeConfig({ storage, pricing: { '/route': 100 } }))
+    const res = await engine.handle(makeRequest({ headers: { authorization } }))
+    if (res.action !== 'proxy') throw new Error('expected proxy')
+
+    expect(engine.reconcile(paymentHash, 0, res.reconcileId).newBalance).toBe(1000)
+    const again = engine.reconcile(paymentHash, 0, res.reconcileId)
+    expect(again.adjusted).toBe(false)
+    expect(storage.balance(paymentHash)).toBe(1000)
+  })
+
+  it('ignores a reconcile id issued for another payment hash', async () => {
+    const a = credit()
+    const b = credit(a.storage)
+    const engine = createTollBooth(makeConfig({ storage: a.storage, pricing: { '/route': 100 } }))
+    const resA = await engine.handle(makeRequest({ headers: { authorization: a.authorization } }))
+    await engine.handle(makeRequest({ headers: { authorization: b.authorization } }))
+    if (resA.action !== 'proxy') throw new Error('expected proxy')
+
+    expect(engine.reconcile(b.paymentHash, 0, resA.reconcileId).adjusted).toBe(false)
+    expect(a.storage.balance(b.paymentHash)).toBe(900)
+  })
+
+  it('does not mint credits for a per-request payment', async () => {
+    const storage = memoryStorage()
+    const paymentId = randomBytes(32).toString('hex')
+    const engine = createTollBooth(makeConfig({
+      storage,
+      pricing: { '/route': 100 },
+      rails: [{
+        type: 'test',
+        creditSupported: false,
+        async challenge() { return { headers: {}, body: {} } },
+        detect: () => true,
+        verify: () => ({ authenticated: true, paymentId, mode: 'per-request', currency: 'sat' }),
+      }],
+    }))
+    const res = await engine.handle(makeRequest())
+    if (res.action !== 'proxy') throw new Error('expected proxy')
+    expect(res.reconcileId).toBeUndefined()
+
+    expect(engine.reconcile(paymentId, 0).adjusted).toBe(false)
+    expect(storage.balance(paymentId)).toBe(0)
+  })
+
+  it('fires onPayment once per credential, even after reconciling', async () => {
+    const onPayment = vi.fn()
+    const { storage, paymentHash, authorization } = credit()
+    const engine = createTollBooth(makeConfig({ storage, onPayment, pricing: { '/route': 10 } }))
+    for (let i = 0; i < 3; i++) {
+      const res = await engine.handle(makeRequest({ headers: { authorization } }))
+      if (res.action !== 'proxy') throw new Error('expected proxy')
+      engine.reconcile(paymentHash, 5, res.reconcileId)
+    }
+    expect(onPayment).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe('strictPricing', () => {
   it('challenges unpriced routes when strictPricing is true', async () => {
     const engine = createTollBooth(makeConfig({ strictPricing: true }))

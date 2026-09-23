@@ -13,7 +13,13 @@ import type { TollBoothRequest, TollBoothResult, TollBoothCoreConfig, ReconcileR
 
 export interface TollBoothEngine {
   handle(req: TollBoothRequest): Promise<TollBoothResult>
-  reconcile(paymentHash: string, actualCost: number): ReconcileResult
+  /**
+   * Settle a proxied credit-mode request against the cost the upstream
+   * reported. Pass the `reconcileId` from the proxy result: without it the
+   * call only succeeds when exactly one estimate is outstanding for the
+   * payment hash. Each estimate is reconciled at most once.
+   */
+  reconcile(paymentHash: string, actualCost: number, reconcileId?: string): ReconcileResult
   freeTier: IFreeTier | null
   upstream: string
 }
@@ -112,9 +118,50 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
     console.warn('[toll-booth] pricing is configured but strictPricing is disabled — requests to unpriced paths are proxied for free. Set strictPricing: true to charge the default amount on unmatched paths.')
   }
 
+  // Outstanding estimates for reconciliation, one per proxied credit-mode
+  // request and keyed by a per-request id. Keying them by payment hash let
+  // concurrent requests on one credential overwrite each other's estimate,
+  // so one request could be refunded against another's (higher) price.
   const MAX_ESTIMATED_COSTS = 10_000
   const MAX_AGE_MS = 60_000
-  const estimatedCosts = new Map<string, { cost: number; ts: number; currency: Currency }>()
+  const estimatedCosts = new Map<string, { paymentHash: string; cost: number; ts: number; currency: Currency }>()
+
+  // Payment ids already reported through onPayment, bounded so that it
+  // cannot grow without limit; the oldest id is forgotten first.
+  const MAX_SEEN_PAYMENTS = 10_000
+  const seenPayments = new Set<string>()
+
+  function recordEstimate(paymentHash: string, cost: number, currency: Currency): string {
+    if (estimatedCosts.size >= MAX_ESTIMATED_COSTS) {
+      const now = Date.now()
+      for (const [key, entry] of estimatedCosts) {
+        if (now - entry.ts > MAX_AGE_MS) estimatedCosts.delete(key)
+      }
+      // Still full: drop the oldest entries (Map keeps insertion order).
+      for (const key of estimatedCosts.keys()) {
+        if (estimatedCosts.size < MAX_ESTIMATED_COSTS) break
+        estimatedCosts.delete(key)
+      }
+    }
+    const id = randomBytes(16).toString('hex')
+    estimatedCosts.set(id, { paymentHash, cost, ts: Date.now(), currency })
+    return id
+  }
+
+  /** Find the estimate to reconcile. Without a reconcile id, only an unambiguous match counts. */
+  function findEstimate(paymentHash: string, reconcileId?: string): string | undefined {
+    if (reconcileId !== undefined) {
+      const entry = estimatedCosts.get(reconcileId)
+      return entry?.paymentHash === paymentHash ? reconcileId : undefined
+    }
+    let found: string | undefined
+    for (const [key, entry] of estimatedCosts) {
+      if (entry.paymentHash !== paymentHash) continue
+      if (found !== undefined) return undefined
+      found = key
+    }
+    return found
+  }
 
   return {
     freeTier,
@@ -364,8 +411,12 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
                 ? storage.balance(result.paymentId, result.currency)
                 : undefined
 
-            // Fire onPayment exactly once per paymentHash (first time seen)
-            if (result.paymentId && !estimatedCosts.has(result.paymentId)) {
+            // Fire onPayment once per payment id (first time seen)
+            if (!seenPayments.has(result.paymentId)) {
+              if (seenPayments.size >= MAX_SEEN_PAYMENTS) {
+                seenPayments.delete(seenPayments.values().next().value as string)
+              }
+              seenPayments.add(result.paymentId)
               const creditedAmount = (remaining ?? 0) + cost
               config.onPayment?.({
                 timestamp: new Date().toISOString(),
@@ -375,27 +426,13 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
               })
             }
 
-            // Track estimated cost with currency for reconciliation
-            if (result.paymentId) {
-              // Evict stale entries; if still at cap, drop oldest entries
-              if (estimatedCosts.size >= MAX_ESTIMATED_COSTS) {
-                const now = Date.now()
-                for (const [key, entry] of estimatedCosts) {
-                  if (now - entry.ts > MAX_AGE_MS) estimatedCosts.delete(key)
-                }
-                // Force-evict oldest entries if still at capacity
-                if (estimatedCosts.size >= MAX_ESTIMATED_COSTS) {
-                  const overflow = estimatedCosts.size - MAX_ESTIMATED_COSTS + 1
-                  let evicted = 0
-                  for (const key of estimatedCosts.keys()) {
-                    if (evicted >= overflow) break
-                    estimatedCosts.delete(key)
-                    evicted++
-                  }
-                }
-              }
-              estimatedCosts.set(result.paymentId, { cost, ts: Date.now(), currency: result.currency })
-            }
+            // Only a credit balance can be reconciled: per-request payments
+            // are settled outright and session balances live apart from the
+            // credits table, so adjusting credits for them would mint a
+            // balance nobody paid for.
+            const reconcileId = result.mode === 'credit'
+              ? recordEstimate(result.paymentId, cost, result.currency)
+              : undefined
 
             // Build response headers
             const headers: Record<string, string> = {}
@@ -461,6 +498,7 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
               estimatedCost: cost,
               creditBalance: remaining,
               tier: resolvedTier,
+              ...(reconcileId !== undefined && { reconcileId }),
             }
           }
 
@@ -501,11 +539,14 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
       return issueChallenge()
     },
 
-    reconcile(paymentHash: string, actualCost: number): ReconcileResult {
-      const entry = estimatedCosts.get(paymentHash)
-      if (entry === undefined) {
+    reconcile(paymentHash: string, actualCost: number, reconcileId?: string): ReconcileResult {
+      const key = findEstimate(paymentHash, reconcileId)
+      const entry = key === undefined ? undefined : estimatedCosts.get(key)
+      if (key === undefined || entry === undefined) {
         return { adjusted: false, newBalance: storage.balance(paymentHash), delta: 0 }
       }
+      // Each estimate is reconciled at most once.
+      estimatedCosts.delete(key)
       const delta = entry.cost - actualCost
       if (delta === 0) {
         return { adjusted: false, newBalance: storage.balance(paymentHash, entry.currency), delta: 0 }
@@ -515,7 +556,6 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
         const unit = entry.currency === 'usd' ? 'cents' : 'sats'
         console.warn(`[toll-booth] Reconciliation: additional charge of ${-delta} ${unit} for ${paymentHash}, new balance ${newBalance}`)
       }
-      estimatedCosts.delete(paymentHash)
       return { adjusted: true, newBalance, delta }
     },
   }

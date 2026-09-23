@@ -90,6 +90,8 @@ export type TollBoothEnv = {
     tollBoothCreditBalance: number | undefined
     tollBoothFreeRemaining: number | undefined
     tollBoothTier: string | undefined
+    /** Pass to `engine.reconcile` with the payment hash (credit mode only). */
+    tollBoothReconcileId: string | undefined
   }
 }
 
@@ -211,6 +213,7 @@ export function createHonoTollBooth(config: HonoTollBoothConfig): HonoTollBooth 
       c.set('tollBoothCreditBalance', result.creditBalance)
       c.set('tollBoothFreeRemaining', result.freeRemaining)
       c.set('tollBoothTier', result.tier)
+      c.set('tollBoothReconcileId', result.reconcileId)
     }
     c.set('tollBoothAction', result.action)
 

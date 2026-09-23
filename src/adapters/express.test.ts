@@ -285,6 +285,7 @@ describe('Express adapter', () => {
         headers: { 'X-Credit-Balance': '90' },
         paymentHash: 'a'.repeat(64),
         estimatedCost: 10,
+        reconcileId: 'r1',
         creditBalance: 90,
       })
       const reconcileSpy = vi.spyOn(engine, 'reconcile').mockReturnValue({ adjusted: true, newBalance: 93, delta: 3 })
@@ -294,7 +295,7 @@ describe('Express adapter', () => {
 
       try {
         await request(app, '/route', { method: 'GET' })
-        expect(reconcileSpy).toHaveBeenCalledWith('a'.repeat(64), 7)
+        expect(reconcileSpy).toHaveBeenCalledWith('a'.repeat(64), 7, 'r1')
       } finally {
         upstream.close()
         handleSpy.mockRestore()
@@ -422,6 +423,7 @@ describe('Express adapter', () => {
         headers: { 'X-Credit-Balance': '90' },
         paymentHash: 'a'.repeat(64),
         estimatedCost: 10,
+        reconcileId: 'r1',
         creditBalance: 90,
       })
       const reconcileSpy = vi.spyOn(engine, 'reconcile').mockReturnValue({ adjusted: true, newBalance: 100, delta: 10 })
@@ -432,7 +434,7 @@ describe('Express adapter', () => {
       try {
         const res = await request(app, '/route', { method: 'GET' })
         expect(res.status).toBe(200)
-        expect(reconcileSpy).toHaveBeenCalledWith('a'.repeat(64), 0)
+        expect(reconcileSpy).toHaveBeenCalledWith('a'.repeat(64), 0, 'r1')
         expect(res.headers.get('x-credit-balance')).toBe('100')
       } finally {
         upstream.close()

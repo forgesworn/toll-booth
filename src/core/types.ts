@@ -27,7 +27,18 @@ export interface TollBoothRequest {
 }
 
 export type TollBoothResult =
-  | { action: 'proxy'; upstream: string; headers: Record<string, string>; paymentHash?: string; estimatedCost?: number; creditBalance?: number; freeRemaining?: number; tier?: string }
+  | {
+    action: 'proxy'
+    upstream: string
+    headers: Record<string, string>
+    paymentHash?: string
+    estimatedCost?: number
+    creditBalance?: number
+    freeRemaining?: number
+    tier?: string
+    /** Identifies this request's cost estimate; pass it to `engine.reconcile`. Set for credit-mode payments only. */
+    reconcileId?: string
+  }
   | { action: 'challenge'; status: 400 | 401 | 402 | 429; headers: Record<string, string>; body: Record<string, unknown> }
   | { action: 'pass'; upstream: string; headers: Record<string, string> }
   | { action: 'blocked'; status: 403; body: Record<string, unknown> }
