@@ -463,17 +463,21 @@ describe('estimatedCosts map overflow eviction', () => {
     storage.settleWithCredit(paymentHash, 100_000, preimage)
 
     // Make several requests to populate estimatedCosts
+    let last: Awaited<ReturnType<typeof engine.handle>> | undefined
     for (let i = 0; i < 5; i++) {
-      await engine.handle({
+      last = await engine.handle({
         method: 'GET',
         path: '/api',
         headers: { authorization: `L402 ${macaroon}:${preimage}` },
         ip: '1.2.3.4',
       })
     }
+    if (last?.action !== 'proxy') throw new Error('expected proxy')
 
-    // Reconcile should work (entry exists)
-    const result = engine.reconcile(paymentHash, 5)
+    // Five estimates are outstanding for one hash: without an id the
+    // reconcile is ambiguous and refused; with its id each one settles.
+    expect(engine.reconcile(paymentHash, 5).adjusted).toBe(false)
+    const result = engine.reconcile(paymentHash, 5, last.reconcileId)
     expect(result.adjusted).toBe(true)
   })
 })

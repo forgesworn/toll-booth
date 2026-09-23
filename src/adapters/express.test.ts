@@ -285,6 +285,7 @@ describe('Express adapter', () => {
         headers: { 'X-Credit-Balance': '90' },
         paymentHash: 'a'.repeat(64),
         estimatedCost: 10,
+        reconcileId: 'r1',
         creditBalance: 90,
       })
       const reconcileSpy = vi.spyOn(engine, 'reconcile').mockReturnValue({ adjusted: true, newBalance: 93, delta: 3 })
@@ -294,7 +295,7 @@ describe('Express adapter', () => {
 
       try {
         await request(app, '/route', { method: 'GET' })
-        expect(reconcileSpy).toHaveBeenCalledWith('a'.repeat(64), 7)
+        expect(reconcileSpy).toHaveBeenCalledWith('a'.repeat(64), 7, 'r1')
       } finally {
         upstream.close()
         handleSpy.mockRestore()
@@ -422,6 +423,7 @@ describe('Express adapter', () => {
         headers: { 'X-Credit-Balance': '90' },
         paymentHash: 'a'.repeat(64),
         estimatedCost: 10,
+        reconcileId: 'r1',
         creditBalance: 90,
       })
       const reconcileSpy = vi.spyOn(engine, 'reconcile').mockReturnValue({ adjusted: true, newBalance: 100, delta: 10 })
@@ -432,7 +434,7 @@ describe('Express adapter', () => {
       try {
         const res = await request(app, '/route', { method: 'GET' })
         expect(res.status).toBe(200)
-        expect(reconcileSpy).toHaveBeenCalledWith('a'.repeat(64), 0)
+        expect(reconcileSpy).toHaveBeenCalledWith('a'.repeat(64), 0, 'r1')
         expect(res.headers.get('x-credit-balance')).toBe('100')
       } finally {
         upstream.close()
@@ -719,6 +721,10 @@ describe('Express adapter', () => {
       '/api%2Fpaid',
       '/api/free/..%2Fpaid',
       '/x\\..\\api/paid',
+      '/api/paid;x=1',
+      '/api/free;/../paid',
+      '/api/free/..;/paid',
+      '/api/paid%3Bx=1',
     ]
 
     for (const path of exploitPaths) {
@@ -766,6 +772,27 @@ describe('Express adapter', () => {
         await requestRaw(app, rawGet('//evil.example/a/./b/../%7Euser?q=1'))
         expect(handle.mock.calls[0][0].path).toBe('/evil.example/a/~user')
         expect(upstream.received[0].url).toBe('/evil.example/a/~user?q=1')
+      } finally {
+        upstream.close()
+      }
+    })
+
+    it('rejects semicolon path parameters without contacting the upstream', async () => {
+      const upstream = await startRecordingUpstream()
+      const engine = createTollBooth({
+        backend: mockBackend(),
+        storage: memoryStorage(),
+        pricing: { '/api/paid': 100 },
+        upstream: `http://127.0.0.1:${upstream.port}`,
+        rootKey: ROOT_KEY,
+      })
+      const app = express()
+      app.use(createExpressMiddleware(engine, `http://127.0.0.1:${upstream.port}`))
+      try {
+        for (const path of ['/api/paid;x=1', '/api/free;/../paid', '/api/free/..;/paid', '/api/paid%3Bx=1']) {
+          expect(statusOf(await requestRaw(app, rawGet(path))), path).toBe(400)
+        }
+        expect(upstream.received).toHaveLength(0)
       } finally {
         upstream.close()
       }

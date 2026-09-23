@@ -210,7 +210,7 @@ export function createWebStandardMiddleware(
             const actualCost = parseInt(tollCostHeader, 10)
             const maxAllowed = (result.estimatedCost ?? actualCost) * 10
             if (Number.isSafeInteger(actualCost) && actualCost >= 0 && actualCost <= maxAllowed) {
-              const reconciled = engine.reconcile(result.paymentHash, actualCost)
+              const reconciled = engine.reconcile(result.paymentHash, actualCost, result.reconcileId)
               if (reconciled.adjusted) {
                 responseHeaders.set('X-Credit-Balance', String(reconciled.newBalance))
               }

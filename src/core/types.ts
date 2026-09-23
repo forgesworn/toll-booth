@@ -1,5 +1,5 @@
 // src/core/types.ts
-import { createHash } from 'node:crypto'
+import { createHmac, randomBytes } from 'node:crypto'
 import type { LightningBackend, CreditTier, PaymentEvent, RequestEvent, ChallengeEvent } from '../types.js'
 import type { StorageBackend, StoredInvoice } from '../storage/interface.js'
 import type { PaymentRail, PriceInfo, PricingEntry } from './payment-rail.js'
@@ -7,14 +7,29 @@ import type { PaymentRail, PriceInfo, PricingEntry } from './payment-rail.js'
 /** Matches a valid 64-char lowercase hex payment hash. */
 export const PAYMENT_HASH_RE = /^[0-9a-f]{64}$/
 
+/** Random per-process key for {@link hashIp} when no key is supplied. */
+const PROCESS_IP_HASH_KEY = randomBytes(32)
+
 /**
- * One-way hash of an IP address with a daily-rotating salt.
- * Rate limiting still works (same IP produces same hash within a day),
- * but the raw IP cannot be recovered from storage.
+ * Derive the {@link hashIp} key from a deployment's root key, so IP hashes
+ * are stable across restarts (pending-invoice limits keep working with
+ * persistent storage) but cannot be computed without the root key.
  */
-export function hashIp(ip: string): string {
-  const daySalt = new Date().toISOString().slice(0, 10)
-  return createHash('sha256').update(`${daySalt}:${ip}`).digest('hex').slice(0, 32)
+export function deriveIpHashKey(rootKey: string): Buffer {
+  return createHmac('sha256', rootKey).update('toll-booth-ip-hash-v1').digest()
+}
+
+/**
+ * Keyed one-way hash of an IP address, rotated daily.
+ *
+ * Rate limiting still works (the same IP gives the same hash within a UTC
+ * day), but the raw IP cannot be recovered from storage: the hash is an
+ * HMAC under a secret key, so the IPv4 space cannot be brute-forced
+ * without it. When no key is given a random per-process key is used.
+ */
+export function hashIp(ip: string, key: Uint8Array = PROCESS_IP_HASH_KEY): string {
+  const day = new Date().toISOString().slice(0, 10)
+  return createHmac('sha256', key).update(`${day}:${ip}`).digest('hex').slice(0, 32)
 }
 
 export interface TollBoothRequest {
@@ -27,7 +42,18 @@ export interface TollBoothRequest {
 }
 
 export type TollBoothResult =
-  | { action: 'proxy'; upstream: string; headers: Record<string, string>; paymentHash?: string; estimatedCost?: number; creditBalance?: number; freeRemaining?: number; tier?: string }
+  | {
+    action: 'proxy'
+    upstream: string
+    headers: Record<string, string>
+    paymentHash?: string
+    estimatedCost?: number
+    creditBalance?: number
+    freeRemaining?: number
+    tier?: string
+    /** Identifies this request's cost estimate; pass it to `engine.reconcile`. Set for credit-mode payments only. */
+    reconcileId?: string
+  }
   | { action: 'challenge'; status: 400 | 401 | 402 | 429; headers: Record<string, string>; body: Record<string, unknown> }
   | { action: 'pass'; upstream: string; headers: Record<string, string> }
   | { action: 'blocked'; status: 403; body: Record<string, unknown> }
