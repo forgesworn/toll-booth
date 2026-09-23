@@ -78,6 +78,14 @@ Security-hardening release following a full review of the payment flow. Every fi
 
 # [4.5.0](https://github.com/forgesworn/toll-booth/compare/v4.4.2...v4.5.0) (2026-03-28)
 
+## 6.2.6 (2026-09-23)
+
+### Bug Fixes
+
+- session tokens, per-request reconciliation, keyed IP hashes and path parameters
+
+
+
 ## 6.2.5 (2026-09-23)
 
 ### Bug Fixes
