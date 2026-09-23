@@ -78,6 +78,14 @@ Security-hardening release following a full review of the payment flow. Every fi
 
 # [4.5.0](https://github.com/forgesworn/toll-booth/compare/v4.4.2...v4.5.0) (2026-03-28)
 
+## 6.2.4 (2026-09-23)
+
+### Bug Fixes
+
+- keep accepting unsigned mints and never drop a rotated note (#96)
+
+
+
 ## 6.2.3 (2026-09-07)
 
 ### Bug Fixes
