@@ -56,7 +56,7 @@ toll-booth does not phone home, collect analytics, or send data to any service o
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability, please email **security@trotters.cc** rather than opening a public issue. We will respond within 48 hours.
+If you discover a security vulnerability, please report it privately through GitHub's private vulnerability reporting at https://github.com/forgesworn/toll-booth/security/advisories/new rather than opening a public issue. We will respond within 48 hours.
 
 ## Supported Versions
 
