@@ -9,6 +9,7 @@ import { canonicalisePath } from '../core/request-path.js'
 import type { LightningBackend, CreditTier } from '../types.js'
 import type { StorageBackend } from '../storage/interface.js'
 import { handleCreateInvoice } from '../core/create-invoice.js'
+import { assertValidRootKey } from '../macaroon.js'
 import type { CreateInvoiceDeps } from '../core/create-invoice.js'
 import { handleInvoiceStatus, renderInvoiceStatusHtml } from '../core/invoice-status.js'
 import type { InvoiceStatusDeps } from '../core/invoice-status.js'
@@ -227,6 +228,7 @@ export function createHonoTollBooth(config: HonoTollBoothConfig): HonoTollBooth 
   }
 
   function createPaymentApp(paymentConfig: PaymentAppConfig): Hono {
+    assertValidRootKey(paymentConfig.rootKey)
     const app = new Hono()
 
     const createInvoiceDeps: CreateInvoiceDeps = {

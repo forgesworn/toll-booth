@@ -850,3 +850,68 @@ describe('X-Toll-Cost strict validation', () => {
     expect(/^\d+$/.test('1000')).toBe(true)
   })
 })
+
+describe('root key validation (forged macaroons)', () => {
+  /** Mint a macaroon with an empty HMAC key, as an attacker could. */
+  async function forgeWithEmptyKey(paymentHash: string): Promise<string> {
+    const { newMacaroon } = await import('macaroon')
+    const { serializeMacaroonV2 } = await import('../macaroon.js')
+    const id = new Uint8Array(66)
+    id.set(Buffer.from(paymentHash, 'hex'), 2)
+    id.set(randomBytes(32), 34)
+    const m = newMacaroon({ identifier: id, location: 'toll-booth', rootKey: new Uint8Array(0), version: 2 })
+    m.addFirstPartyCaveat(`payment_hash = ${paymentHash}`)
+    m.addFirstPartyCaveat('credit_balance = 1000000')
+    m.addFirstPartyCaveat('currency = sat')
+    return Buffer.from(serializeMacaroonV2(m)).toString('base64')
+  }
+
+  it('verifyMacaroon refuses empty and non-hex root keys instead of accepting forgeries', async () => {
+    const { verifyMacaroon } = await import('../macaroon.js')
+    const { paymentHash } = makeCredential()
+    const forged = await forgeWithEmptyKey(paymentHash)
+    for (const key of ['', 'zz'.repeat(32), 'a'.repeat(63), 'a'.repeat(66)]) {
+      expect(() => verifyMacaroon(key, forged), JSON.stringify(key)).toThrow(/64 hex characters/)
+    }
+    expect(verifyMacaroon(ROOT_KEY, forged).valid).toBe(false)
+  })
+
+  it('createL402Rail, createTollBooth and createPaymentApp reject an empty root key', async () => {
+    const { createL402Rail } = await import('./l402-rail.js')
+    const storage = memoryStorage()
+    expect(() => createL402Rail({ rootKey: '', storage, defaultAmount: 1 })).toThrow(/64 hex characters/)
+    expect(() => createTollBooth({ storage, pricing: {}, upstream: 'http://u.test', rootKey: '' })).toThrow(/64 hex characters/)
+    expect(() => createTollBooth({ storage, pricing: {}, upstream: 'http://u.test', rootKey: '', rails: [] })).toThrow(/64 hex characters/)
+    const engine = createTollBooth({ storage, pricing: {}, upstream: 'http://u.test', rootKey: ROOT_KEY })
+    const { createPaymentApp } = createHonoTollBooth({ engine })
+    expect(() => createPaymentApp({ storage, rootKey: '', tiers: [], defaultAmount: 1 })).toThrow(/64 hex characters/)
+  })
+
+  it('IETF rails reject an empty hmacSecret', async () => {
+    const { createIETFPaymentRail } = await import('./ietf-payment.js')
+    const { createIETFSessionRail } = await import('./ietf-session.js')
+    const backend = { createInvoice: vi.fn(), checkInvoice: vi.fn(), sendPayment: vi.fn() }
+    const storage = memoryStorage()
+    expect(() => createIETFPaymentRail({ hmacSecret: '', realm: 'r', backend, storage })).toThrow(/hmacSecret/)
+    expect(() => createIETFSessionRail({ hmacSecret: '', realm: 'r', backend, storage, session: {} })).toThrow(/hmacSecret/)
+  })
+
+  it('Booth validates a supplied empty key but still auto-generates when none is given', () => {
+    const base = {
+      adapter: 'web-standard' as const,
+      backend: { createInvoice: vi.fn(), checkInvoice: vi.fn() },
+      pricing: {},
+      upstream: 'http://localhost',
+      storage: memoryStorage(),
+      getClientIp: () => '127.0.0.1',
+    }
+    expect(() => new Booth({ ...base, rootKey: '' })).toThrow(/64 hex characters/)
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      new Booth({ ...base, storage: memoryStorage() }).close()
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('auto-generated'))
+    } finally {
+      warn.mockRestore()
+    }
+  })
+})

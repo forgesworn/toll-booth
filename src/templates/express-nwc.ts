@@ -8,6 +8,7 @@ import {
   generateReadme,
   generateGitignore,
   generateTsConfig,
+  rootKeyGuard,
 } from './shared.js'
 
 function generateServer(ctx: TemplateContext): string {
@@ -20,6 +21,7 @@ import { closeSync, fstatSync, openSync, readSync } from 'node:fs'
 import { Booth } from '@forgesworn/toll-booth'
 import { nwcBackend } from '@forgesworn/toll-booth/backends/nwc'
 
+${rootKeyGuard('node')}
 function loadNwcUri(): string {
   const file = process.env.NWC_URI_FILE
   if (!file) throw new Error('NWC_URI_FILE is required')
@@ -67,7 +69,7 @@ const booth = new Booth({
   upstream: ${upstream},
   freeTier: { requestsPerDay: parseInt(process.env.FREE_TIER_REQUESTS ?? '10', 10) },
   defaultInvoiceAmount: 1000,
-  rootKey: process.env.ROOT_KEY,
+  rootKey,
   trustProxy: true,
 })
 

@@ -6,6 +6,7 @@
 
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
 import type { StorageBackend, Session } from '../storage/interface.js'
+import { assertValidRootKey } from '../macaroon.js'
 import type { LightningBackend, SessionConfig } from '../types.js'
 import type { PaymentRail, PriceInfo, ChallengeFragment, RailVerifyResult } from './payment-rail.js'
 import type { TollBoothRequest } from './types.js'
@@ -143,6 +144,7 @@ export function createIETFSessionRail(config: IETFSessionRailConfig): PaymentRai
   /** Get a session by bearer token (for NeedTopUp checks in streaming). */
   getSessionByBearer(token: string): Session | null
 } {
+  assertValidRootKey(config.hmacSecret, 'hmacSecret')
   const { hmacSecret, realm, backend, storage, description } = config
   if (!backend.sendPayment) {
     throw new Error('Session intent requires a Lightning backend that supports sendPayment() for refunds')

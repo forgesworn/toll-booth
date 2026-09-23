@@ -437,3 +437,28 @@ describe('generic template', () => {
     expect(pkg.dependencies['@hono/node-server']).toBeDefined()
   })
 })
+
+describe('ROOT_KEY guard', () => {
+  const projects: Array<[string, Record<string, string>]> = [
+    ['express-phoenixd', generateExpressPhoenixd(makeContext()).files],
+    ['hono-cashu', generateHonoCashu(makeContext({ framework: 'hono', backend: 'cashu-only' })).files],
+    ['deno-lnd', generateDenoLnd(makeContext({ framework: 'deno', backend: 'lnd' })).files],
+    ['express-nwc', generateExpressNwc(makeContext({ backend: 'nwc' })).files],
+    ['generic hono lnd', generateGeneric(makeContext({ framework: 'hono', backend: 'lnd' })).files],
+    ['generic hono cashu', generateGeneric(makeContext({ framework: 'hono', backend: 'cashu-only' })).files],
+    ['generic express lnd', generateGeneric(makeContext({ backend: 'lnd' })).files],
+    ['generic deno phoenixd', generateGeneric(makeContext({ framework: 'deno', backend: 'phoenixd' })).files],
+    ['generic bun lnd', generateGeneric(makeContext({ framework: 'bun', backend: 'lnd' })).files],
+  ]
+
+  for (const [name, files] of projects) {
+    it(`${name} fails fast when ROOT_KEY is missing and never falls back to an empty key`, () => {
+      const server = files['server.ts']
+      expect(server).toContain('ROOT_KEY must be set to 64 hex characters')
+      expect(server).toContain('openssl rand -hex 32')
+      expect(server).not.toMatch(/ROOT_KEY\)? \?\? ''/)
+      expect(server).toMatch(/^\s*rootKey,$/m)
+      expectValidTypeScript(server)
+    })
+  }
+})

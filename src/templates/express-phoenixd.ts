@@ -8,6 +8,7 @@ import {
   generateReadme,
   generateGitignore,
   generateTsConfig,
+  rootKeyGuard,
 } from './shared.js'
 
 function generateServer(ctx: TemplateContext): string {
@@ -19,6 +20,7 @@ function generateServer(ctx: TemplateContext): string {
 import { Booth } from '@forgesworn/toll-booth'
 import { phoenixdBackend } from '@forgesworn/toll-booth/backends/phoenixd'
 
+${rootKeyGuard('node')}
 const app = express()
 app.use(express.json())
 
@@ -34,7 +36,7 @@ const booth = new Booth({
   upstream: ${upstream},
   freeTier: { requestsPerDay: parseInt(process.env.FREE_TIER_REQUESTS ?? '10', 10) },
   defaultInvoiceAmount: 1000,
-  rootKey: process.env.ROOT_KEY,
+  rootKey,
   trustProxy: true,
 })
 

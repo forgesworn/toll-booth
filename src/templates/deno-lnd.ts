@@ -8,6 +8,7 @@ import {
   generateGitignore,
   TOLL_BOOTH_DENO_PACKAGE,
   tollBoothDenoSubpath,
+  rootKeyGuard,
 } from './shared.js'
 
 function generateServer(ctx: TemplateContext): string {
@@ -18,6 +19,7 @@ function generateServer(ctx: TemplateContext): string {
   return `import { Booth } from '@forgesworn/toll-booth'
 import { lndBackend } from '@forgesworn/toll-booth/backends/lnd'
 
+${rootKeyGuard('deno')}
 const backend = lndBackend({
   url: Deno.env.get('LND_REST_URL') ?? 'https://localhost:8080',
   macaroon: Deno.env.get('LND_MACAROON') ?? '',
@@ -30,7 +32,7 @@ const booth = new Booth({
   upstream: ${upstream},
   freeTier: { requestsPerDay: parseInt(Deno.env.get('FREE_TIER_REQUESTS') ?? '10', 10) },
   defaultInvoiceAmount: 1000,
-  rootKey: Deno.env.get('ROOT_KEY'),
+  rootKey,
   trustProxy: true,
 })
 

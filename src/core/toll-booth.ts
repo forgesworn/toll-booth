@@ -7,6 +7,7 @@ import { normalisePricing, normalisePricingTable, normalisePath, isTieredPricing
 import { canonicalisePath } from './request-path.js'
 import type { Currency, PriceInfo, PricingEntry, TieredPricing } from './payment-rail.js'
 import { hashIp } from './types.js'
+import { assertValidRootKey } from '../macaroon.js'
 import type { TollBoothRequest, TollBoothResult, TollBoothCoreConfig, ReconcileResult } from './types.js'
 
 export interface TollBoothEngine {
@@ -45,6 +46,8 @@ function pricingKey(route: string): string {
 }
 
 export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
+  assertValidRootKey(config.rootKey)
+
   // Validate tiered pricing entries: each must have a 'default' key
   for (const [route, entry] of Object.entries(config.pricing ?? {})) {
     if (typeof entry === 'object' && !('sats' in entry) && !('usd' in entry)) {
