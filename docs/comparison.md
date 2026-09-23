@@ -17,7 +17,7 @@ An honest comparison of toll-booth against every alternative we know of. We beli
 | **Self-service payment page** | Yes - QR codes, tier selector, wallet buttons | No | No | Yes | No |
 | **Cashu-only mode** | Yes - no Lightning node required | No | No | No | Yes |
 | **Self-hosted** | Yes | Yes | Facilitator is Coinbase-hosted | No | Partial (relay-based) |
-| **Production deployed** | Yes (jokes.trotters.dev, satgate) | Yes (Loop, Pool, LN node runner services) | Testnets only (March 2026) | Yes | Yes |
+| **Production deployed** | Yes (jokes.forgesworn.dev, satgate) | Yes (Loop, Pool, LN node runner services) | Testnets only (March 2026) | Yes | Yes |
 | **IETF Payment draft** | Yes (draft-ryan-httpauth-payment-01) | No | No | No | No |
 | **AI agent support** | Yes (402-mcp, programmatic L402 flow) | No | Yes (Google A2A integration) | Yes (L402-python client) | No |
 | **Privacy** | No accounts, no KYC, hashed IPs with rotating salt | No accounts, no KYC | Wallet address visible on-chain | Account required | Pseudonymous (Nostr) |

@@ -217,11 +217,11 @@ Booth instance properties:
 
 ### Case Studies
 
-- [jokes.trotters.dev](docs/case-studies/jokes-trotters-dev.md) - joke API behind Lightning payments (live demo)
-- [satgate](docs/case-studies/satgate.md) - production AI inference gateway built on toll-booth (live at satgate.trotters.dev)
+- [jokes.forgesworn.dev](docs/case-studies/jokes-demo.md) - joke API behind Lightning payments (live demo)
+- [satgate](docs/case-studies/satgate.md) - production AI inference gateway built on toll-booth (live at satgate.forgesworn.dev)
 
 ### Examples
 
-- [Sats for Laughs](examples/sats-for-laughs/) - complete joke API deployment (live at jokes.trotters.dev)
+- [Sats for Laughs](examples/sats-for-laughs/) - complete joke API deployment (live at jokes.forgesworn.dev)
 - [Valhalla routing proxy](examples/valhalla-proxy/) - Docker Compose reference (Express + Phoenixd)
 - [Full API reference](llms-full.txt) - complete type definitions and examples

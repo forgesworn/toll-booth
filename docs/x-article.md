@@ -76,7 +76,7 @@ Multiple payment rails. One middleware. NWC stays behind the Lightning rail.
 
 ### Not vapourware
 
-toll-booth is running in production right now. It gates a joke API at jokes.trotters.dev and an AI inference gateway at satgate.trotters.dev -real Lightning invoices, real payments, real responses.
+toll-booth is running in production right now. It gates a joke API at jokes.forgesworn.dev and an AI inference gateway at satgate.forgesworn.dev -real Lightning invoices, real payments, real responses.
 
 It includes a free tier for discovery (configurable daily allowance per IP), volume discount tiers for committed users, and a self-service payment page with QR codes and wallet adapter buttons.
 

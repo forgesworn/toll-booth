@@ -14,7 +14,7 @@
 
 ![toll-booth demo](demo/toll-booth-demo.gif)
 
-[Live demo](https://jokes.trotters.dev/) - pay 21 sats, get a joke. No account. No sign-up. ([API](https://jokes.trotters.dev/api/joke))
+[Live demo](https://jokes.forgesworn.dev/) - pay 21 sats, get a joke. No account. No sign-up. ([API](https://jokes.forgesworn.dev/api/joke))
 
 ### Try it now
 
@@ -93,19 +93,19 @@ An agent using Claude, GPT, or any MCP-capable model can call your API, receive 
 
 ## Live demo
 
-Visit [jokes.trotters.dev](https://jokes.trotters.dev/) in a browser to try it - get a free joke, hit the paywall, scan the QR code or pay with a browser wallet extension.
+Visit [jokes.forgesworn.dev](https://jokes.forgesworn.dev/) in a browser to try it - get a free joke, hit the paywall, scan the QR code or pay with a browser wallet extension.
 
 Or use the API directly:
 
 ```bash
 # Get a free joke (1 free per day per IP)
-curl https://jokes.trotters.dev/api/joke
+curl https://jokes.forgesworn.dev/api/joke
 
 # Free tier exhausted - request a Lightning invoice for 21 sats
-curl -X POST https://jokes.trotters.dev/create-invoice
+curl -X POST https://jokes.forgesworn.dev/create-invoice
 
 # Pay the invoice with any Lightning wallet, then authenticate
-curl -H "Authorization: L402 <macaroon>:<preimage>" https://jokes.trotters.dev/api/joke
+curl -H "Authorization: L402 <macaroon>:<preimage>" https://jokes.forgesworn.dev/api/joke
 ```
 
 ---
@@ -345,7 +345,7 @@ Implements the [IETF Payment authentication scheme](https://datatracker.ietf.org
 ## Case studies
 
 - [satgate: Pay-per-token AI inference](docs/case-studies/satgate.md)
-- [jokes.trotters.dev: From zero to production L402 API](docs/case-studies/jokes-trotters-dev.md)
+- [jokes.forgesworn.dev: From zero to production L402 API](docs/case-studies/jokes-demo.md)
 
 ---
 
@@ -461,7 +461,7 @@ Deploy toll-booth as a sidecar (Docker Compose, Kubernetes) or as a standalone g
 
 ### sats-for-laughs - build your own paid API
 
-[`examples/sats-for-laughs/`](examples/sats-for-laughs/) is the fastest path from "I have an API" to "my API earns sats". It's the same code that runs the [live demo](https://jokes.trotters.dev/). Includes a web frontend with QR codes and wallet adapter buttons, plus a JSON API for programmatic access. Clone it, change three env vars, deploy.
+[`examples/sats-for-laughs/`](examples/sats-for-laughs/) is the fastest path from "I have an API" to "my API earns sats". It's the same code that runs the [live demo](https://jokes.forgesworn.dev/). Includes a web frontend with QR codes and wallet adapter buttons, plus a JSON API for programmatic access. Clone it, change three env vars, deploy.
 
 ```bash
 cd examples/sats-for-laughs
