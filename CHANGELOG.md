@@ -78,6 +78,14 @@ Security-hardening release following a full review of the payment flow. Every fi
 
 # [4.5.0](https://github.com/forgesworn/toll-booth/compare/v4.4.2...v4.5.0) (2026-03-28)
 
+## 6.3.0 (2026-10-06)
+
+### Features
+
+- move the lnurlcash rail to @lnurlcash/kit 0.20.2, keeping old notes and mints working (#104)
+
+
+
 ## 6.2.6 (2026-09-23)
 
 ### Bug Fixes
