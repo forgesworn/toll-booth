@@ -1,0 +1,38 @@
+diff --git a/node_modules/@cashu/cashu-ts/lib/cashu-ts.es.js b/node_modules/@cashu/cashu-ts/lib/cashu-ts.es.js
+index cf75ad6..a431c7d 100644
+--- a/node_modules/@cashu/cashu-ts/lib/cashu-ts.es.js
++++ b/node_modules/@cashu/cashu-ts/lib/cashu-ts.es.js
+@@ -4171,7 +4171,7 @@ var oo = class {
+ 		return e.isZero() && t.isZero() ? xa.UNPAID : e.greaterThan(t) ? xa.PAID : xa.ISSUED;
+ 	}
+ 	normalizeMintQuoteBolt11Fields(e) {
+-		e.amount = j.from(e.amount), e.expiry = Y(e.expiry, "mintQuoteBolt11.expiry", null), (typeof e.state != "string" || !Object.values(xa).includes(e.state)) && e.amount_paid instanceof j && e.amount_issued instanceof j && (e.state = this.deriveMintQuoteState(e.amount_paid, e.amount_issued));
++		e.amount = e.amount === void 0 ? void 0 : j.from(e.amount), e.expiry = Y(e.expiry, "mintQuoteBolt11.expiry", null), (typeof e.state != "string" || !Object.values(xa).includes(e.state)) && e.amount_paid instanceof j && e.amount_issued instanceof j && (e.state = this.deriveMintQuoteState(e.amount_paid, e.amount_issued));
+ 	}
+ 	normalizeMintQuoteBolt12Fields(e) {
+ 		G(e, "amount"), e.amount = e.amount === null ? null : j.from(e.amount), e.expiry = Y(e.expiry, "mintQuoteBolt12.expiry", null), e.amount_paid = j.from(e.amount_paid), e.amount_issued = j.from(e.amount_issued);
+@@ -4189,14 +4189,14 @@ var oo = class {
+ 		return r && ((a.request == null || a.request === "") && delete a.request, a.fee_reserve ?? delete a.fee_reserve), this.normalizeMeltBaseFields(a, i), e === "bolt11" || e === "bolt12" ? this.normalizeMeltBoltFields(a, e, i, r) : e === "onchain" && this.normalizeMeltOnchainFields(a, r), n ? n(a) : a;
+ 	}
+ 	normalizeMeltBaseFields(e, t) {
+-		if (e.amount = j.from(e.amount), e.expiry = Y(e.expiry, "meltQuote.expiry", void 0), e.change) {
++		if (e.amount = e.amount === void 0 ? void 0 : j.from(e.amount), e.expiry = Y(e.expiry, "meltQuote.expiry", void 0), e.change) {
+ 			if (!Array.isArray(e.change) || e.change.length > 1024) throw this._logger.error("Invalid response from mint...", {
+ 				type: ao(e.change),
+ 				op: t
+ 			}), new S("Invalid response from mint");
+ 			e.change = this.normalizeSignatureAmounts(e.change);
+ 		}
+-		if (!U(e) || typeof e.quote != "string" || !(e.amount instanceof j) || typeof e.unit != "string" || typeof e.state != "string" || typeof e.expiry != "number" || !Object.values(Sa).includes(e.state)) throw this._logger.error("Invalid response from mint...", { op: t }), new S("Invalid response from mint");
++		if (!U(e) || typeof e.quote != "string" || e.amount !== void 0 && !(e.amount instanceof j) || typeof e.unit != "string" || typeof e.state != "string" || typeof e.expiry != "number" || !Object.values(Sa).includes(e.state)) throw this._logger.error("Invalid response from mint...", { op: t }), new S("Invalid response from mint");
+ 	}
+ 	normalizeMeltBoltFields(e, t, n, r) {
+ 		let i = (t) => r && e[t] === void 0;
+@@ -6303,6 +6303,7 @@ var Ro = class {
+ 		});
+ 	}
+ 	assertBolt11MintQuoteAmount(e, t) {
++		if (e.amount === void 0 || t === void 0) return;
+ 		if (this.failIf(!e.amount.equals(t), "Mint quote amount does not match", {
+ 			expected: t.toString(),
+ 			quoted: e.amount.toString()
