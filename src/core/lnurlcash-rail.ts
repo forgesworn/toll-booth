@@ -42,7 +42,7 @@ export const LNURLCASH_REQUEST_PREFIX = 'lnurlcashreq1'
  * back, since a payment is identified by the note it burns. It is derived
  * rather than drawn at random so the same charge always names itself the
  * same way, and derived from the SHORT form's canonical bytes so that it
- * agrees with the id lnurlcash-kit gives a short-form request it reads.
+ * agrees with the id a short-form request is given when it is read.
  */
 export function buildLnurlcashCharge(
   amountSats: number,
@@ -136,7 +136,7 @@ export function createLnurlcashRail(config: LnurlcashRailConfig, storage?: Stora
       // The body is the charge request the published JSON Schema for this
       // method validates, which forbids anything beyond amount, currency and
       // methodDetails. The header is that same charge as a payment request,
-      // which is what `lnurlcashreq1` means and what lnurlcash-kit decodes,
+      // which is what `lnurlcashreq1` means and what wallets decode,
       // so it also carries the version and the handle a bare charge has no
       // room for.
       return {
