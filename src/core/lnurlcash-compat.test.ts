@@ -132,7 +132,7 @@ describe('lnurlcash compatibility', () => {
         })
 
         it('takes a note certified under both names', async () => {
-          const { k1 } = noteOn(currentBoth, null)
+          const k1 = newSecret()
           const cert = currentBoth.state.creditNote(k1, 21_000)!
           const url = `${currentBoth.url}/w?k1=${k1}&c=${cert}&sig=${cert}`
           expect((await settle(currentBoth, url, requireSignature)).authenticated).toBe(true)
@@ -317,6 +317,8 @@ describe('lnurlcash compatibility', () => {
       expect(resolveNoteInput(`https://mint.example.com/w?k1=${ck1}`)).not.toBeNull()
       // Its certificate has no offline rule here, so it decides nothing.
       expect(verifyCertificate(ck1, 21_000, 'ab'.repeat(65), '02' + 'ab'.repeat(32))).toBe('unverifiable')
+      const cs1 = current.state.creditNote(newSecret(), 21_000)!
+      expect(verifyCertificate(ck1, 21_000, cs1, '02' + 'ab'.repeat(32))).toBe('unverifiable')
     })
 
     it('refuses something that is no spend at all', () => {

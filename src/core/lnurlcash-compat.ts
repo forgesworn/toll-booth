@@ -140,8 +140,9 @@ export type CertificateVerdict = 'valid' | 'invalid' | 'unverifiable'
  * - fixed-prefix `cs1` with no amount (superseded): decoded and checked
  *   under the same pre-taproot rule.
  *
- * A superseded certificate on a key-path or script-path spend has no rule
- * here and is `unverifiable`.
+ * A superseded certificate on a key-path or script-path spend, and any
+ * certificate on a pre-LUD-25 `ck1`, has no rule here and is
+ * `unverifiable`.
  */
 export function verifyCertificate(
   k1: string,
@@ -150,6 +151,9 @@ export function verifyCertificate(
   mintPubkey: string,
 ): CertificateVerdict {
   const value = certificate.trim()
+  // A pre-LUD-25 ck1 names its note by a key recovered from the spend,
+  // which no certificate rule here covers, whatever the certificate's shape.
+  if (isLegacyCk1(k1)) return 'unverifiable'
   if (isCs1WithAmount(value)) {
     return verifyNoteSignature(k1, amountMsat, value, mintPubkey) ? 'valid' : 'invalid'
   }

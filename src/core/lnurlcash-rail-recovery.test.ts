@@ -110,20 +110,36 @@ describe('lnurlcash-rail recovery', () => {
     expect(m.state.noteState(onNoteReceived.mock.calls[0][0].k1)).toBe('outstanding')
   })
 
-  it('hands nothing over when the mint refuses the rotate outright', async () => {
+  it('hands over exactly one note when two callers race to spend the same one', async () => {
     const m = await mint()
     const { url, k1 } = presented(m)
     const onNoteReceived = vi.fn()
     const rail = createLnurlcashRail({ mints: [`127.0.0.1:${m.port}`], onNoteReceived }, memoryStorage())
 
-    // Spend it between the lookup and the rotate by spending it first: the
-    // lookup then refuses, so nothing is rotated and nothing is handed over.
+    // Both look the note up while it is live; one rotate lands and the
+    // other is refused at the callback. The refusal is the mint's answer
+    // to that request, so nothing moved and nothing is handed over for it.
+    const results = await Promise.all([
+      rail.verify(makeReq({ 'x-lnurlcash': url }), { sats: 10 }),
+      rail.verify(makeReq({ 'x-lnurlcash': url }), { sats: 10 }),
+    ])
+
+    expect(results.filter((r) => r.authenticated)).toHaveLength(1)
+    expect(m.state.noteState(k1)).toBe('burned')
+    expect(onNoteReceived).toHaveBeenCalledTimes(1)
+  })
+
+  it('hands nothing over for a note already spent', async () => {
+    const m = await mint()
+    const { url } = presented(m)
+    const onNoteReceived = vi.fn()
+    const rail = createLnurlcashRail({ mints: [`127.0.0.1:${m.port}`], onNoteReceived }, memoryStorage())
+
     const first = await rail.verify(makeReq({ 'x-lnurlcash': url }), { sats: 10 })
-    const second = await rail.verify(makeReq({ 'x-lnurlcash': url }), { sats: 10 })
+    const replay = await rail.verify(makeReq({ 'x-lnurlcash': url }), { sats: 10 })
 
     expect(first.authenticated).toBe(true)
-    expect(second.authenticated).toBe(false)
-    expect(m.state.noteState(k1)).toBe('burned')
+    expect(replay.authenticated).toBe(false)
     expect(onNoteReceived).toHaveBeenCalledTimes(1)
   })
 })
