@@ -28,7 +28,12 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
-      - run: npm audit
+      # Anything that ships fails on any advisory. Dev tooling fails only on a
+      # critical one: a high with no fixed release (braces <=3.0.3, reached
+      # only through patch-package reading this repo's own patch files at
+      # install) must not block every merge.
+      - run: npm audit --omit=dev
+      - run: npm audit --audit-level=critical
 
   integration:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
