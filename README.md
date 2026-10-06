@@ -293,13 +293,17 @@ const booth = new Booth({
 Clients pay by sending a bearer note URL in the request header, in either spelling:
 
 ```
-X-LNURLcash: lnurlw://mint.example.com/w?k1=<64 hex>&amount=21000
-X-LNURLcash: https://mint.example.com/w?k1=<64 hex>&amount=21000
+X-LNURLcash: lnurlw://mint.example.com/w?k1=<64 hex>&c=cs<amount>1...
+X-LNURLcash: https://mint.example.com/w?k1=<64 hex>&amount=21000&sig=<130 hex>
 ```
 
-An unpaid request is answered with `402` carrying the same charge twice, each in its own settled shape. The body's `lnurlcash` section is the charge request the published JSON Schema for this payment method validates: `amount` as a decimal string of sats, `currency`, and `methodDetails.mints`. The `X-LNURLcash` header is that same charge as a payment request, `lnurlcashreq1` followed by unpadded base64url of its RFC 8785 canonical JSON, so it also carries `v` and an `id` handle that a bare charge request has no room for. That is the form `lnurlcash-kit` decodes and the conformance vectors pin.
+Notes in the shape LUD-25 has used since 29 Sep 2026 (certificate `c` = `cs1<amount>` over the note's taproot key) and in the shape before it (`sig` = hex over the note's hash, alongside `amount`) are both accepted.
+
+An unpaid request is answered with `402` carrying the same charge twice, each in its own settled shape. The body's `lnurlcash` section is the charge request the published JSON Schema for this payment method validates: `amount` as a decimal string of sats, `currency`, and `methodDetails.mints`. The `X-LNURLcash` header is that same charge as a payment request, `lnurlcashreq1` followed by unpadded base64url of its RFC 8785 canonical JSON, so it also carries `v` and an `id` handle that a bare charge request has no room for. That is the form the conformance vectors pin.
 
 The booth settles a note by **rotating** it at the mint: it generates a fresh secret of its own, sends only that secret's hash, and the mint moves the note's value onto it. That single call does three jobs at once - it proves the note is live, it burns the secret the client presented, and it makes the booth the sole owner of the replacement. There is no local replay table to keep, because a replayed note is refused by the mint. The mint is also the authority on what a note is worth: the `amount` in the URL is a hint and is never trusted.
+
+**Mint compatibility.** The booth speaks to a mint in the forms every generation reads, so it works with current mints and with those that predate the 29 Sep 2026 revision of LUD-25 (including ones that only understand `h`/`k1`): a note is looked up by its own `k1`, and the rotate names the new note's 64-hex hash as both `p1` (the current name) and `h` (the older one). Notes handed to `onNoteReceived` carry the mint's certificate as `c` when the mint certifies the current way, and as `sig` with `amount` when it certifies the older way. `meltNoteToLightning` melts a note in any of those shapes, including notes handed over by earlier versions of toll-booth.
 
 Configuration:
 
@@ -307,7 +311,7 @@ Configuration:
 |---|---|
 | `mints` | Accepted mints (1+), each a host or any URL on that host. Notes from anywhere else are refused before any network call. |
 | `unit` | `'sat'` (the only value; notes are sat-denominated). |
-| `requireSignature` | Require the note URL's `sig` to verify against the mint's advertised pubkey. Off by default - a mint with no funding source of its own issues unsigned notes. |
+| `requireSignature` | Require the note URL's certificate (`c`, or the older `sig`) to verify against the mint's advertised pubkey, under the rule for its shape: `cs1<amount>` over the note's taproot key, or hex over its hash. A superseded certificate on a key-path spend has no offline rule and is left to the mint. The replacement note must also come back certified. Off by default - a mint with no funding source of its own issues unsigned notes. |
 | `timeoutMs` | Leash on calls to the mint, default `10000`. Verification happens on the request path, so a slow mint must not hold your caller open. |
 | `onNoteReceived` | Fire-and-forget callback handed the settled note (`{url, k1, amountMsat, host}`). Melt it, persist it, or forward it. |
 

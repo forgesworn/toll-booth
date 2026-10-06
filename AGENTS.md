@@ -49,6 +49,8 @@ src/
     x402-rail.ts            # x402 on-chain stablecoin payment rail
     xcashu-rail.ts          # xcashu (NUT-24) direct-header payment rail
     lnurlcash-rail.ts       # lnurlcash payment rail
+    lnurlcash-compat.ts     # LUD-25 wire layer readable by every mint generation (old and new note shapes)
+    melt-note-to-lightning.ts # LUD-25 note-to-Lightning melt utility
     ietf-payment.ts         # IETF Payment auth rail (draft-ryan-httpauth-payment-01)
     ietf-session.ts         # IETF Payment session intent rail
     create-invoice.ts       # POST /create-invoice handler (tier support)
