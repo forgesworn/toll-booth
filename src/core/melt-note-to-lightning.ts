@@ -5,7 +5,7 @@
 // lnurlcash rail: pair it with `onNoteReceived` and the booth keeps nothing
 // bearer for longer than one payment.
 
-import { fetchNoteInfo, meltNote, requireNoteK1, resolveNoteInput } from 'lnurlcash-kit'
+import { lookupNote, meltNote, requireK1, resolveNoteInput } from './lnurlcash-compat.js'
 
 export type MeltNoteResult =
   | { accepted: true; amountSats: number; verifyUrl?: string }
@@ -21,6 +21,12 @@ export type MeltNoteResult =
  * When the mint supports LUD-21 the result carries a `verifyUrl` to poll:
  * the note is only burned once the outgoing payment actually lands, and a
  * failed payment restores it.
+ *
+ * Any note this booth has handed over can be melted, whichever version of
+ * toll-booth wrote it and whichever mint generation issued it: the note is
+ * looked up by its own `k1` and melted with `k1` and `pr`, which every mint
+ * reads, and any certificate it carries (`c`, or the older `sig`) is left
+ * off the wire.
  *
  * @param opts.noteUrl - The note to spend, as `lnurlw://...` or `https://...?k1=...`
  * @param opts.createInvoice - Callback creating a BOLT11 invoice on the operator's node
@@ -39,7 +45,7 @@ export async function meltNoteToLightning(opts: {
 
   let k1: string
   try {
-    k1 = requireNoteK1(noteUrl)
+    k1 = requireK1(noteUrl)
   } catch {
     return { accepted: false, error: 'Note carries no secret' }
   }
@@ -47,7 +53,7 @@ export async function meltNoteToLightning(opts: {
   let callback: string
   let amountMsat: number
   try {
-    const info = await fetchNoteInfo(noteUrl, options)
+    const info = await lookupNote(noteUrl, options)
     callback = info.callback
     amountMsat = info.maxWithdrawable
   } catch (error) {

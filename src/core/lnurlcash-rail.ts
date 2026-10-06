@@ -7,18 +7,17 @@
 // note fails at the mint rather than at a local replay table.
 
 import { createHash, randomBytes } from 'node:crypto'
+import { hashK1, serverOf } from '@lnurlcash/kit'
 import {
-  fetchNoteInfo,
-  hashK1,
-  newSecretsOf,
-  noteSignature,
-  requireNoteK1,
+  RotateError,
+  lookupNote,
+  noteCertificate,
+  noteUrlWith,
+  requireK1,
   resolveNoteInput,
   rotateNote,
-  serverOf,
-  verifyNoteSignature,
-  withNewK1,
-} from 'lnurlcash-kit'
+  verifyCertificate,
+} from './lnurlcash-compat.js'
 import type { TollBoothRequest } from './types.js'
 import type { PaymentRail, PriceInfo, ChallengeFragment, RailVerifyResult } from './payment-rail.js'
 import { canonicalJSON, encodeJCS } from './ietf-payment.js'
@@ -43,7 +42,7 @@ export const LNURLCASH_REQUEST_PREFIX = 'lnurlcashreq1'
  * back, since a payment is identified by the note it burns. It is derived
  * rather than drawn at random so the same charge always names itself the
  * same way, and derived from the SHORT form's canonical bytes so that it
- * agrees with the id lnurlcash-kit gives a short-form request it reads.
+ * agrees with the id a short-form request is given when it is read.
  */
 export function buildLnurlcashCharge(
   amountSats: number,
@@ -65,8 +64,8 @@ export function buildLnurlcashCharge(
  * on the charge, not a nonce, since nothing verifies it coming back: a
  * payment is identified by the note it burns. It is derived rather than
  * drawn at random so the same charge always names itself the same way, and
- * derived from the SHORT form's canonical bytes so it agrees with the id
- * lnurlcash-kit gives a short-form request it reads.
+ * derived from the SHORT form's canonical bytes so it agrees with the id a
+ * short-form request is given when it is read.
  */
 export function buildLnurlcashRequest(
   amountSats: number,
@@ -84,8 +83,8 @@ export function buildLnurlcashRequest(
  * Encode a payment request for the `X-LNURLcash` challenge header:
  * `lnurlcashreq1` + base64url(JCS JSON).
  *
- * TODO: delegate to lnurlcash-kit's `encodePaymentRequest` once 0.2.0 is on
- * the registry. It produces exactly this, and one definition beats two.
+ * Defined here rather than taken from a library: @lnurlcash/kit treats
+ * payment requests as wallet policy and does not export an encoder.
  */
 export function encodeLnurlcashRequest(amountSats: number, unit: 'sat', mints: string[]): string {
   return LNURLCASH_REQUEST_PREFIX + encodeJCS(buildLnurlcashRequest(amountSats, unit, mints))
@@ -116,14 +115,8 @@ export function createLnurlcashRail(config: LnurlcashRailConfig, storage?: Stora
   const hosts = config.mints.map(toHost)
   const accepted = new Set(hosts)
   // A paywall verifies on the request path, so the mint gets a short leash:
-  // the kit's own default is 30s, which would hold a caller open far too long.
-  // lnurlcash-kit 0.7+ refuses an unsigned mint unless told otherwise, and a
-  // rotate it refuses has already spent the note. Opt out unless this booth
-  // requires signatures itself.
-  const clientOptions = {
-    timeoutMs: config.timeoutMs ?? 10_000,
-    requireSignatures: config.requireSignature === true,
-  }
+  // a wallet's usual 30s would hold a caller open far too long.
+  const clientOptions = { timeoutMs: config.timeoutMs ?? 10_000 }
 
   return {
     type: 'lnurlcash',
@@ -143,7 +136,7 @@ export function createLnurlcashRail(config: LnurlcashRailConfig, storage?: Stora
       // The body is the charge request the published JSON Schema for this
       // method validates, which forbids anything beyond amount, currency and
       // methodDetails. The header is that same charge as a payment request,
-      // which is what `lnurlcashreq1` means and what lnurlcash-kit decodes,
+      // which is what `lnurlcashreq1` means and what wallets decode,
       // so it also carries the version and the handle a bare charge has no
       // room for.
       return {
@@ -159,7 +152,8 @@ export function createLnurlcashRail(config: LnurlcashRailConfig, storage?: Stora
       const header = req.headers['x-lnurlcash']
       if (typeof header !== 'string') return FAIL
 
-      // A note is a URL carrying a 32-byte hex secret; anything else,
+      // A note is a URL carrying a spend: a 32-byte hex secret, or a
+      // key-path or script-path spend, which the mint judges. Anything else,
       // including a payment request echoed back, is not one.
       const noteUrl = resolveNoteInput(header)
       if (!noteUrl) return FAIL
@@ -175,11 +169,11 @@ export function createLnurlcashRail(config: LnurlcashRailConfig, storage?: Stora
       if (requiredSats === undefined) return FAIL
 
       // Fire-and-forget: hand the operator a note this booth now owns.
-      const handOver = (k1: string, amountMsat: number, signature?: string): void => {
+      const handOver = (k1: string, amountMsat: number, certificate?: string): void => {
         if (!config.onNoteReceived) return
         try {
           const result = config.onNoteReceived({
-            url: withNewK1(noteUrl, k1, amountMsat, signature),
+            url: noteUrlWith(noteUrl, k1, amountMsat, certificate),
             k1,
             amountMsat,
             host: serverOf(noteUrl),
@@ -194,17 +188,23 @@ export function createLnurlcashRail(config: LnurlcashRailConfig, storage?: Stora
 
       let noteMsat: number | undefined
       try {
-        const k1 = requireNoteK1(noteUrl)
+        const k1 = requireK1(noteUrl)
 
         // The mint is the authority on what the note is worth, not the
-        // `amount` the URL happens to declare.
-        const info = await fetchNoteInfo(noteUrl, clientOptions)
+        // `amount` the URL happens to declare. Asked by the note's own k1,
+        // the lookup every mint generation answers.
+        const info = await lookupNote(noteUrl, clientOptions)
         noteMsat = info.maxWithdrawable
 
         if (config.requireSignature) {
-          const signature = noteSignature(noteUrl)
-          if (!signature || !info.mintPubkey) return FAIL
-          if (!verifyNoteSignature(k1, info.maxWithdrawable, signature, info.mintPubkey)) return FAIL
+          // The certificate the payer's note carries, as `c` or the older
+          // `sig`, checked under the rule for its shape. A superseded shape
+          // with no offline rule proves nothing either way; the mint's own
+          // answer (this lookup, and the rotate below) then stands, so an
+          // old certificate is never the reason a live note is refused.
+          const certificate = noteCertificate(noteUrl)
+          if (!certificate || !info.mintPubkey) return FAIL
+          if (verifyCertificate(k1, info.maxWithdrawable, certificate, info.mintPubkey) === 'invalid') return FAIL
         }
 
         if (info.maxWithdrawable < requiredSats * 1000) return FAIL
@@ -213,6 +213,21 @@ export function createLnurlcashRail(config: LnurlcashRailConfig, storage?: Stora
         // made here and only its hash goes on the wire, so this server is the
         // sole holder of the new note. A spent note fails on this call.
         const rotated = await rotateNote(info.callback, k1, clientOptions)
+
+        // What the mint certified the new note as, kept only if it holds up.
+        const verdict =
+          rotated.certificate && info.mintPubkey
+            ? verifyCertificate(rotated.k1, info.maxWithdrawable, rotated.certificate, info.mintPubkey)
+            : undefined
+        const certificate = rotated.certificate && verdict !== 'invalid' ? rotated.certificate : undefined
+
+        if (config.requireSignature && verdict !== 'valid') {
+          // The rotate landed, so the caller's value now sits under a secret
+          // only this booth holds, but the new note cannot be verified
+          // offline. Access is refused; the note is handed over to reconcile.
+          handOver(rotated.k1, info.maxWithdrawable, certificate)
+          return FAIL
+        }
 
         // The new secret is unique per settlement, so its hash is a payment
         // id that can never collide with an earlier one.
@@ -224,7 +239,7 @@ export function createLnurlcashRail(config: LnurlcashRailConfig, storage?: Stora
           storage.settleWithCredit(paymentId, creditedSats, randomBytes(32).toString('hex'), unit)
         }
 
-        handOver(rotated.k1, info.maxWithdrawable, rotated.signature)
+        handOver(rotated.k1, info.maxWithdrawable, certificate)
 
         return {
           authenticated: true,
@@ -236,12 +251,12 @@ export function createLnurlcashRail(config: LnurlcashRailConfig, storage?: Stora
       } catch (error) {
         // Mint unreachable, note already spent, note unknown, or an
         // ambiguous rotate. All of them fail closed: no access is granted.
-        logSettlementFailure(error)
-        // A rotate that landed unsigned, or may have landed, still moved the
-        // caller's value under a secret only this booth holds. Dropping it
-        // would destroy that value, so the operator gets it to reconcile.
-        if (noteMsat !== undefined) {
-          for (const k1 of newSecretsOf(error)) handOver(k1, noteMsat)
+        logSettlementFailure(error instanceof RotateError ? error.cause : error)
+        // A rotate that may have landed still moved the caller's value under
+        // a secret only this booth holds. Dropping it would destroy that
+        // value, so the operator gets it to reconcile.
+        if (noteMsat !== undefined && error instanceof RotateError && error.newK1) {
+          handOver(error.newK1, noteMsat)
         }
         return FAIL
       }

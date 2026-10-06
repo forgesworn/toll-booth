@@ -135,9 +135,11 @@ export interface LnurlcashRailConfig {
   /** Currency unit. Notes are sat-denominated; 'sat' is the only value. */
   unit?: 'sat'
   /**
-   * Require the note URL to carry a `sig` that verifies against the mint's
-   * advertised pubkey. Off by default: a mint with no funding source of its
-   * own issues unsigned notes, and the rotate is the check that matters.
+   * Require the note URL to carry a certificate (`c`, or the older `sig`)
+   * that verifies against the mint's advertised pubkey under the rule for
+   * its shape, and the replacement note to come back certified. Off by
+   * default: a mint with no funding source of its own issues unsigned
+   * notes, and the rotate is the check that matters.
    */
   requireSignature?: boolean
   /** Timeout for calls to the mint, in milliseconds. Default: 10000. */

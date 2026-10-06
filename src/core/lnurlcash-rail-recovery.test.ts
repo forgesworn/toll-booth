@@ -1,55 +1,145 @@
 import { describe, it, expect, afterAll, vi } from 'vitest'
 import { createMockMint } from 'lnurlcash-conformance/mock-mint'
+import type { MockMint } from 'lnurlcash-conformance/mock-mint'
 import { randomBytes } from 'node:crypto'
 import { memoryStorage } from '../storage/memory.js'
 import type { TollBoothRequest } from './types.js'
 
-// A rotate the mint confirms without a signature has already spent the
-// presented note. The kit refuses it but carries the replacement secret, and
-// the rail must hand that secret on rather than drop it with the value.
-const replacement = randomBytes(32).toString('hex')
+// A rotate the mint confirms without a certificate has already spent the
+// presented note. Under requireSignature the booth refuses access, but the
+// replacement secret is the only key to the caller's value, so the rail must
+// hand it on rather than drop it. The rotate here really lands at the mint;
+// only the certificate on the way back is withheld.
+let withholdCertificate = false
 
-vi.mock('lnurlcash-kit', async (importOriginal) => {
-  const kit = await importOriginal<typeof import('lnurlcash-kit')>()
+vi.mock('./lnurlcash-compat.js', async (importOriginal) => {
+  const compat = await importOriginal<typeof import('./lnurlcash-compat.js')>()
   return {
-    ...kit,
-    rotateNote: async () => {
-      throw new kit.UnverifiableNoteError('rotate confirmed without a signature', [replacement])
+    ...compat,
+    rotateNote: async (...args: Parameters<typeof compat.rotateNote>) => {
+      const rotated = await compat.rotateNote(...args)
+      return withholdCertificate ? { k1: rotated.k1 } : rotated
     },
   }
 })
 
 const { createLnurlcashRail } = await import('./lnurlcash-rail.js')
 
-const mint = await createMockMint()
-afterAll(() => mint.close())
+const mints: MockMint[] = []
+afterAll(async () => {
+  await Promise.all(mints.map((m) => m.close()))
+})
+
+async function mint(options: Parameters<typeof createMockMint>[0] = {}): Promise<MockMint> {
+  const m = await createMockMint(options)
+  mints.push(m)
+  return m
+}
 
 function makeReq(headers: Record<string, string>): TollBoothRequest {
   return { method: 'GET', path: '/api/test', headers, ip: '127.0.0.1' }
 }
 
-describe('lnurlcash-rail recovery', () => {
-  it('refuses access but hands over a note whose rotate landed unsigned', async () => {
-    const k1 = randomBytes(32).toString('hex')
-    const sig = mint.state.creditNote(k1, 21_000)
-    const presented = new URL(`${mint.url}/w`)
-    presented.searchParams.set('k1', k1)
-    presented.searchParams.set('amount', '21000')
-    if (sig) presented.searchParams.set('sig', sig)
+function presented(m: MockMint, amountMsat = 21_000): { url: string; k1: string } {
+  const k1 = randomBytes(32).toString('hex')
+  const cert = m.state.creditNote(k1, amountMsat)
+  const url = new URL(`${m.url}/w`)
+  url.searchParams.set('k1', k1)
+  if (cert) url.searchParams.set('c', cert)
+  else url.searchParams.set('amount', String(amountMsat))
+  return { url: url.toString(), k1 }
+}
 
+describe('lnurlcash-rail recovery', () => {
+  it('refuses access but hands over a note whose rotate landed without a certificate', async () => {
+    const m = await mint()
+    const { url, k1 } = presented(m)
     const onNoteReceived = vi.fn()
     const rail = createLnurlcashRail(
-      { mints: [`127.0.0.1:${mint.port}`], requireSignature: true, onNoteReceived },
+      { mints: [`127.0.0.1:${m.port}`], requireSignature: true, onNoteReceived },
       memoryStorage(),
     )
-    const result = await rail.verify(makeReq({ 'x-lnurlcash': presented.toString() }), { sats: 10 })
 
-    expect(result.authenticated).toBe(false)
+    withholdCertificate = true
+    try {
+      const result = await rail.verify(makeReq({ 'x-lnurlcash': url }), { sats: 10 })
+      expect(result.authenticated).toBe(false)
+    } finally {
+      withholdCertificate = false
+    }
+
+    expect(m.state.noteState(k1)).toBe('burned')
     expect(onNoteReceived).toHaveBeenCalledTimes(1)
     const note = onNoteReceived.mock.calls[0][0]
-    expect(note.k1).toBe(replacement)
     expect(note.amountMsat).toBe(21_000)
-    expect(new URL(note.url).searchParams.get('k1')).toBe(replacement)
-    expect(new URL(note.url).searchParams.get('sig')).toBeNull()
+    const held = new URL(note.url)
+    expect(held.searchParams.get('k1')).toBe(note.k1)
+    expect(held.searchParams.get('amount')).toBe('21000')
+    expect(held.searchParams.get('c')).toBeNull()
+    expect(held.searchParams.get('sig')).toBeNull()
+    // The handed-over note is real: the mint holds it under the new secret.
+    expect(m.state.noteState(note.k1)).toBe('outstanding')
+  })
+
+  it('refuses access but hands over a note whose rotate the mint did not confirm', async () => {
+    const m = await mint({ unconfirmedMutation: true })
+    const { url, k1 } = presented(m)
+    const onNoteReceived = vi.fn()
+    const rail = createLnurlcashRail({ mints: [`127.0.0.1:${m.port}`], onNoteReceived }, memoryStorage())
+
+    const result = await rail.verify(makeReq({ 'x-lnurlcash': url }), { sats: 10 })
+
+    expect(result.authenticated).toBe(false)
+    expect(m.state.noteState(k1)).toBe('burned')
+    expect(onNoteReceived).toHaveBeenCalledTimes(1)
+    const note = onNoteReceived.mock.calls[0][0]
+    expect(m.state.noteState(note.k1)).toBe('outstanding')
+  })
+
+  it('settles a rotate whose answer was lost, by retrying it and taking the replay', async () => {
+    const m = await mint({ dropAfterMutation: true })
+    const { url, k1 } = presented(m)
+    const onNoteReceived = vi.fn()
+    const rail = createLnurlcashRail({ mints: [`127.0.0.1:${m.port}`], onNoteReceived }, memoryStorage())
+
+    const result = await rail.verify(makeReq({ 'x-lnurlcash': url }), { sats: 10 })
+
+    expect(result.authenticated).toBe(true)
+    expect(m.state.noteState(k1)).toBe('burned')
+    expect(onNoteReceived).toHaveBeenCalledTimes(1)
+    expect(m.state.noteState(onNoteReceived.mock.calls[0][0].k1)).toBe('outstanding')
+  })
+
+  it('hands over exactly one note when two callers race to spend the same one', async () => {
+    const m = await mint()
+    const { url, k1 } = presented(m)
+    const onNoteReceived = vi.fn()
+    const rail = createLnurlcashRail({ mints: [`127.0.0.1:${m.port}`], onNoteReceived }, memoryStorage())
+
+    // Both look the note up while it is live; one rotate lands and the
+    // other is refused at the callback. The refusal is the mint's answer
+    // to that request, so nothing moved and nothing is handed over for it.
+    const results = await Promise.all([
+      rail.verify(makeReq({ 'x-lnurlcash': url }), { sats: 10 }),
+      rail.verify(makeReq({ 'x-lnurlcash': url }), { sats: 10 }),
+    ])
+
+    expect(results.filter((r) => r.authenticated)).toHaveLength(1)
+    expect(m.state.noteState(k1)).toBe('burned')
+    expect(onNoteReceived).toHaveBeenCalledTimes(1)
+  })
+
+  it('hands nothing over for a note already spent', async () => {
+    const m = await mint()
+    const { url } = presented(m)
+    const onNoteReceived = vi.fn()
+    const rail = createLnurlcashRail({ mints: [`127.0.0.1:${m.port}`], onNoteReceived }, memoryStorage())
+
+    const first = await rail.verify(makeReq({ 'x-lnurlcash': url }), { sats: 10 })
+    const replay = await rail.verify(makeReq({ 'x-lnurlcash': url }), { sats: 10 })
+
+    expect(first.authenticated).toBe(true)
+    expect(replay.authenticated).toBe(false)
+    expect(onNoteReceived).toHaveBeenCalledTimes(1)
   })
 })
