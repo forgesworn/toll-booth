@@ -276,6 +276,9 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
           if (activeTypes.includes('x402')) {
             hints.push('x402: Sign the payment, then send \u2014 PAYMENT-SIGNATURE header')
           }
+          if (activeTypes.includes('nano')) {
+            hints.push('Nano: Send the amount to the address, then send the block hash \u2014 X-Nano-Block header')
+          }
           if (activeTypes.includes('xcashu')) {
             hints.push('Cashu: Send token via \u2014 X-Cashu header')
           }

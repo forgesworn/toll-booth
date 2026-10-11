@@ -118,6 +118,7 @@ curl -H "Authorization: L402 <macaroon>:<preimage>" https://jokes.forgesworn.dev
 - **LNURLcash bearer notes** - accepts a note URL as specified by the proposed [LUD-25 (lnurl/luds#301)](https://github.com/lnurl/luds/pull/301) in an `X-LNURLcash` header. One rotate at the mint is the verification, the double-spend check and the transfer of ownership.
 - **IETF Payment authentication** - implements [draft-ryan-httpauth-payment-01](https://datatracker.ietf.org/doc/draft-ryan-httpauth-payment/), an expired IETF Internet-Draft for HTTP payment authentication. HMAC-bound stateless challenges with Lightning settlement.
 - **x402 stablecoin payments** - accepts [x402](https://x402.org) on-chain stablecoin payments (USDC on Base, Polygon) alongside Lightning and Cashu simultaneously
+- **Nano (XNO) payments** - accepts a confirmed Nano send block to your own address, presented by hash in an `X-Nano-Block` header. Feeless, no facilitator; verified against a node RPC
 - **Cashu-only mode** - no Lightning node required; ideal for serverless and edge deployments
 - **Credit system** - pre-paid balance with volume discount tiers
 - **Free tier** - configurable daily allowance (IP-hashed, no PII stored)
@@ -384,9 +385,10 @@ Each backend implements the `LightningBackend` interface (`createInvoice` + `che
 | **Language** | Go binary | TypeScript middleware |
 | **Deployment** | Standalone reverse proxy | Embeds in your app, or runs as a gateway in front of any HTTP service |
 | **Lightning node** | Requires LND | Phoenixd, LND, CLN, LNbits, NWC, or none (ecash-only) |
-| **Payment rails** | Lightning only | Lightning, Cashu ecash, xcashu (NUT-24), LNURLcash bearer notes (proposed LUD-25, lnurl/luds#301), x402 stablecoins, IETF Payment - simultaneously |
+| **Payment rails** | Lightning only | Lightning, Cashu ecash, xcashu (NUT-24), LNURLcash bearer notes (proposed LUD-25, lnurl/luds#301), x402 stablecoins, Nano (XNO), IETF Payment - simultaneously |
 | **IETF Payment** | No | Yes - [draft-ryan-httpauth-payment-01](https://datatracker.ietf.org/doc/draft-ryan-httpauth-payment/) with stateless HMAC challenges |
 | **x402 stablecoins** | No | Yes - USDC on Base, Polygon via pluggable facilitator |
+| **Nano (XNO)** | No | Yes - confirmed send block to your address in an `X-Nano-Block` header, checked over node RPC |
 | **Cashu ecash** | No | Yes - redeemCashu callback + xcashu (NUT-24) direct-header rail |
 | **LNURLcash notes** | No | Yes - proposed LUD-25 bearer notes in an `X-LNURLcash` header, settled with one rotate |
 | **Credit system** | No | Pre-paid balance with volume discount tiers |
@@ -419,6 +421,26 @@ const booth = new Booth({
 The 402 challenge includes both `WWW-Authenticate` (L402) and `Payment-Required` (x402) headers. Clients choose their preferred rail. x402 payments settle into the same credit system as Lightning — volume discount tiers apply regardless of payment method.
 
 The unique value of toll-booth isn't any single payment rail. It's the **middleware layer**: gating, credit accounting, free tiers, volume discounts, upstream proxying, and macaroon credentials — all framework-agnostic, all runtime-agnostic, all payment-rail agnostic. Payment protocols are pluggable rails. toll-booth is the booth.
+
+## Nano (XNO) payments
+
+Nano sits beside the other rails for routes priced in USD. The client sends the quoted amount to your address and presents the send block's hash; there is no facilitator and no fee.
+
+```typescript
+const booth = new Booth({
+  adapter: 'express',
+  backend: phoenixdBackend({ url: '...', password: '...' }),
+  nano: {
+    address: 'nano_3t6k35gi95xu6tergt6p69ck76ogmitsa8mnijtpxm9fkcm736xtoncuohr3',
+    rawPerCent: '1000000000000000000000000', // or quoteRawPerCent: async () => ...
+    // rpcUrl: 'https://rpc.nano.to' (default), maxBlockAgeSeconds: 3600 (default)
+  },
+  pricing: { '/api': { sats: 10, usd: 5 } },
+  upstream: 'http://localhost:8080',
+})
+```
+
+The 402 challenge carries an `X-Nano` header (`nano:<address>?amount=<raw>`) and a `nano` body section with `address`, `amount_raw` and `uri`. The client retries with `X-Nano-Block: <64-hex block hash>`. The rail looks the block up with `blocks_info` and admits the request only when the block is a confirmed state send to your address for at least the quoted raw, seen by the node within `maxBlockAgeSeconds`. Each block pays for one request and is settled once. You supply the exchange rate; toll-booth has no price oracle.
 
 ---
 
@@ -854,6 +876,7 @@ The 402 body will include a `credit_tiers` array with the tier options.
 |-------|---------------|-------------|
 | `message` | Yes | `"Payment required."` |
 | `l402` | When L402 rail is active | Invoice, macaroon, payment hash, amount, payment URL |
+| `nano` | When the Nano rail is active and the route has a USD price | `{ address, amount_raw, amount_usd, uri }` |
 | `lnurlcash` | When the lnurlcash rail is active | `{ amount, unit, mints }` - the price and which mints' notes are accepted |
 | `booth` | When `serviceName` is set | `{ name, description }` service metadata |
 | `auth_hint` | When `serviceName` is set | Human/agent-readable instructions for each active payment rail |
