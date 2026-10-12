@@ -47,6 +47,7 @@ src/
     payment-rail.ts         # PaymentRail interface and pricing normalisation
     l402-rail.ts            # L402 Lightning + macaroon payment rail
     x402-rail.ts            # x402 on-chain stablecoin payment rail
+    nano-rail.ts            # Nano (XNO) send-block payment rail (node RPC verification)
     xcashu-rail.ts          # xcashu (NUT-24) direct-header payment rail
     lnurlcash-rail.ts       # lnurlcash payment rail
     lnurlcash-compat.ts     # LUD-25 wire layer readable by every mint generation (old and new note shapes)
@@ -95,7 +96,7 @@ examples/
 
 **Core engine** (`createTollBooth()`) is framework-agnostic; adapters translate between framework requests and `TollBoothRequest`/`TollBoothResult`. Core handlers (`handleCreateInvoice`, `handleCashuRedeem`) follow the same pattern.
 
-**Payment rails** are pluggable via the `PaymentRail` interface. Built-in rails: L402 (Lightning + macaroon), x402 (on-chain stablecoins), xcashu (NUT-24 direct-header), lnurlcash, and IETF Payment (draft-ryan-httpauth-payment-01, stateless Lightning). Multiple rails can run simultaneously on a single deployment.
+**Payment rails** are pluggable via the `PaymentRail` interface. Built-in rails: L402 (Lightning + macaroon), x402 (on-chain stablecoins), Nano (XNO send blocks), xcashu (NUT-24 direct-header), lnurlcash, and IETF Payment (draft-ryan-httpauth-payment-01, stateless Lightning). Multiple rails can run simultaneously on a single deployment.
 
 **Storage** is abstracted via `StorageBackend` interface. SQLite (WAL mode, better-sqlite3) is the default; `memoryStorage()` available for tests. Three tables: `credits` (balance ledger), `invoices`, `cashu_claims` (redemption leases).
 

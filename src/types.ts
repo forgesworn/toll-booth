@@ -60,6 +60,7 @@ export interface LightningBackend {
 import type { Proof } from '@cashu/cashu-ts'
 import type { Currency, PricingEntry } from './core/payment-rail.js'
 import type { X402RailConfig } from './core/x402-types.js'
+import type { NanoRailConfig } from './core/nano-rail.js'
 
 /**
  * Pricing table mapping route patterns to amounts.
@@ -286,6 +287,13 @@ export interface BoothConfig {
 
   /** x402 stablecoin payment rail configuration. */
   x402?: X402RailConfig
+
+  /**
+   * Nano (XNO) payment rail: accept a confirmed send block to the operator's
+   * address, presented by hash in the `X-Nano-Block` header. Needs a USD
+   * route price and an operator-supplied raw-per-cent rate.
+   */
+  nano?: NanoRailConfig
 
   /**
    * xcashu (NUT-24) config — accept Cashu ecash via X-Cashu header.

@@ -10,6 +10,7 @@ import { createTollBooth } from './core/toll-booth.js'
 import { createL402Rail } from './core/l402-rail.js'
 import { assertValidRootKey } from './macaroon.js'
 import { createX402Rail } from './core/x402-rail.js'
+import { createNanoRail } from './core/nano-rail.js'
 import { createXCashuRail } from './core/xcashu-rail.js'
 import { createLnurlcashRail } from './core/lnurlcash-rail.js'
 import { createIETFPaymentRail } from './core/ietf-payment.js'
@@ -89,8 +90,8 @@ export class Booth {
   private closed = false
 
   constructor(config: BoothOptions & EventHandler) {
-    if (!config.backend && !config.redeemCashu && !config.x402 && !config.xcashu && !config.lnurlcash) {
-      throw new Error('At least one payment method required: provide a Lightning backend, redeemCashu callback, x402 config, xcashu config, or lnurlcash config')
+    if (!config.backend && !config.redeemCashu && !config.x402 && !config.nano && !config.xcashu && !config.lnurlcash) {
+      throw new Error('At least one payment method required: provide a Lightning backend, redeemCashu callback, x402 config, nano config, xcashu config, or lnurlcash config')
     }
 
     // Auto-generate only when no key is given at all. A supplied key,
@@ -141,6 +142,10 @@ export class Booth {
 
     if (config.x402) {
       rails.push(createX402Rail({ ...config.x402, storage: this.storage }))
+    }
+
+    if (config.nano) {
+      rails.push(createNanoRail(config.nano))
     }
 
     if (config.xcashu) {
