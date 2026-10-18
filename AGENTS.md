@@ -2,7 +2,7 @@
 
 AI agent instructions for working with this codebase.
 
-L402 middleware: gates any HTTP API behind Lightning payments. Supports Express, Web Standard (Deno, Bun, Cloudflare Workers), and Hono.
+L402 middleware: gates any HTTP API behind payments (Lightning, Cashu, xcashu, LNURLcash, x402, IETF Payment). Supports Express, Web Standard (Deno, Bun, Cloudflare Workers), and Hono.
 
 ## Commands
 
@@ -85,11 +85,13 @@ examples/
 1. Client requests priced endpoint without L402 header
 2. Free tier checked (per-IP, per-day allowance)
 3. If exhausted, a 402 response is returned with a BOLT-11 invoice + macaroon
-4. Client pays (Lightning, NWC, or Cashu), obtains preimage or settlement secret
+4. Client pays the Lightning invoice (preimage) or redeems Cashu at `/cashu-redeem` via `redeemCashu` (settlement secret)
 5. Client sends `Authorization: L402 <macaroon>:<preimage>`
 6. Macaroon verified, credit granted, request proxied upstream with `X-Credit-Balance` header
 
-**Booth class** is a facade that wires together the engine, storage, and adapter. Constructor takes `adapter: 'express' | 'web-standard' | 'hono'` to select framework integration. One `new Booth(config)` call exposes `.middleware`, `.invoiceStatusHandler`, `.createInvoiceHandler`, and optional payment handlers such as `.cashuRedeemHandler`. For Hono, use `createHonoTollBooth()` directly for more idiomatic integration (auth middleware + payment route sub-app).
+That is the L402 flow. The xcashu, LNURLcash, x402 and IETF Payment rails answer the same 402 with their own headers instead of steps 4 to 6.
+
+**Booth class** is a facade that wires together the engine, storage, and adapter. Constructor takes `adapter: 'express' | 'web-standard'` to select framework integration (`'hono'` is not a valid value). One `new Booth(config)` call exposes `.middleware`, `.invoiceStatusHandler`, `.createInvoiceHandler`, and optional payment handlers such as `.cashuRedeemHandler`. For Hono, use `createTollBooth()` with `createHonoTollBooth({ engine })` instead (auth middleware + payment route sub-app).
 
 **Hono adapter** (`createHonoTollBooth()`) provides an auth middleware and a `createPaymentApp()` factory that returns a Hono sub-app with `/create-invoice`, `/invoice-status/:paymentHash`, and optional `/cashu-redeem` routes. Context variables (`TollBoothEnv`) expose payment state to downstream handlers.
 

@@ -1,11 +1,11 @@
 # toll-booth — Complete API Reference
 
-> toll-booth lets AI agents discover, pay for, and consume any HTTP API using Lightning, Cashu, NWC, x402 stablecoins, or IETF Payment (draft-ryan-httpauth-payment-01) - no accounts, no API keys, no human in the loop. toll-booth is the only middleware that accepts L402, x402, Cashu, and IETF Payment simultaneously. It's payment-rail agnostic HTTP 402 middleware that embeds in your Node.js app, supporting Express 5, Hono, Deno, Bun, and Cloudflare Workers.
+> toll-booth is the server side of HTTP 402 payments: it gates any HTTP API so that AI agents and other clients can pay for and consume it using Lightning (L402), Cashu, LNURLcash, x402 stablecoins, or IETF Payment (draft-ryan-httpauth-payment-01) - no accounts, no API keys, no human in the loop. The client side, where an agent discovers and pays, is 402-mcp. toll-booth is the only middleware that accepts L402, x402, Cashu, and IETF Payment simultaneously. It's payment-rail agnostic HTTP 402 middleware that embeds in your Node.js app, supporting Express 5, Hono, Deno, Bun, and Cloudflare Workers.
 
 ## Quick Start
 
 ```bash
-npm install @forgesworn/toll-booth
+npm install @forgesworn/toll-booth express   # express and hono are optional peer dependencies; install the one you use
 ```
 
 Scaffold a new project interactively:
@@ -48,7 +48,7 @@ const booth = new Booth({
     url: 'http://localhost:9740',
     password: process.env.PHOENIXD_PASSWORD!,
   }),
-  pricing: { '/api': 10 },
+  pricing: { '/api/resource': 10 },
   upstream: 'http://localhost:8080',
 })
 
@@ -434,7 +434,7 @@ const booth = new Booth({
     url: process.env.PHOENIXD_URL!,
     password: process.env.PHOENIXD_PASSWORD!,
   }),
-  pricing: { '/api': 10 },
+  pricing: { '/api/resource': 10 },
   upstream: 'http://localhost:8080',
   freeTier: { requestsPerDay: 5 },  // or { creditsPerDay: 100 } for usage-based
   creditTiers: [
@@ -463,9 +463,12 @@ const booth = new Booth({
   redeemCashu: async (token, paymentHash) => {
     // Verify and redeem the ecash token with your Cashu mint.
     // Return the credited amount in satoshis.
+    const wallet = new Wallet(getTokenMetadata(token).mint, { unit: 'sat' })  // Wallet, getTokenMetadata, sumProofs come from @cashu/cashu-ts
+    await wallet.loadMint()
+    const amountRedeemed = sumProofs(await wallet.receive(token)).toNumber()
     return amountRedeemed
   },
-  pricing: { '/api': 5 },
+  pricing: { '/api/resource': 5 },
   upstream: 'http://localhost:8080',
 })
 
@@ -507,7 +510,7 @@ const storage = sqliteStorage({ path: './toll-booth.db' })
 const rootKey = process.env.ROOT_KEY!
 
 const engine = createTollBooth({
-  pricing: { '/api': 10 },
+  pricing: { '/api/resource': 10 },
   backend,
   storage,
   rootKey,
@@ -584,8 +587,8 @@ Enable by adding `ietfPayment` to your Booth config:
 ```typescript
 const booth = new Booth({
   adapter: 'express',
-  backend: phoenixdBackend({ url: '...', password: '...' }),
-  pricing: { '/api': 10 },
+  backend: phoenixdBackend({ url: 'http://localhost:9740', password: process.env.PHOENIXD_PASSWORD! }),
+  pricing: { '/api/resource': 10 },
   upstream: 'http://localhost:8080',
   ietfPayment: {
     realm: 'api.example.com',
@@ -630,7 +633,7 @@ interface IETFReceipt {
 ### Key Properties
 
 - **Stateless** - challenges are HMAC-bound; no server-side session storage required.
-- **Standards-track** - implements the IETF draft for interoperability with other compliant clients and servers.
+- **Draft-based** - implements an expired IETF Internet-Draft (not a standard) for interoperability with clients and servers that implement the same draft.
 - **Multi-rail compatible** - runs alongside L402, x402, and Cashu rails on the same deployment. The `WWW-Authenticate` response includes challenges from all active rails simultaneously.
 - **Lightning-settled** - uses the same Lightning backend as L402 for invoice creation and payment verification.
 
@@ -639,7 +642,7 @@ interface IETFReceipt {
 1. Client requests a priced endpoint without credentials.
 2. Free tier checked per IP per day; if allowance remains (requests or sats budget) the request is proxied.
 3. Free tier exhausted: HTTP 402 response with BOLT-11 invoice and a macaroon.
-4. Client pays via Lightning wallet, NWC, or Cashu ecash token.
+4. Client pays the Lightning invoice, or redeems a Cashu token at `/cashu-redeem` (when `redeemCashu` is set) and uses the returned settlement secret in place of the preimage. The other rails (xcashu, LNURLcash, x402, IETF Payment) answer the 402 with their own headers instead of steps 4 to 6.
 5. Client sends `Authorization: L402 <macaroon>:<preimage>` on subsequent requests.
 6. Macaroon verified against root key; preimage validated against payment hash.
 7. Credits deducted per request from the payment-hash balance.

@@ -39,7 +39,7 @@ This spins up a fully working L402-gated joke API on localhost with a mock Light
 ### Option B: your own API
 
 ```bash
-npm install @forgesworn/toll-booth
+npm install @forgesworn/toll-booth express
 ```
 
 ```typescript
@@ -54,7 +54,7 @@ const booth = new Booth({
     url: 'http://localhost:9740',
     password: process.env.PHOENIXD_PASSWORD!,
   }),
-  pricing: { '/api': 10 },           // 10 sats per request
+  pricing: { '/api/resource': 10 },           // 10 sats per request
   upstream: 'http://localhost:8080',  // your existing API
 })
 

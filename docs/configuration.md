@@ -10,7 +10,7 @@ The `Booth` constructor accepts a config object with `adapter` plus all `BoothCo
 |--------|------|---------|-------------|
 | `adapter` | `'express' \| 'web-standard'` | — | **Required.** Framework integration to use. For Hono, use `createHonoTollBooth()` directly instead. |
 | `backend` | `LightningBackend` | — | Lightning node for invoice creation and status checks. Optional when using Cashu-only mode, x402, xcashu, or lnurlcash. |
-| `pricing` | `Record<string, number \| PriceInfo \| TieredPricing>` | — | **Required.** Route pattern to cost. Values can be a number (sats), a `PriceInfo` object (`{ sats: 10, usd: 1 }`), or a tiered map (`{ default: 10, premium: 100 }`). |
+| `pricing` | `Record<string, number \| PriceInfo \| TieredPricing>` | — | **Required.** Exact route path to cost: matching is exact after path normalisation (case-insensitive, trailing slash ignored), with no prefix or wildcard matching, so `'/api'` prices `/api` only. Values can be a number (sats), a `PriceInfo` object (`{ sats: 10, usd: 1 }`), or a tiered map (`{ default: 10, premium: 100 }`). |
 | `upstream` | `string` | — | **Required.** URL to proxy authorised requests to. |
 | `rootKey` | `string` | Random | Macaroon signing key (64 hex chars / 32 bytes). Auto-generated if omitted; **set a persistent key for production** or all macaroons are invalidated on restart. |
 | `defaultInvoiceAmount` | `number` | `1000` | Default invoice amount in sats. Used as the route cost when `strictPricing` challenges an unpriced route. |
@@ -141,7 +141,7 @@ sequenceDiagram
         T-->>C: 200 + X-Free-Remaining header
     else Free tier exhausted
         T-->>C: 402 + Invoice + Macaroon
-        C->>C: Pay via Lightning / Cashu / NWC
+        C->>C: Pay the invoice (or redeem Cashu)
         C->>T: GET /api/resource<br/>Authorization: L402 macaroon:preimage
         T->>T: Verify macaroon + preimage
         T->>T: Settle credit + debit cost
@@ -154,6 +154,24 @@ sequenceDiagram
 1. Client requests a priced endpoint without credentials
 2. Free tier checked — if allowance remains, request passes through
 3. If exhausted → **402** response with BOLT-11 invoice + macaroon
-4. Client pays via Lightning, NWC, or Cashu
-5. Client sends `Authorization: L402 <macaroon>:<preimage>`
+4. Client pays the Lightning invoice and gets its preimage, or redeems a Cashu token at `/cashu-redeem` (when `redeemCashu` is set) and gets a settlement secret
+5. Client sends `Authorization: L402 <macaroon>:<preimage>`, with the settlement secret in place of the preimage after a Cashu redeem
 6. Macaroon verified, credit deducted, request proxied upstream
+
+This is the L402 flow. The other rails (xcashu, LNURLcash, x402 and IETF Payment) answer the same 402 with their own headers instead of steps 4 to 6; the README covers each rail.
+
+## Hono payment app options
+
+`createHonoTollBooth({ engine })` returns `createPaymentApp(config)`, which mounts `/create-invoice`, `/invoice-status/:paymentHash` and, optionally, `/cashu-redeem`. Its option names differ slightly from `Booth`:
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `storage` | `StorageBackend` | Required. Must be the same instance passed to `createTollBooth()`. |
+| `rootKey` | `string` | Required. Must be the same value passed to `createTollBooth()`, or the auth middleware cannot verify the macaroons this app mints. |
+| `tiers` | `CreditTier[]` | Required. Equivalent of `creditTiers` on `Booth`; use `[]` for none. |
+| `defaultAmount` | `number` | Required. Equivalent of `defaultInvoiceAmount` on `Booth` and `createTollBooth()`; pass the same number to both. |
+| `backend` | `LightningBackend` | Lightning backend used to create invoices. |
+| `maxPendingPerIp` | `number` | Equivalent of `invoiceRateLimit.maxPendingPerIp`. |
+| `cashuRedeem` | `(token, paymentHash) => Promise<number>` | Equivalent of `redeemCashu`; enables `/cashu-redeem`. |
+| `serviceName` | `string` | Name used in invoice descriptions. Defaults to `'toll-booth'`. |
+| `getClientIp` | `(c: Context) => string` | Custom client IP resolver. |

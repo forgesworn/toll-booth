@@ -93,7 +93,7 @@ If the macaroon contains built-in caveats, they are checked against the current 
 | Caveat | Check | Example |
 |--------|-------|---------|
 | `route = /api/*` | Request path must match the pattern. Supports prefix matching with `/*` wildcard. | `route = /api/v1/*` allows `/api/v1/users` but not `/admin` |
-| `expires = 2026-06-01T00:00:00Z` | Current time must be before the expiry timestamp. | Rejects expired macaroons |
+| `expires = <ISO 8601 UTC timestamp>` | Current time must be before the expiry timestamp. | Rejects expired macaroons |
 | `ip = 203.0.113.1` | Client IP must match exactly. | Binds the macaroon to a specific client |
 
 Any failing caveat check returns `{ valid: false }` immediately.
