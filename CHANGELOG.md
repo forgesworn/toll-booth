@@ -1,83 +1,3 @@
-## [5.0.0](https://github.com/forgesworn/toll-booth/compare/v4.8.0...v5.0.0) (2026-08-08)
-
-Security-hardening release following a full review of the payment flow. Every finding was reproduced with a proof of concept before fixing, and each fix ships with regression tests.
-
-### Bug Fixes
-
-- **IETF session top-up replay (critical).** Top-up payment hashes are now consumed atomically with the credit write (`createSessionWithSettlement` / `topUpSessionWithSettlement` storage transactions). Previously the same challenge + preimage could be replayed to inflate session credit up to `maxDepositSats` from a single payment.
-- **IETF charge credentials are bound to route and amount.** The HMAC challenge now covers the resource path, `verify()` rejects credentials presented at a different route, and the engine refuses to settle when `amountPaid` is below the route price. A payment for a cheap route can no longer unlock an expensive one.
-- **Currency-mismatch no longer resolves to free access.** If a route has no price in the authenticating rail's currency, the engine issues a fresh challenge instead of treating the cost as zero (previously an x402 credential on a sats-only route proxied for free, indefinitely).
-- **Path normalisation.** Request paths are normalised once in the engine (duplicate slashes collapsed, trailing slashes stripped) for pricing lookup, challenge issuance, and rail verification across all adapters. Pricing-table keys are normalised at startup and collisions throw. A one-time startup warning is emitted when pricing is configured and `strictPricing` is off.
-- **x402 payments validated against advertised requirements.** Network, asset, payTo and amount are checked before and after facilitator verification; the same `buildRequirements()` output feeds both challenge and verify so they cannot drift.
-- **NWC response verification.** Wallet responses are signature-checked (defence in depth alongside relay-layer verification) and a one-time warning is emitted when a wallet falls back to NIP-04 encryption.
-
-### Breaking Changes
-
-- IETF Payment charge credentials now carry a `resource` field; credentials minted before this release are rejected. Clients must request a fresh challenge.
-- `X402Facilitator.verify(payload, requirements)` takes the full payment requirements as a second argument. Custom facilitator implementations must be updated.
-- `RailVerifyResult` gains `amountPaid`; custom payment rails should populate it.
-
-## [4.7.0](https://github.com/forgesworn/toll-booth/compare/v4.6.1...v4.7.0) (2026-05-23)
-
-
-### Added
-- `invoiceRateLimit.maxPendingPerIp` now also applies to the 402 challenge code path, not only `POST /create-invoice`. A single client IP that exceeds the cap by hitting priced endpoints without paying will receive HTTP 429 (with `Retry-After: 3600`) instead of a fresh invoice + macaroon.
-- `INVOICE_MAX_AGE_MS` env var on the `valhalla-proxy` example (default 1 hour in the example; the library's `invoiceMaxAgeMs` default remains 24 hours).
-
-### Internal
-- `TollBoothCoreConfig` gains optional `invoiceRateLimit?: { maxPendingPerIp: number }`.
-- `Booth` forwards `invoiceRateLimit` from `BoothConfig` into the engine.
-- Public `TollBoothResult` type's `challenge` variant status union widened from `401 | 402` to `401 | 402 | 429`. Existing consumers narrowing on `status === 402` continue to compile; consumers should consider handling the new 429 case if they branch on the status field.
-
-## [4.5.5](https://github.com/forgesworn/toll-booth/compare/v4.5.3...v4.5.5) (2026-04-12)
-
-
-### Bug Fixes
-
-* regenerate cashu-ts patch for v3.6.3 (production-minor bump in #17 left patch pinned to 3.6.1, breaking patch-package at install)
-
-
-### Chores
-
-* first release via forgesworn/anvil v0.8 pipeline (replaces semantic-release)
-* pin ci.yml action refs to commit SHAs (required by anvil strict-action-pins gate)
-* bump actions/checkout to v6 and actions/setup-node to v6
-* dev-dependency refresh (hono, vite, @hono/node-server, lodash-es)
-
-> Note: v4.5.4 was tagged but never reached npm — it was the first attempt at the anvil v0.8 pipeline and surfaced the two caller-side issues fixed above. Skipping 4.5.4 on npm in favour of 4.5.5.
-
-## [4.5.4](https://github.com/forgesworn/toll-booth/compare/v4.5.3...v4.5.4) (2026-04-12)
-
-
-### Chores
-
-* first release via forgesworn/anvil v0.8 pipeline (replaces semantic-release)
-* bump actions/checkout to v6 and actions/setup-node to v6
-* dev-dependency refresh (hono, vite, @hono/node-server, lodash-es)
-
-## [4.5.3](https://github.com/forgesworn/toll-booth/compare/v4.5.2...v4.5.3) (2026-04-12)
-
-
-### Bug Fixes
-
-* resolve development dependency vulnerabilities ([47eb2b2](https://github.com/forgesworn/toll-booth/commit/47eb2b27cecef33f4563ec760dc9eb378bcc55c8))
-
-## [4.5.2](https://github.com/forgesworn/toll-booth/compare/v4.5.1...v4.5.2) (2026-04-12)
-
-
-### Bug Fixes
-
-* resolve runtime dependency vulnerabilities ([319619f](https://github.com/forgesworn/toll-booth/commit/319619ff4e805434e91fb125ac9474aeaf08a36c))
-
-## [4.5.1](https://github.com/forgesworn/toll-booth/compare/v4.5.0...v4.5.1) (2026-04-07)
-
-
-### Bug Fixes
-
-* strip context7.json to claim-only fields ([5cf0be1](https://github.com/forgesworn/toll-booth/commit/5cf0be18d8484b5ce84ba32f5479854f4f88d92c))
-
-# [4.5.0](https://github.com/forgesworn/toll-booth/compare/v4.4.2...v4.5.0) (2026-03-28)
-
 ## 6.3.1 (2026-10-18)
 
 ### Bug Fixes
@@ -230,6 +150,25 @@ Security-hardening release following a full review of the payment flow. Every fi
 
 
 
+## [5.0.0](https://github.com/forgesworn/toll-booth/compare/v4.8.0...v5.0.0) (2026-08-08)
+
+Security-hardening release following a full review of the payment flow. Every finding was reproduced with a proof of concept before fixing, and each fix ships with regression tests.
+
+### Bug Fixes
+
+- **IETF session top-up replay (critical).** Top-up payment hashes are now consumed atomically with the credit write (`createSessionWithSettlement` / `topUpSessionWithSettlement` storage transactions). Previously the same challenge + preimage could be replayed to inflate session credit up to `maxDepositSats` from a single payment.
+- **IETF charge credentials are bound to route and amount.** The HMAC challenge now covers the resource path, `verify()` rejects credentials presented at a different route, and the engine refuses to settle when `amountPaid` is below the route price. A payment for a cheap route can no longer unlock an expensive one.
+- **Currency-mismatch no longer resolves to free access.** If a route has no price in the authenticating rail's currency, the engine issues a fresh challenge instead of treating the cost as zero (previously an x402 credential on a sats-only route proxied for free, indefinitely).
+- **Path normalisation.** Request paths are normalised once in the engine (duplicate slashes collapsed, trailing slashes stripped) for pricing lookup, challenge issuance, and rail verification across all adapters. Pricing-table keys are normalised at startup and collisions throw. A one-time startup warning is emitted when pricing is configured and `strictPricing` is off.
+- **x402 payments validated against advertised requirements.** Network, asset, payTo and amount are checked before and after facilitator verification; the same `buildRequirements()` output feeds both challenge and verify so they cannot drift.
+- **NWC response verification.** Wallet responses are signature-checked (defence in depth alongside relay-layer verification) and a one-time warning is emitted when a wallet falls back to NIP-04 encryption.
+
+### Breaking Changes
+
+- IETF Payment charge credentials now carry a `resource` field; credentials minted before this release are rejected. Clients must request a fresh challenge.
+- `X402Facilitator.verify(payload, requirements)` takes the full payment requirements as a second argument. Custom facilitator implementations must be updated.
+- `RailVerifyResult` gains `amountPaid`; custom payment rails should populate it.
+
 ## 4.8.0 (2026-05-23)
 
 ### Features
@@ -244,6 +183,18 @@ Security-hardening release following a full review of the payment flow. Every fi
 - forward engine status (429 vs 402) instead of hard-coding 402 (adapters)
 
 
+
+## [4.7.0](https://github.com/forgesworn/toll-booth/compare/v4.6.1...v4.7.0) (2026-05-23)
+
+
+### Added
+- `invoiceRateLimit.maxPendingPerIp` now also applies to the 402 challenge code path, not only `POST /create-invoice`. A single client IP that exceeds the cap by hitting priced endpoints without paying will receive HTTP 429 (with `Retry-After: 3600`) instead of a fresh invoice + macaroon.
+- `INVOICE_MAX_AGE_MS` env var on the `valhalla-proxy` example (default 1 hour in the example; the library's `invoiceMaxAgeMs` default remains 24 hours).
+
+### Internal
+- `TollBoothCoreConfig` gains optional `invoiceRateLimit?: { maxPendingPerIp: number }`.
+- `Booth` forwards `invoiceRateLimit` from `BoothConfig` into the engine.
+- Public `TollBoothResult` type's `challenge` variant status union widened from `401 | 402` to `401 | 402 | 429`. Existing consumers narrowing on `status === 402` continue to compile; consumers should consider handling the new 429 case if they branch on the status field.
 
 ## 4.6.1 (2026-05-10)
 
@@ -261,6 +212,55 @@ Security-hardening release following a full review of the payment flow. Every fi
 
 
 
+
+## [4.5.5](https://github.com/forgesworn/toll-booth/compare/v4.5.3...v4.5.5) (2026-04-12)
+
+
+### Bug Fixes
+
+* regenerate cashu-ts patch for v3.6.3 (production-minor bump in #17 left patch pinned to 3.6.1, breaking patch-package at install)
+
+
+### Chores
+
+* first release via forgesworn/anvil v0.8 pipeline (replaces semantic-release)
+* pin ci.yml action refs to commit SHAs (required by anvil strict-action-pins gate)
+* bump actions/checkout to v6 and actions/setup-node to v6
+* dev-dependency refresh (hono, vite, @hono/node-server, lodash-es)
+
+> Note: v4.5.4 was tagged but never reached npm — it was the first attempt at the anvil v0.8 pipeline and surfaced the two caller-side issues fixed above. Skipping 4.5.4 on npm in favour of 4.5.5.
+
+## [4.5.4](https://github.com/forgesworn/toll-booth/compare/v4.5.3...v4.5.4) (2026-04-12)
+
+
+### Chores
+
+* first release via forgesworn/anvil v0.8 pipeline (replaces semantic-release)
+* bump actions/checkout to v6 and actions/setup-node to v6
+* dev-dependency refresh (hono, vite, @hono/node-server, lodash-es)
+
+## [4.5.3](https://github.com/forgesworn/toll-booth/compare/v4.5.2...v4.5.3) (2026-04-12)
+
+
+### Bug Fixes
+
+* resolve development dependency vulnerabilities ([47eb2b2](https://github.com/forgesworn/toll-booth/commit/47eb2b27cecef33f4563ec760dc9eb378bcc55c8))
+
+## [4.5.2](https://github.com/forgesworn/toll-booth/compare/v4.5.1...v4.5.2) (2026-04-12)
+
+
+### Bug Fixes
+
+* resolve runtime dependency vulnerabilities ([319619f](https://github.com/forgesworn/toll-booth/commit/319619ff4e805434e91fb125ac9474aeaf08a36c))
+
+## [4.5.1](https://github.com/forgesworn/toll-booth/compare/v4.5.0...v4.5.1) (2026-04-07)
+
+
+### Bug Fixes
+
+* strip context7.json to claim-only fields ([5cf0be1](https://github.com/forgesworn/toll-booth/commit/5cf0be18d8484b5ce84ba32f5479854f4f88d92c))
+
+# [4.5.0](https://github.com/forgesworn/toll-booth/compare/v4.4.2...v4.5.0) (2026-03-28)
 
 ### Features
 
