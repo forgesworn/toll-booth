@@ -28,6 +28,8 @@ Spins up a fully working L402-gated joke API on localhost. Mock Lightning backen
 
 ## Minimal example
 
+Install with `npm install @forgesworn/toll-booth express`.
+
 ```typescript
 import express from 'express'
 import { Booth } from '@forgesworn/toll-booth'
@@ -37,7 +39,7 @@ const app = express()
 const booth = new Booth({
   adapter: 'express',
   backend: phoenixdBackend({ url: 'http://localhost:9740', password: process.env.PHOENIXD_PASSWORD! }),
-  pricing: { '/api': 10 },           // 10 sats per request
+  pricing: { '/api/resource': 10 },           // 10 sats per request
   upstream: 'http://localhost:8080',  // your existing API
 })
 
@@ -55,7 +57,7 @@ app.listen(3000)
 | | The old way | With toll-booth |
 |---|---|---|
 | **Step 1** | Create a Stripe account | `npm install @forgesworn/toll-booth` |
-| **Step 2** | Verify your identity (KYC) | Set your pricing: `{ '/api': 10 }` |
+| **Step 2** | Verify your identity (KYC) | Set your pricing: `{ '/api/resource': 10 }` |
 | **Step 3** | Integrate billing SDK | `app.use(booth.middleware)` |
 | **Step 4** | Build a sign-up page | Done. No sign-up page needed. |
 | **Step 5** | Handle webhooks, refunds, chargebacks | Done. Payments are final. |
@@ -66,7 +68,7 @@ app.listen(3000)
 
 Zero accounts. Zero API keys. Zero chargebacks. Zero KYC. Zero vendor lock-in.
 
-Your API earns money the moment it receives a request. Clients pay with Lightning, Cashu ecash, or NWC — no relationship with you required. Payments settle instantly and are cryptographically final — no disputes, no reversals, no Stripe risk reviews.
+Your API earns money the moment it receives a request. Clients need no relationship with you: they pay with Lightning, Cashu ecash, LNURLcash notes, x402 stablecoins or IETF Payment, whichever rails you enable. Payments settle instantly and are cryptographically final: no disputes, no reversals, no Stripe risk reviews.
 
 ---
 
@@ -135,6 +137,8 @@ curl -H "Authorization: L402 <macaroon>:<preimage>" https://jokes.forgesworn.dev
 npm install @forgesworn/toll-booth
 ```
 
+`express` and `hono` are optional peer dependencies and are not installed with toll-booth. Install the one you use: `npm install express` (and `npm install -D @types/express` for TypeScript) or `npm install hono`. The Web Standard adapter needs neither. The snippets after the framework sections are fragments: they reuse `Booth`, `phoenixdBackend`, `express` and `app` from the Express example above.
+
 ### Express
 
 ```typescript
@@ -151,7 +155,7 @@ const booth = new Booth({
     url: 'http://localhost:9740',
     password: process.env.PHOENIXD_PASSWORD!,
   }),
-  pricing: { '/api': 10 },           // 10 sats per request
+  pricing: { '/api/resource': 10 },           // 10 sats per request
   upstream: 'http://localhost:8080',  // your API
   rootKey: process.env.ROOT_KEY,      // 64 hex chars, required for production
 })
@@ -175,7 +179,7 @@ const booth = new Booth({
     url: 'https://localhost:8080',
     macaroon: process.env.LND_MACAROON!,
   }),
-  pricing: { '/api': 5 },
+  pricing: { '/api/resource': 5 },
   upstream: 'http://localhost:8080',
 })
 
@@ -192,6 +196,10 @@ Deno.serve({ port: 3000 }, async (req: Request) => {
 
 ### Hono
 
+```bash
+npm install @forgesworn/toll-booth hono
+```
+
 ```typescript
 import { Hono } from 'hono'
 import { createHonoTollBooth, type TollBoothEnv } from '@forgesworn/toll-booth/hono'
@@ -200,12 +208,17 @@ import { createTollBooth } from '@forgesworn/toll-booth'
 import { sqliteStorage } from '@forgesworn/toll-booth/storage/sqlite'
 
 const storage = sqliteStorage({ path: './toll-booth.db' })
+const backend = phoenixdBackend({ url: 'http://localhost:9740', password: process.env.PHOENIXD_PASSWORD! })
+const rootKey = process.env.ROOT_KEY!
+const defaultInvoiceAmount = 1000
+
 const engine = createTollBooth({
-  backend: phoenixdBackend({ url: 'http://localhost:9740', password: process.env.PHOENIXD_PASSWORD! }),
+  backend,
   storage,
-  pricing: { '/api': 10 },
+  pricing: { '/api/resource': 10 },
   upstream: 'http://localhost:8080',
-  rootKey: process.env.ROOT_KEY!,
+  rootKey,
+  defaultInvoiceAmount,
 })
 
 const tollBooth = createHonoTollBooth({ engine })
@@ -213,10 +226,11 @@ const app = new Hono<TollBoothEnv>()
 
 // Mount payment routes
 app.route('/', tollBooth.createPaymentApp({
-  storage,
-  rootKey: process.env.ROOT_KEY!,
+  backend,                        // creates the Lightning invoices
+  storage,                        // the same instance the engine uses
+  rootKey,                        // the same value the engine uses
   tiers: [],
-  defaultAmount: 1000,
+  defaultAmount: defaultInvoiceAmount,
 }))
 
 // Gate your API
@@ -229,19 +243,37 @@ app.get('/api/resource', (c) => {
 export default app
 ```
 
+`createPaymentApp()` names its default amount `defaultAmount`; it is the same setting as `defaultInvoiceAmount` on `Booth` and `createTollBooth()`, so pass the same number to both. Pass the same `storage` instance and `rootKey` value to `createTollBooth()` and `createPaymentApp()`: the payment app mints macaroons with that key and records invoices in that storage, and the auth middleware can only verify what it can read back. See [docs/configuration.md](docs/configuration.md#hono-payment-app-options).
+
 ### Cashu-only (no Lightning node)
+
+```bash
+npm install @forgesworn/toll-booth @cashu/cashu-ts
+```
 
 ```typescript
 import { Booth } from '@forgesworn/toll-booth'
+import { Wallet, getTokenMetadata, sumProofs } from '@cashu/cashu-ts'
+
+// Keep this in durable storage in production: crash recovery replays redeemCashu
+// for the same paymentHash and expects the same answer.
+const redeemed = new Map<string, number>()
 
 const booth = new Booth({
   adapter: 'web-standard',
   redeemCashu: async (token, paymentHash) => {
-    // Verify and redeem the ecash token with your Cashu mint
-    // Return the amount redeemed in satoshis
+    const previous = redeemed.get(paymentHash)
+    if (previous !== undefined) return previous
+
+    // Swap the proofs at the mint that issued the token; the mint is the double-spend check
+    const wallet = new Wallet(getTokenMetadata(token).mint, { unit: 'sat' })
+    await wallet.loadMint()
+    const proofs = await wallet.receive(token)
+    const amountRedeemed = sumProofs(proofs).toNumber() // satoshis
+    redeemed.set(paymentHash, amountRedeemed)
     return amountRedeemed
   },
-  pricing: { '/api': 5 },
+  pricing: { '/api/resource': 5 },
   upstream: 'http://localhost:8080',
 })
 ```
@@ -259,7 +291,7 @@ const booth = new Booth({
     mints: ['https://mint.minibits.cash'],
     unit: 'sat',
   },
-  pricing: { '/api': 10 },
+  pricing: { '/api/resource': 10 },
   upstream: 'http://localhost:3000',
 })
 ```
@@ -272,6 +304,10 @@ Unlike the `redeemCashu` callback (which integrates Cashu into the L402 payment-
 
 ```typescript
 import { Booth, meltNoteToLightning } from '@forgesworn/toll-booth'
+import { phoenixdBackend } from '@forgesworn/toll-booth/backends/phoenixd'
+
+// Your own Lightning node, used here only to sweep notes onto it
+const myNode = phoenixdBackend({ url: 'http://localhost:9740', password: process.env.PHOENIXD_PASSWORD! })
 
 const booth = new Booth({
   adapter: 'web-standard',
@@ -281,11 +317,11 @@ const booth = new Booth({
     onNoteReceived: async note => {
       await meltNoteToLightning({
         noteUrl: note.url,
-        createInvoice: sats => myNode.createInvoice(sats),
+        createInvoice: async sats => (await myNode.createInvoice(sats)).bolt11,
       })
     },
   },
-  pricing: { '/api': 10 },
+  pricing: { '/api/resource': 10 },
   upstream: 'http://localhost:3000',
 })
 ```
@@ -322,14 +358,17 @@ No Lightning node is required. `meltNoteToLightning({noteUrl, createInvoice})` s
 ### IETF Payment (draft-ryan-httpauth-payment-01)
 
 ```typescript
+import { Booth } from '@forgesworn/toll-booth'
+import { phoenixdBackend } from '@forgesworn/toll-booth/backends/phoenixd'
+
 const booth = new Booth({
   adapter: 'express',
-  backend: phoenixdBackend({ url: '...', password: '...' }),
+  backend: phoenixdBackend({ url: 'http://localhost:9740', password: process.env.PHOENIXD_PASSWORD! }),
   ietfPayment: {
     realm: 'api.example.com',
     // hmacSecret auto-derived from rootKey if omitted
   },
-  pricing: { '/api': 10 },
+  pricing: { '/api/resource': 10 },
   upstream: 'http://localhost:8080',
 })
 ```
@@ -403,15 +442,28 @@ For a detailed comparison with all alternatives, see [docs/comparison.md](docs/c
 [x402](https://x402.org) is Coinbase's HTTP 402 payment protocol for on-chain stablecoins. toll-booth speaks it natively. A single deployment accepts Lightning **and** x402 stablecoins **and** Cashu — simultaneously. The seller doesn't care how they get paid. They just want paid.
 
 ```typescript
+import { Booth, type X402Facilitator } from '@forgesworn/toll-booth'
+import { phoenixdBackend } from '@forgesworn/toll-booth/backends/phoenixd'
+
+// You supply the settlement check. `verify` must confirm on-chain that `payload`
+// paid `requirements.amount` of `requirements.asset` on `requirements.network`
+// to `requirements.payTo`. This placeholder fails closed: it accepts nothing
+// until you replace it with a call to your facilitator or chain node.
+const myFacilitator: X402Facilitator = {
+  async verify(payload, _requirements) {
+    return { valid: false, txHash: '', amount: 0, sender: payload.sender }
+  },
+}
+
 const booth = new Booth({
   adapter: 'express',
-  backend: phoenixdBackend({ url: '...', password: '...' }),
+  backend: phoenixdBackend({ url: 'http://localhost:9740', password: process.env.PHOENIXD_PASSWORD! }),
   x402: {
     receiverAddress: '0x1234...abcd',
     network: 'base',
     facilitator: myFacilitator, // verifies on-chain settlement
   },
-  pricing: { '/api': { sats: 10, usd: 5 } }, // price in both currencies
+  pricing: { '/api/resource': { sats: 10, usd: 5 } }, // price in both currencies
   upstream: 'http://localhost:8080',
 })
 ```
@@ -438,7 +490,7 @@ Point `upstream` at your existing service:
 ```typescript
 const booth = new Booth({
   adapter: 'express',
-  backend: phoenixdBackend({ url: '...', password: '...' }),
+  backend: phoenixdBackend({ url: 'http://localhost:9740', password: process.env.PHOENIXD_PASSWORD! }),
   pricing: { '/api/search': 5, '/api/generate': 20 },
   upstream: 'http://my-dotnet-api:5000',  // ASP.NET, FastAPI, Gin, Rails...
 })
@@ -451,7 +503,7 @@ Deploy toll-booth as a sidecar (Docker Compose, Kubernetes) or as a standalone g
 ## Production checklist
 
 - **Set a persistent `rootKey`** (64 hex chars / 32 bytes). Without it, a random key is generated per restart and all existing macaroons become invalid. Generate one with: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
-- Use a persistent `dbPath` (default: `./toll-booth.db`).
+- Use a persistent database. With `Booth`, set `dbPath` (default: `./toll-booth.db`; mutually exclusive with `storage`). With `createTollBooth()`, pass a `storage` such as `sqliteStorage({ path })`. See [docs/configuration.md](docs/configuration.md#storage).
 - Enable `strictPricing: true` to prevent unpriced routes from bypassing billing.
 - Ensure your `pricing` keys match the paths the middleware actually sees (after mounting). Each adapter computes one canonical path, prices the request on it and forwards exactly that path upstream: dot segments are resolved, percent-encoded unreserved characters are decoded, duplicate slashes are collapsed, and encoded `/`, `\` or `.` segments and literal backslashes are rejected with 400. Pricing lookups ignore a trailing slash and are **case-insensitive**, so `/API/joke` is charged as `/api/joke` (case-insensitive upstreams such as Express would otherwise serve it for free); the path is forwarded with its original case.
 - Set `trustProxy: true` when behind a reverse proxy, or provide a `getClientIp` callback for per-client free-tier isolation.
@@ -497,7 +549,7 @@ sequenceDiagram
         T-->>C: 200 + X-Free-Remaining header
     else Free tier exhausted
         T-->>C: 402 + Invoice + Macaroon
-        C->>C: Pay via Lightning / Cashu / NWC
+        C->>C: Pay the invoice (or redeem Cashu)
         C->>T: GET /api/resource<br/>Authorization: L402 macaroon:preimage
         T->>T: Verify macaroon + preimage
         T->>T: Settle credit + debit cost
@@ -510,9 +562,11 @@ sequenceDiagram
 1. Client requests a priced endpoint without credentials
 2. Free tier checked - if allowance remains, request passes through
 3. If exhausted - **402** response with BOLT-11 invoice + macaroon
-4. Client pays via Lightning, NWC, or Cashu
-5. Client sends `Authorization: L402 <macaroon>:<preimage>`
+4. Client pays the Lightning invoice and gets its preimage, or redeems a Cashu token at `/cashu-redeem` (when `redeemCashu` is set) and gets a settlement secret. (NWC is how the operator's own Lightning backend can be reached, not a way for clients to pay.)
+5. Client sends `Authorization: L402 <macaroon>:<preimage>`, with the settlement secret in place of the preimage after a Cashu redeem
 6. Macaroon verified, credit deducted, request proxied upstream
+
+This is the L402 flow. The other rails (xcashu, LNURLcash, x402 and IETF Payment) answer the same 402 with their own headers instead of steps 4 to 6; see their sections.
 
 ---
 
@@ -523,8 +577,8 @@ Three optional callbacks let you observe the payment lifecycle without modifying
 ```typescript
 const booth = new Booth({
   adapter: 'express',
-  backend: phoenixdBackend({ url: '...', password: '...' }),
-  pricing: { '/api': 10 },
+  backend: phoenixdBackend({ url: 'http://localhost:9740', password: process.env.PHOENIXD_PASSWORD! }),
+  pricing: { '/api/resource': 10 },
   upstream: 'http://localhost:8080',
 
   // Fired once per payment hash on first successful authentication
@@ -558,7 +612,7 @@ toll-booth only gates routes that appear in the `pricing` map. Unpriced routes p
 ```typescript
 const booth = new Booth({
   adapter: 'express',
-  backend: phoenixdBackend({ url: '...', password: '...' }),
+  backend: phoenixdBackend({ url: 'http://localhost:9740', password: process.env.PHOENIXD_PASSWORD! }),
   pricing: {
     '/api/premium': 100,    // 100 sats per request
     '/api/generate': 50,    // 50 sats per request
@@ -590,7 +644,7 @@ To gate everything by default (opt-out instead of opt-in), enable `strictPricing
 ```typescript
 const booth = new Booth({
   adapter: 'express',
-  backend: phoenixdBackend({ url: '...', password: '...' }),
+  backend: phoenixdBackend({ url: 'http://localhost:9740', password: process.env.PHOENIXD_PASSWORD! }),
   pricing: { '/health': 0 },    // explicitly free
   strictPricing: true,           // everything else costs defaultInvoiceAmount
   defaultInvoiceAmount: 10,
@@ -607,13 +661,15 @@ Add application-specific restrictions to macaroons via the `/create-invoice` end
 > **Caveats restrict access; they never grant it.** Whoever requests the invoice chooses its caveats, so a caveat can only narrow what a macaroon may do. Never unlock anything because a caveat is present (for example, do not serve premium features because `X-Toll-Caveat-Tier` says `premium`); charge for that with tiered pricing (for example `{ default: 5, premium: 42 }`) instead. toll-booth strips any `X-Toll-*`, `X-Credit-Balance`, `X-Free-Remaining` or `X-Session-Balance` header the client sends, so the values your upstream sees always come from a verified macaroon.
 
 ```bash
-# Request an invoice with custom caveats
+# Request an invoice with custom caveats. The expiry must be in the future,
+# so compute it (here 30 days ahead) rather than pasting a fixed date.
+EXPIRES=$(node -e "console.log(new Date(Date.now() + 30 * 86400000).toISOString())")
 curl -X POST https://api.example.com/create-invoice \
   -H 'Content-Type: application/json' \
-  -d '{
-    "amountSats": 1000,
-    "caveats": ["model = llama3", "tier = basic", "expires = 2026-06-01T00:00:00Z"]
-  }'
+  -d "{
+    \"amountSats\": 1000,
+    \"caveats\": [\"model = llama3\", \"tier = basic\", \"expires = $EXPIRES\"]
+  }"
 ```
 
 When the client authenticates with this macaroon, toll-booth parses the caveats and forwards them as headers to your upstream:
@@ -667,7 +723,7 @@ app.get('/api/generate', (c) => {
 | Caveat | Effect | Example |
 |--------|--------|---------|
 | `route = /api/*` | Restrict the macaroon to specific paths. Supports `/*` prefix matching. | Only allows requests under `/api/` |
-| `expires = 2026-06-01T00:00:00Z` | Time-limited access. Rejected after the timestamp. | 30-day access pass |
+| `expires = <ISO 8601 UTC timestamp>` | Time-limited access. Rejected once the timestamp has passed, so use a time in the future. | 30-day access pass: set it 30 days ahead |
 | `ip = 203.0.113.1` | Bind the macaroon to a specific client IP. | Prevent credential sharing |
 
 **Custom caveats** (any key not in the reserved list) are parsed by toll-booth and forwarded to your upstream as `X-Toll-Caveat-*` request headers. Your upstream is responsible for enforcing them, as restrictions only. Up to 16 custom caveats per macaroon, max 1024 characters each.
@@ -744,8 +800,8 @@ Use `responseHeaders` to add arbitrary headers to every response, including 402 
 ```typescript
 const booth = new Booth({
   adapter: 'express',
-  backend: phoenixdBackend({ url: '...', password: '...' }),
-  pricing: { '/api': 10 },
+  backend: phoenixdBackend({ url: 'http://localhost:9740', password: process.env.PHOENIXD_PASSWORD! }),
+  pricing: { '/api/resource': 10 },
   upstream: 'http://localhost:8080',
   responseHeaders: {
     'X-Powered-By': 'toll-booth',
@@ -764,8 +820,8 @@ Set `serviceName` and `description` to include machine-readable service metadata
 ```typescript
 const booth = new Booth({
   adapter: 'express',
-  backend: phoenixdBackend({ url: '...', password: '...' }),
-  pricing: { '/api': 10 },
+  backend: phoenixdBackend({ url: 'http://localhost:9740', password: process.env.PHOENIXD_PASSWORD! }),
+  pricing: { '/api/resource': 10 },
   upstream: 'http://localhost:8080',
   serviceName: 'my-api',
   description: 'Premium data API with real-time market feeds',
@@ -835,8 +891,8 @@ When `creditTiers` are configured, the 402 body includes them so clients can off
 ```typescript
 const booth = new Booth({
   adapter: 'express',
-  backend: phoenixdBackend({ url: '...', password: '...' }),
-  pricing: { '/api': 10 },
+  backend: phoenixdBackend({ url: 'http://localhost:9740', password: process.env.PHOENIXD_PASSWORD! }),
+  pricing: { '/api/resource': 10 },
   upstream: 'http://localhost:8080',
   creditTiers: [
     { amountSats: 1000, creditSats: 1000, label: '1k sats' },
@@ -854,7 +910,7 @@ The 402 body will include a `credit_tiers` array with the tier options.
 |-------|---------------|-------------|
 | `message` | Yes | `"Payment required."` |
 | `l402` | When L402 rail is active | Invoice, macaroon, payment hash, amount, payment URL |
-| `lnurlcash` | When the lnurlcash rail is active | `{ amount, unit, mints }` - the price and which mints' notes are accepted |
+| `lnurlcash` | When the lnurlcash rail is active | `{ amount, currency, methodDetails: { mints } }` - `amount` is a decimal string of sats, `mints` lists the mints whose notes are accepted |
 | `booth` | When `serviceName` is set | `{ name, description }` service metadata |
 | `auth_hint` | When `serviceName` is set | Human/agent-readable instructions for each active payment rail |
 | `tiers` | For tiered-pricing routes | Available pricing tiers for the requested route |
@@ -870,9 +926,9 @@ The five most common options:
 
 | Option | Type | Description |
 |--------|------|-------------|
-| `adapter` | `'express' \| 'web-standard'` | Framework integration to use. For Hono, use `createHonoTollBooth()` from `@forgesworn/toll-booth/hono` instead. |
+| `adapter` | `'express' \| 'web-standard'` | Framework integration to use. `'hono'` is not a `Booth` adapter value: for Hono, use `createHonoTollBooth()` from `@forgesworn/toll-booth/hono` instead. |
 | `backend` | `LightningBackend` | Lightning node (optional if using Cashu-only) |
-| `pricing` | `Record<string, number>` | Route pattern to cost in sats |
+| `pricing` | `Record<string, number \| { sats?: number, usd?: number } \| { default: ..., [tier]: ... }>` | Exact route path to cost. A number is sats, `{ sats, usd }` prices in both currencies, and `{ default: 5, premium: 42 }` is a tiered map that must include `default`. Matching is exact on the request path after normalisation (case-insensitive, trailing slash ignored). There is no prefix or wildcard matching: `'/api'` prices `/api` only, not `/api/joke`. Unlisted paths pass free unless `strictPricing` is on. |
 | `upstream` | `string` | URL to proxy authorised requests to |
 | `freeTier` | `{ requestsPerDay: number }` or `{ creditsPerDay: number }` | Daily free allowance per IP (request-count or sats-budget) |
 
@@ -889,7 +945,7 @@ See [docs/configuration.md](docs/configuration.md) for the full reference includ
 | **[Configuration](docs/configuration.md)** | Full reference for all Booth options |
 | **[Deployment](docs/deployment.md)** | Docker, nginx, Cloudflare Workers, Deno, Bun, Hono |
 | **[Security](docs/security.md)** | Threat model, macaroon security, hardening measures |
-| **[Migration](docs/migration.md)** | Upgrading from v1 to v2, and v2 to v3 |
+| **[Migration](docs/migration.md)** | Upgrading between major versions (v1 to v6) |
 | **[Contributing](CONTRIBUTING.md)** | Development setup, conventions, adding backends |
 
 ---

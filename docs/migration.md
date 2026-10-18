@@ -1,5 +1,20 @@
 # Migration Guide
 
+## v5 to v6
+
+**Breaking change:** the payer-side NWC flow was removed. NWC is now only the operator's own Lightning backend, built on `@forgesworn/nwc-kit`.
+
+### What was removed
+
+- The `nwcPayInvoice` option, the `POST /nwc-pay` route, and the NWC choice on the payment page. toll-booth never accepts a payer's NWC connection URI: it is a bearer-equivalent wallet credential and stays with the wallet owner.
+- `createExpressNwcHandler` and `createWebStandardNwcHandler`, and the `nwcPay` option of the Hono `createPaymentApp()`.
+
+### What to change
+
+Delete any use of those options and routes. Clients pay through the rails you enable (Lightning invoice, Cashu, xcashu, LNURLcash, x402, IETF Payment). If you used `nwcBackend()` as your Lightning backend, it keeps working; load its `nwcUrl` from a private file as shown under v1 to v2 below.
+
+---
+
 ## v4 to v5
 
 **Breaking changes:** IETF Payment credential format, `X402Facilitator` interface, `RailVerifyResult` shape. <!-- gitleaks:allow -- false-positive type name -->
@@ -29,6 +44,26 @@ verify: async (payload, requirements) => { /* ... */ }
 - Request paths are normalised before pricing lookup (`/api/joke/` and `/api/joke` are priced identically). If you relied on trailing-slash variants being unpriced, set `strictPricing: true` and price the canonical path.
 - A one-time startup warning is printed when pricing is configured and `strictPricing` is off.
 - x402 (USD) credentials on sats-only routes (and vice versa) are now challenged instead of proxied at zero cost.
+
+---
+
+## v3 to v4
+
+**Breaking change:** the npm package was renamed from `@thecryptodonkey/toll-booth` to `@forgesworn/toll-booth`.
+
+### What to change
+
+Install the new package, remove the old one, and update every import path:
+
+```typescript
+// v3
+import { Booth } from '@thecryptodonkey/toll-booth'
+import { phoenixdBackend } from '@thecryptodonkey/toll-booth/backends/phoenixd'
+
+// v4 and later
+import { Booth } from '@forgesworn/toll-booth'
+import { phoenixdBackend } from '@forgesworn/toll-booth/backends/phoenixd'
+```
 
 ---
 

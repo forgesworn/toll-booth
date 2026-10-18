@@ -1,12 +1,12 @@
 # toll-booth
 
-> toll-booth lets AI agents discover, pay for, and consume any HTTP API using Lightning, Cashu, NWC, x402 stablecoins, or IETF Payment (draft-ryan-httpauth-payment-01) - no accounts, no API keys, no human in the loop. It's payment-rail agnostic HTTP 402 middleware that embeds in your Node.js app, supporting Express 5, Hono, Deno, Bun, and Cloudflare Workers.
+> toll-booth is the server side of HTTP 402 payments: it gates any HTTP API so that AI agents and other clients can pay for and consume it using Lightning (L402), Cashu, LNURLcash, x402 stablecoins, or IETF Payment (draft-ryan-httpauth-payment-01) - no accounts, no API keys, no human in the loop. It's payment-rail agnostic HTTP 402 middleware that embeds in your Node.js app or runs as a gateway in front of any HTTP service, supporting Express 5, Hono, Deno, Bun, and Cloudflare Workers. The client side, where an agent discovers and pays, is 402-mcp.
 
-toll-booth is the only middleware that accepts L402, x402, Cashu, and IETF Payment (draft-ryan-httpauth-payment-01) simultaneously. It embeds in your existing Node.js application as middleware (not a separate proxy). It supports Express 5, Hono, Deno, Bun, and Cloudflare Workers. Five Lightning backends are supported (Phoenixd, LND, Core Lightning, LNbits, NWC), or you can run in Cashu-only mode with no Lightning node at all - ideal for serverless and edge deployments. x402 stablecoin payments (Coinbase's on-chain payment protocol) and IETF Payment (standards-track HTTP authentication for payments) are also supported via pluggable payment rails.
+toll-booth is the only middleware that accepts L402, x402, Cashu, and IETF Payment (draft-ryan-httpauth-payment-01) simultaneously. It embeds in your Node.js application as middleware, or runs as a reverse proxy gateway in front of any HTTP service; either way it forwards authorised requests to the `upstream` URL you configure. It supports Express 5, Hono, Deno, Bun, and Cloudflare Workers. Five Lightning backends are supported (Phoenixd, LND, Core Lightning, LNbits, NWC), or you can run in Cashu-only mode with no Lightning node at all - ideal for serverless and edge deployments. x402 stablecoin payments (Coinbase's on-chain payment protocol), xcashu (NUT-24) direct-header Cashu payments, LNURLcash bearer notes (proposed LUD-25) and IETF Payment (draft-ryan-httpauth-payment-01, an expired IETF Internet-Draft, not a standard) are also supported via pluggable payment rails.
 
 The closest alternative is Aperture (Lightning Labs), a Go reverse proxy that requires LND. toll-booth is TypeScript middleware that works with any Lightning backend, runs serverless, supports Cashu ecash, accepts x402 stablecoins, and implements IETF Payment (draft-ryan-httpauth-payment-01, an expired IETF Internet-Draft).
 
-Payment rails are pluggable - a single toll-booth deployment can accept Lightning, Cashu, x402 stablecoins, and IETF Payment simultaneously. The seller doesn't care how they get paid.
+Payment rails are pluggable - a single toll-booth deployment can accept Lightning, Cashu (redeemCashu and xcashu), LNURLcash, x402 stablecoins, and IETF Payment simultaneously. The seller doesn't care how they get paid.
 
 Try it instantly: `npx @forgesworn/toll-booth demo`
 
@@ -15,7 +15,7 @@ Scaffold a new project: `npx @forgesworn/toll-booth init` — interactive CLI th
 ## Getting Started
 
 ```bash
-npm install @forgesworn/toll-booth
+npm install @forgesworn/toll-booth express   # express and hono are optional peer dependencies; install the one you use
 ```
 
 ```typescript
@@ -32,7 +32,7 @@ const booth = new Booth({
     url: 'http://localhost:9740',
     password: process.env.PHOENIXD_PASSWORD!,
   }),
-  pricing: { '/api': 10 },
+  pricing: { '/api/resource': 10 },
   upstream: 'http://localhost:8080',
 })
 
@@ -45,13 +45,20 @@ app.listen(3000)
 For Cashu-only mode (no Lightning node required):
 
 ```typescript
+import { Booth } from '@forgesworn/toll-booth'
+import { Wallet, getTokenMetadata, sumProofs } from '@cashu/cashu-ts'  // npm install @cashu/cashu-ts
+
 const booth = new Booth({
   adapter: 'web-standard',
   redeemCashu: async (token, paymentHash) => {
-    // Verify and redeem the ecash token with your Cashu mint
+    // Swap the proofs at the issuing mint. In production, store the result per paymentHash
+    // and return it on a repeat call: crash recovery replays redeemCashu and expects the same answer.
+    const wallet = new Wallet(getTokenMetadata(token).mint, { unit: 'sat' })
+    await wallet.loadMint()
+    const amountRedeemed = sumProofs(await wallet.receive(token)).toNumber()
     return amountRedeemed
   },
-  pricing: { '/api': 5 },
+  pricing: { '/api/resource': 5 },
   upstream: 'http://localhost:8080',
 })
 ```
@@ -61,14 +68,14 @@ const booth = new Booth({
 - **Booth** — the main facade class. Instantiate with a config object, then wire `.middleware`, `.invoiceStatusHandler`, and `.createInvoiceHandler` into your router.
 - **LightningBackend** — interface with two methods: `createInvoice(amountSats, memo?)` and `checkInvoice(paymentHash)`. Five implementations provided; implement your own for custom backends.
 - **L402 flow** — client requests a priced endpoint, receives HTTP 402 with a Lightning invoice and macaroon, pays the invoice, then sends `Authorization: L402 <macaroon>:<preimage>` to access the API.
-- **Payment methods** — Lightning (via any backend), Cashu ecash tokens (via `redeemCashu` callback), x402 stablecoins, and IETF Payment. NWC is one merchant-side Lightning backend, not a separate payer rail. Multiple rails run simultaneously on a single deployment.
+- **Payment methods** — Lightning (via any backend), Cashu ecash tokens (via the `redeemCashu` callback or the xcashu NUT-24 rail), LNURLcash bearer notes, x402 stablecoins, and IETF Payment. NWC is one merchant-side Lightning backend, not a separate payer rail. Multiple rails run simultaneously on a single deployment.
 - **Credit system** — payments grant a credit balance. Each request deducts from the balance. Volume discount tiers available via `creditTiers`.
 - **Free tier** — optional per-IP daily allowance. Request-based: `freeTier: { requestsPerDay: N }`. Usage-based: `freeTier: { creditsPerDay: N }` (daily sats budget debited by each request's cost). Requests within the allowance bypass payment.
-- **Payment rails** — pluggable payment rail abstraction (`PaymentRail` interface). Built-in rails: `createL402Rail()` for Lightning/macaroon auth, `createX402Rail()` for on-chain stablecoin payments, and IETF Payment for standards-track HTTP payment authentication. Multiple rails can run simultaneously on the same deployment.
+- **Payment rails** — pluggable payment rail abstraction (`PaymentRail` interface). Built-in rails: `createL402Rail()` for Lightning/macaroon auth, `createX402Rail()` for on-chain stablecoin payments, `createXCashuRail()` for xcashu (NUT-24), `createLnurlcashRail()` for LNURLcash notes, and `createIETFPaymentRail()` for IETF Payment (an expired Internet-Draft, not a standard). Multiple rails can run simultaneously on the same deployment.
 - **IETF Payment** — implements draft-ryan-httpauth-payment-01, an expired IETF Internet-Draft for HTTP-native payment authentication. HMAC-bound stateless challenges (no server state needed), Lightning settlement via any supported backend, and `Payment-Receipt` response header on successful auth. Enable with `ietfPayment: { realm: 'api.example.com' }` in Booth config.
-- **Adapters** — `'express'` for Express 4/5, `'web-standard'` for Deno, Bun, and Cloudflare Workers, `'hono'` for Hono. For Hono, use `createHonoTollBooth()` directly for idiomatic integration (auth middleware + payment route sub-app).
+- **Adapters** — `'express'` for Express 4/5, `'web-standard'` for Deno, Bun, and Cloudflare Workers, and nothing else: `'hono'` is not a Booth adapter value. For Hono, use `createTollBooth()` with `createHonoTollBooth({ engine })` from `@forgesworn/toll-booth/hono` (auth middleware + `createPaymentApp()` sub-app). `createPaymentApp()` takes `defaultAmount` (the same setting as `defaultInvoiceAmount`), and its `storage` and `rootKey` must be the same instance and value given to `createTollBooth()`.
 - **Event hooks** — three optional callbacks for observing the payment lifecycle: `onPayment` (fires once per payment hash on first successful auth; receives `{ timestamp, paymentHash, amountSats, currency, rail }`), `onRequest` (fires on every authenticated or free-tier request; receives `{ timestamp, endpoint, satsDeducted, remainingBalance, latencyMs, authenticated, currency, tier }`), and `onChallenge` (fires when a 402 challenge is issued; receives `{ timestamp, endpoint, amountSats }`). Pass them in the Booth config or engine config. Use for logging, analytics, webhook dispatch, or metrics.
-- **Selective route gating** — only routes listed in the `pricing` map are gated. Unpriced routes pass through free by default (`strictPricing: false`; a startup warning is emitted when pricing is configured in this mode). Enable `strictPricing: true` to gate all routes at `defaultInvoiceAmount`. Each adapter prices and forwards one canonical path (dot segments resolved, encoded unreserved characters decoded, duplicate slashes collapsed; encoded `/`, `\`, `.` segments and backslashes rejected with 400). Pricing lookups ignore trailing slashes and are case-insensitive. You can also mount the middleware on a specific Express path prefix (e.g. `app.use('/api/paid', booth.middleware)`) to scope gating to a subset of routes.
+- **Selective route gating** — only routes listed in the `pricing` map are gated. Pricing keys match one path exactly (after normalisation; there is no prefix or wildcard matching), so `'/api'` prices `/api` but not `/api/joke`. A value is a number of sats, `{ sats, usd }`, or a tiered map with a `default` key. Unpriced routes pass through free by default (`strictPricing: false`; a startup warning is emitted when pricing is configured in this mode). Enable `strictPricing: true` to gate all routes at `defaultInvoiceAmount`. Each adapter prices and forwards one canonical path (dot segments resolved, encoded unreserved characters decoded, duplicate slashes collapsed; encoded `/`, `\`, `.` segments and backslashes rejected with 400). Pricing lookups ignore trailing slashes and are case-insensitive. You can also mount the middleware on a specific Express path prefix (e.g. `app.use('/api/paid', booth.middleware)`) to scope gating to a subset of routes.
 - **Custom macaroon caveats** — the `/create-invoice` endpoint accepts a `caveats` array of `"key = value"` strings (up to 16 caveats, max 1024 chars each). Built-in caveats verified by toll-booth: `route` (path restriction with wildcards), `expires` (ISO 8601 expiry), `ip` (client IP binding). Custom caveats (any non-reserved key) are parsed and forwarded to your upstream as `X-Toll-Caveat-{Key}: value` request headers. Your upstream enforces them as restrictions only: the client chooses caveats, so they never grant access. Client-sent `X-Toll-*` and `X-Credit-Balance` headers are stripped before proxying. Example: `caveats: ["model = llama3", "tier = basic"]` results in headers `X-Toll-Caveat-Model: llama3` and `X-Toll-Caveat-Tier: basic`.
 - **Payment state in handlers** — after successful auth, Hono handlers access payment details via typed context variables: `c.get('tollBoothCreditBalance')`, `c.get('tollBoothPaymentHash')`, `c.get('tollBoothEstimatedCost')`, `c.get('tollBoothFreeRemaining')`, `c.get('tollBoothTier')`, `c.get('tollBoothAction')`. Express and Web Standard adapters add `X-Credit-Balance` and `X-Free-Remaining` headers to the client response, and forward `X-Credit-Balance`, `X-Toll-Tier` and `X-Toll-Caveat-*` headers to the upstream service. The Hono middleware sets the same headers on the request its handlers see.
 
@@ -77,8 +84,8 @@ const booth = new Booth({
 ```typescript
 const booth = new Booth({
   adapter: 'express',
-  backend: phoenixdBackend({ url: '...', password: '...' }),
-  pricing: { '/api': 10 },
+  backend: phoenixdBackend({ url: 'http://localhost:9740', password: process.env.PHOENIXD_PASSWORD! }),
+  pricing: { '/api/resource': 10 },
   upstream: 'http://localhost:8080',
   onPayment: (event) => {
     console.log(`Payment: ${event.amountSats} sats via ${event.rail} (${event.paymentHash})`)
@@ -98,7 +105,7 @@ const booth = new Booth({
 // Only /api/premium and /api/generate are gated; all other routes pass free
 const booth = new Booth({
   adapter: 'express',
-  backend: phoenixdBackend({ url: '...', password: '...' }),
+  backend: phoenixdBackend({ url: 'http://localhost:9740', password: process.env.PHOENIXD_PASSWORD! }),
   pricing: {
     '/api/premium': 100,
     '/api/generate': 50,
@@ -117,7 +124,9 @@ app.get('/api/free', (req, res) => res.json({ free: true }))  // unaffected
 
 // Or gate everything with strictPricing
 const strictBooth = new Booth({
-  ...config,
+  adapter: 'express',
+  backend: phoenixdBackend({ url: 'http://localhost:9740', password: process.env.PHOENIXD_PASSWORD! }),
+  upstream: 'http://localhost:8080',
   strictPricing: true,           // all routes gated at defaultInvoiceAmount
   defaultInvoiceAmount: 10,
   pricing: { '/health': 0 },    // explicitly free
@@ -139,7 +148,7 @@ When the client authenticates, toll-booth forwards custom caveats to your upstre
 
 Built-in caveats (verified automatically by toll-booth):
 - `route = /api/*` — restrict macaroon to specific paths (supports wildcards)
-- `expires = 2026-06-01T00:00:00Z` — time-limited access
+- `expires = <ISO 8601 UTC timestamp in the future>` - time-limited access; a past timestamp is rejected immediately
 - `ip = 203.0.113.1` — bind to a specific client IP
 
 ## Accessing Payment State Example
@@ -188,7 +197,19 @@ Subpath imports for tree-shaking:
 Payment rail factories (for multi-rail setups):
 - `createL402Rail(config)` — L402 Lightning + macaroon rail
 - `createX402Rail(config)` — x402 on-chain stablecoin rail (requires a facilitator)
+- `createXCashuRail(config, storage?)` - xcashu (NUT-24) direct-header Cashu rail; `config` is `{ mints, unit?, onProofsReceived? }`
+- `createLnurlcashRail(config, storage?)` - LNURLcash (proposed LUD-25) bearer-note rail; `config` is `{ mints, unit?, requireSignature?, timeoutMs?, onNoteReceived? }`
 - `createIETFPaymentRail(config)` — IETF Payment rail (draft-ryan-httpauth-payment-01, stateless Lightning)
+- `createIETFSessionRail(config)` - IETF Payment session intent rail
+
+Engine, storage and handlers (all exported from the main entry point):
+- `createTollBooth(config)` - framework-agnostic engine; `config` is `TollBoothCoreConfig` (`storage`, `rootKey`, `pricing` and `upstream` required). Pass the engine to `createHonoTollBooth({ engine })`.
+- `sqliteStorage({ path? })` - SQLite `StorageBackend` (in-memory when `path` is omitted); also at `@forgesworn/toll-booth/storage/sqlite`
+- `memoryStorage()` - in-memory `StorageBackend` for tests
+- `handleCreateInvoice(deps, request)`, `handleInvoiceStatus(...)`, `handleCashuRedeem(deps, request)` - the core handlers behind the adapters' routes
+- `meltNoteToLightning({ noteUrl, createInvoice, timeoutMs? })` - sweep an LNURLcash note onto your own node; `createInvoice` is `(amountSats: number) => Promise<string>` returning a BOLT-11 invoice
+- `meltToLightning` - Cashu-to-Lightning melt utility
+- `StatsCollector` - in-memory usage analytics; `Booth` exposes an instance as `.stats`
 
 Booth instance properties:
 - `.middleware` — main request handler (checks auth, proxies upstream)

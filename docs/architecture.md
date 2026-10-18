@@ -68,7 +68,7 @@ sequenceDiagram
         Toll-->>Client: 200 OK
     else Payment required
         Toll-->>Client: 402 + payment challenge
-        Client->>Rail: Pay (Lightning / Cashu / NWC / x402)
+        Client->>Rail: Pay (Lightning / Cashu / LNURLcash / x402)
         Rail-->>Client: Proof of payment
         Client->>Toll: Retry with credential
         Toll->>Toll: Verify payment, credit account
@@ -199,6 +199,6 @@ graph TB
 | **Client** | [402-mcp](https://github.com/forgesworn/402-mcp) | Discovers, pays, consumes L402 APIs | Doesn't gate or price anything |
 | **Product** | [satgate](https://github.com/TheCryptoDonkey/satgate) | Token counting, model pricing, capacity, streaming | Doesn't handle payments directly |
 | **Middleware** | [toll-booth](https://github.com/forgesworn/toll-booth) | Payment gating, credit accounting, free tiers | Doesn't know about tokens or models |
-| **Rails** | Lightning / Cashu / NWC / x402 | Moves money | Doesn't know about HTTP or APIs |
+| **Rails** | Lightning / Cashu / LNURLcash / x402 | Moves money | Doesn't know about HTTP or APIs |
 
 Each layer does one thing. The boundaries are sharp. Swap any layer without touching the others.

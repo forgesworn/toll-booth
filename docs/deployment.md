@@ -151,7 +151,7 @@ const booth = new Booth({
     const data = await res.json()
     return data.amount
   },
-  pricing: { '/api': 5 },
+  pricing: { '/api/resource': 5 },
   upstream: 'https://your-api.example.com',
   storage: memoryStorage(), // Workers have no filesystem; use in-memory
 })
@@ -189,7 +189,7 @@ const booth = new Booth({
     url: Deno.env.get('LND_REST_URL')!,
     macaroon: Deno.env.get('LND_MACAROON')!,
   }),
-  pricing: { '/api': 10 },
+  pricing: { '/api/resource': 10 },
   upstream: Deno.env.get('UPSTREAM_URL')!,
 })
 
@@ -220,7 +220,7 @@ const booth = new Booth({
     url: process.env.PHOENIXD_URL!,
     password: process.env.PHOENIXD_PASSWORD!,
   }),
-  pricing: { '/api': 10 },
+  pricing: { '/api/resource': 10 },
   upstream: process.env.UPSTREAM_URL!,
 })
 
@@ -256,7 +256,7 @@ const storage = sqliteStorage({ path: './toll-booth.db' })
 const engine = createTollBooth({
   backend: phoenixdBackend({ url: 'http://localhost:9740', password: process.env.PHOENIXD_PASSWORD! }),
   storage,
-  pricing: { '/api': 10 },
+  pricing: { '/api/resource': 10 },
   upstream: 'http://localhost:8080',
   rootKey: process.env.ROOT_KEY!,
 })
@@ -382,7 +382,7 @@ const booth = new Booth({
   backend: phoenixdBackend({ url: '...', password: '...' }),
   rootKey: process.env.ROOT_KEY!,       // same across all instances
   storage: myPostgresStorage(),          // custom StorageBackend implementation
-  pricing: { '/api': 10 },
+  pricing: { '/api/resource': 10 },
   upstream: 'http://localhost:8080',
 })
 ```

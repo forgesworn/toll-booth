@@ -35,7 +35,7 @@ app.use(express.json())
 const booth = new Booth({
   adapter: 'express',
   backend,
-  pricing: { '/api': 10 },
+  pricing: { '/api/resource': 10 },
   upstream: process.env.UPSTREAM_URL ?? 'http://localhost:4000',
   freeTier: { requestsPerDay: 5 },
   defaultInvoiceAmount: 100,
@@ -98,6 +98,6 @@ For local development, use a mock backend that auto-settles invoices. See [`exam
 - **[Credit tiers](../configuration.md)** - volume discounts (pay 10k sats, get 11.1k credits)
 - **[Cashu payments](../configuration.md)** - accept ecash tokens alongside Lightning
 - **[x402 stablecoins](../configuration.md)** - accept USD stablecoin payments via Base
-- **[IETF Payment](../configuration.md)** - standards-track `WWW-Authenticate: Payment` challenges
+- **[IETF Payment](../configuration.md)** - `WWW-Authenticate: Payment` challenges (an expired IETF Internet-Draft, not a standard)
 - **Hono quickstart** - use `createHonoTollBooth()` for idiomatic Hono integration (see [configuration](../configuration.md))
 - **[Full documentation](../configuration.md)** - all options, backends, and deployment patterns
