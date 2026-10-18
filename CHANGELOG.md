@@ -78,6 +78,14 @@ Security-hardening release following a full review of the payment flow. Every fi
 
 # [4.5.0](https://github.com/forgesworn/toll-booth/compare/v4.4.2...v4.5.0) (2026-03-28)
 
+## 6.3.1 (2026-10-18)
+
+### Bug Fixes
+
+- align README, llms files, AGENTS.md and docs with the source (#107) (docs)
+
+
+
 ## 6.3.0 (2026-10-06)
 
 ### Features
