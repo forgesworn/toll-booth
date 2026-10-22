@@ -14,8 +14,6 @@
 
 ![toll-booth demo](demo/toll-booth-demo.gif)
 
-[Live demo](https://jokes.forgesworn.dev/) - pay 21 sats, get a joke. No account. No sign-up. ([API](https://jokes.forgesworn.dev/api/joke))
-
 ### Try it now
 
 ```bash
@@ -23,6 +21,8 @@ npx @forgesworn/toll-booth demo
 ```
 
 Spins up a fully working L402-gated joke API on localhost. Mock Lightning backend, in-memory storage, zero configuration. Scan the QR code from your terminal when the free tier runs out.
+
+Prefer a web page, or want to run it against a real wallet? See [Run the demo yourself](#run-the-demo-yourself).
 
 ---
 
@@ -93,21 +93,42 @@ An agent using Claude, GPT, or any MCP-capable model can call your API, receive 
 
 ---
 
-## Live demo
+## Run the demo yourself
 
-Visit [jokes.forgesworn.dev](https://jokes.forgesworn.dev/) in a browser to try it - get a free joke, hit the paywall, scan the QR code or pay with a browser wallet extension.
+Pay 21 sats, get a joke. No account. No sign-up. The hosted version has been retired, and it was only ever the `sats-for-laughs` example, so you can run the same thing yourself.
 
-Or use the API directly:
+**1. One command, no setup.** Mock Lightning, in-memory storage, on `http://localhost:3000`:
 
 ```bash
-# Get a free joke (1 free per day per IP)
-curl https://jokes.forgesworn.dev/api/joke
+npx @forgesworn/toll-booth demo
+```
 
-# Free tier exhausted - request a Lightning invoice for 21 sats
-curl -X POST https://jokes.forgesworn.dev/create-invoice
+**2. The full app locally.** [`examples/sats-for-laughs`](examples/sats-for-laughs/) adds a web page with QR codes and wallet buttons, tiered pricing and a joke pool. Mock mode auto-settles invoices:
 
-# Pay the invoice with any Lightning wallet, then authenticate
-curl -H "Authorization: L402 <macaroon>:<preimage>" https://jokes.forgesworn.dev/api/joke
+```bash
+git clone https://github.com/forgesworn/toll-booth.git && cd toll-booth
+npm install && npm run build
+cd examples/sats-for-laughs && npm install
+MOCK=true npm start             # http://localhost:3000
+```
+
+**3. Deploy your own with a real backend.** Docker Compose runs the app next to Phoenixd. Set `ROOT_KEY` and the Phoenixd password in `.env`; the [example README](examples/sats-for-laughs/README.md#2-deploy-with-docker-compose) has the exact steps. To use a wallet you already run instead, point `NWC_URI_FILE` at a file holding a Nostr Wallet Connect URI.
+
+Then walk through the flow:
+
+```bash
+# Three free jokes per day per IP
+curl http://localhost:3000/api/joke
+
+# Free tier exhausted (HTTP 402) - request a Lightning invoice for 21 sats
+curl -X POST http://localhost:3000/create-invoice
+
+# Mock backend: the invoice settles in about a second. Read the preimage from the
+# payment_url in the response above (with a real backend, pay the invoice first)
+curl http://localhost:3000<payment_url>
+
+# Authenticate with the macaroon from the invoice response and the preimage
+curl -H "Authorization: L402 <macaroon>:<preimage>" http://localhost:3000/api/joke
 ```
 
 ---
@@ -388,7 +409,7 @@ Implements the [IETF Payment authentication scheme](https://datatracker.ietf.org
 ## Case studies
 
 - [satgate: Pay-per-token AI inference](docs/case-studies/satgate.md)
-- [jokes.forgesworn.dev: From zero to production L402 API](docs/case-studies/jokes-demo.md)
+- [Sats for Laughs: From zero to production L402 API](docs/case-studies/jokes-demo.md) (the hosted demo, retired October 2026)
 
 ---
 
@@ -517,7 +538,7 @@ Deploy toll-booth as a sidecar (Docker Compose, Kubernetes) or as a standalone g
 
 ### sats-for-laughs - build your own paid API
 
-[`examples/sats-for-laughs/`](examples/sats-for-laughs/) is the fastest path from "I have an API" to "my API earns sats". It's the same code that runs the [live demo](https://jokes.forgesworn.dev/). Includes a web frontend with QR codes and wallet adapter buttons, plus a JSON API for programmatic access. Clone it, change three env vars, deploy.
+[`examples/sats-for-laughs/`](examples/sats-for-laughs/) is the fastest path from "I have an API" to "my API earns sats". It is the code the hosted joke demo ran on until October 2026, so you can run your own. Includes a web frontend with QR codes and wallet adapter buttons, plus a JSON API for programmatic access. Clone it, change three env vars, deploy.
 
 ```bash
 cd examples/sats-for-laughs

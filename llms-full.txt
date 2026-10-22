@@ -653,7 +653,7 @@ interface IETFReceipt {
 - Repository: https://github.com/forgesworn/toll-booth
 - npm: https://www.npmjs.com/package/@forgesworn/toll-booth
 - Production showcase: [satgate](https://satgate.forgesworn.dev) - AI inference gateway built on toll-booth
-- Live demo: [jokes.forgesworn.dev](https://jokes.forgesworn.dev) - joke API behind Lightning payments
+- Run the demo yourself: `npx @forgesworn/toll-booth demo` (mock Lightning, localhost), or [examples/sats-for-laughs](examples/sats-for-laughs/) for the full joke API (the hosted demo was retired in October 2026)
 - [Comparison with alternatives](docs/comparison.md) - feature matrix vs Aperture, x402, Fewsats, Routstr
 - Guides: [Express quickstart](docs/guides/express-quickstart.md), [AI agent payments](docs/guides/ai-agent-payments.md), [Ollama monetisation](docs/guides/ollama-monetisation.md)
 - Reference deployment: examples/valhalla-proxy/ (Docker Compose, Express + Phoenixd)
