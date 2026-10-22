@@ -43,7 +43,7 @@ No sign-up pages. No billing dashboards. No subscription tiers designed by a gro
 
 An AI agent discovers a service, reads its price from the 402 response, pays the invoice from its Cashu wallet, and accesses the data — all in a single HTTP round-trip. No human in the loop. No OAuth token to refresh. No API key to leak.
 
-This is not a theoretical future. toll-booth is deployed in production at [jokes.forgesworn.dev](https://jokes.forgesworn.dev) (Lightning-paid joke API) and [satgate.forgesworn.dev](https://satgate.forgesworn.dev) (Lightning-paid AI inference). Real invoices, real payments, real responses.
+This is not a theoretical future. toll-booth is deployed in production at [satgate.forgesworn.dev](https://satgate.forgesworn.dev) (Lightning-paid AI inference). Real invoices, real payments, real responses. A Lightning-paid joke API ran alongside it as a public demo until October 2026; the code is in `examples/sats-for-laughs` if you want to run your own.
 
 ## What toll-booth is
 

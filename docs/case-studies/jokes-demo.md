@@ -1,14 +1,16 @@
-# jokes.forgesworn.dev: From Zero to Production L402 API
+# Sats for Laughs: From Zero to Production L402 API
+
+> **Retired.** The hosted demo ran at jokes.forgesworn.dev until 22 October 2026 and has been retired. This case study is kept as a record of how it was built. To run it yourself, use `npx @forgesworn/toll-booth demo` (mock Lightning, zero configuration) or [`examples/sats-for-laughs`](../../examples/sats-for-laughs/) (`MOCK=true npm start`, or Docker Compose with Phoenixd).
 
 ## Problem
 
 You want to deploy a paid API to production. What does a real deployment look like? How much code is needed? What infrastructure do you need?
 
-Most payment integration tutorials stop at "here's how to call the SDK". They rarely show the full picture - Docker, Lightning node, persistence, tiered pricing, free trials, and a self-service payment page that works in a browser. jokes.forgesworn.dev is a complete, running example of all of that.
+Most payment integration tutorials stop at "here's how to call the SDK". They rarely show the full picture - Docker, Lightning node, persistence, tiered pricing, free trials, and a self-service payment page that works in a browser. Sats for Laughs was a complete, running example of all of that.
 
 ## Solution
 
-[jokes.forgesworn.dev](https://jokes.forgesworn.dev) is a joke API that charges satoshis per joke via Lightning. It runs on a VPS with Docker Compose, using Phoenixd as the Lightning backend. The entire deployment is the `sats-for-laughs` example from toll-booth.
+Sats for Laughs was a joke API that charged satoshis per joke via Lightning. It ran on a VPS with Docker Compose, using Phoenixd as the Lightning backend. The entire deployment was the `sats-for-laughs` example from toll-booth, which is still in the repository.
 
 Three quality tiers are available:
 
@@ -22,7 +24,7 @@ Every IP address gets 3 free jokes per day before hitting the paywall. Volume di
 
 ## Architecture
 
-The production stack is two Docker containers on a Hetzner VPS:
+The production stack was two Docker containers on a Hetzner VPS:
 
 ```
 ┌─────────────────────────────────────────────┐
@@ -59,19 +61,22 @@ The toll-booth configuration itself is roughly 35 lines; five credit tiers, a pr
 
 ## Try it
 
+Start the example locally (see the note at the top), then:
+
 ```bash
 # Get a free joke (3 per day per IP)
-curl https://jokes.forgesworn.dev/api/joke
+curl http://localhost:3000/api/joke
 
 # After free tier is exhausted, get an invoice
-curl -X POST https://jokes.forgesworn.dev/create-invoice
+curl -X POST http://localhost:3000/create-invoice
 
 # Pay the Lightning invoice, then authenticate with the preimage
+# (in mock mode, read it from the payment_url in the invoice response)
 curl -H "Authorization: L402 <macaroon>:<preimage>" \
-  https://jokes.forgesworn.dev/api/joke
+  http://localhost:3000/api/joke
 ```
 
-Or visit [https://jokes.forgesworn.dev](https://jokes.forgesworn.dev) in a browser for the self-service payment page with QR codes and wallet integration.
+Or visit `http://localhost:3000` in a browser for the self-service payment page with QR codes and wallet integration.
 
 ## Key takeaway
 
@@ -79,6 +84,6 @@ A production L402 API with tiered pricing, volume discounts, a free tier, Nostr 
 
 ## Links
 
-- **Live:** [https://jokes.forgesworn.dev](https://jokes.forgesworn.dev)
+- **Was live at:** jokes.forgesworn.dev, until 22 October 2026 (retired)
 - **Source:** [`examples/sats-for-laughs`](../../examples/sats-for-laughs/)
 - **toll-booth:** [https://github.com/forgesworn/toll-booth](https://github.com/forgesworn/toll-booth)
