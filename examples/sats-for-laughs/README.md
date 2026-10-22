@@ -38,7 +38,7 @@ Edit `.env`:
 - `ROOT_KEY`: the output of `openssl rand -hex 32`. An empty value is rejected.
 - `PHOENIXD_PASSWORD`: the `http-password-limited-access` value printed above. It can create and look up invoices but cannot spend.
 - `PHOENIXD_URL`: `http://phoenixd:9740`. The `localhost` value in `.env.example` points at the app container itself, not at Phoenixd.
-- `PUBLIC_URL` and `ANNOUNCE_RELAYS`: clear both, or set your own. The values in `.env.example` are placeholders, and while both are set the server publishes a Nostr announcement for that URL at startup.
+- `PUBLIC_URL` and `ANNOUNCE_RELAYS`: empty in `.env.example`. Set both only once your server has a public HTTPS URL; while both are set the server publishes a Nostr announcement for that URL at startup.
 
 Then start everything:
 
