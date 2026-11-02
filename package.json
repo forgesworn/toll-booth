@@ -121,7 +121,7 @@
     "prepare": "patch-package"
   },
   "dependencies": {
-    "@cashu/cashu-ts": "4.12.0",
+    "@cashu/cashu-ts": "4.13.0",
     "@forgesworn/nwc-kit": "0.1.9",
     "@lnurlcash/kit": "0.20.8",
     "@scure/base": "2.4.0",
