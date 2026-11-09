@@ -123,7 +123,7 @@
   "dependencies": {
     "@cashu/cashu-ts": "4.13.0",
     "@forgesworn/nwc-kit": "0.1.9",
-    "@lnurlcash/kit": "0.20.8",
+    "@lnurlcash/kit": "0.21.2",
     "@scure/base": "2.4.0",
     "better-sqlite3": "^13.0.2",
     "farrier-kit": "1.1.3",
