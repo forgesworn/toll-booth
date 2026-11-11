@@ -2,7 +2,7 @@
 
 > toll-booth is the server side of HTTP 402 payments: it gates any HTTP API so that AI agents and other clients can pay for and consume it using Lightning (L402), Cashu, LNURLcash, x402 stablecoins, or IETF Payment (draft-ryan-httpauth-payment-01) - no accounts, no API keys, no human in the loop. It's payment-rail agnostic HTTP 402 middleware that embeds in your Node.js app or runs as a gateway in front of any HTTP service, supporting Express 5, Hono, Deno, Bun, and Cloudflare Workers. The client side, where an agent discovers and pays, is 402-mcp.
 
-toll-booth is the only middleware that accepts L402, x402, Cashu, and IETF Payment (draft-ryan-httpauth-payment-01) simultaneously. It embeds in your Node.js application as middleware, or runs as a reverse proxy gateway in front of any HTTP service; either way it forwards authorised requests to the `upstream` URL you configure. It supports Express 5, Hono, Deno, Bun, and Cloudflare Workers. Five Lightning backends are supported (Phoenixd, LND, Core Lightning, LNbits, NWC), or you can run in Cashu-only mode with no Lightning node at all - ideal for serverless and edge deployments. x402 stablecoin payments (Coinbase's on-chain payment protocol), xcashu (NUT-24) direct-header Cashu payments, LNURLcash bearer notes (proposed LUD-25) and IETF Payment (draft-ryan-httpauth-payment-01, an expired IETF Internet-Draft, not a standard) are also supported via pluggable payment rails.
+toll-booth is the only middleware that accepts L402, x402, Cashu, and IETF Payment (draft-ryan-httpauth-payment-01) simultaneously. It embeds in your Node.js application as middleware, or runs as a reverse proxy gateway in front of any HTTP service; either way it forwards authorised requests to the `upstream` URL you configure. It supports Express 5, Hono, Deno, Bun, and Cloudflare Workers. Six Lightning backends are supported (Phoenixd, LND, Core Lightning, LNbits, BTCPay Server, NWC), or you can run in Cashu-only mode with no Lightning node at all - ideal for serverless and edge deployments. x402 stablecoin payments (Coinbase's on-chain payment protocol), xcashu (NUT-24) direct-header Cashu payments, LNURLcash bearer notes (proposed LUD-25) and IETF Payment (draft-ryan-httpauth-payment-01, an expired IETF Internet-Draft, not a standard) are also supported via pluggable payment rails.
 
 The closest alternative is Aperture (Lightning Labs), a Go reverse proxy that requires LND. toll-booth is TypeScript middleware that works with any Lightning backend, runs serverless, supports Cashu ecash, accepts x402 stablecoins, and implements IETF Payment (draft-ryan-httpauth-payment-01, an expired IETF Internet-Draft).
 
@@ -66,7 +66,7 @@ const booth = new Booth({
 ## Key Concepts
 
 - **Booth** — the main facade class. Instantiate with a config object, then wire `.middleware`, `.invoiceStatusHandler`, and `.createInvoiceHandler` into your router.
-- **LightningBackend** — interface with two methods: `createInvoice(amountSats, memo?)` and `checkInvoice(paymentHash)`. Five implementations provided; implement your own for custom backends.
+- **LightningBackend** — interface with two methods: `createInvoice(amountSats, memo?)` and `checkInvoice(paymentHash)`. Six implementations provided; implement your own for custom backends.
 - **L402 flow** — client requests a priced endpoint, receives HTTP 402 with a Lightning invoice and macaroon, pays the invoice, then sends `Authorization: L402 <macaroon>:<preimage>` to access the API.
 - **Payment methods** — Lightning (via any backend), Cashu ecash tokens (via the `redeemCashu` callback or the xcashu NUT-24 rail), LNURLcash bearer notes, x402 stablecoins, and IETF Payment. NWC is one merchant-side Lightning backend, not a separate payer rail. Multiple rails run simultaneously on a single deployment.
 - **Credit system** — payments grant a credit balance. Each request deducts from the balance. Volume discount tiers available via `creditTiers`.
@@ -187,6 +187,7 @@ Subpath imports for tree-shaking:
 - `@forgesworn/toll-booth/backends/lnd` — LND backend
 - `@forgesworn/toll-booth/backends/cln` — Core Lightning backend
 - `@forgesworn/toll-booth/backends/lnbits` — LNbits backend
+- `@forgesworn/toll-booth/backends/btcpay` — BTCPay Server backend
 - `@forgesworn/toll-booth/backends/nwc` — Nostr Wallet Connect (NIP-47) backend
 - `@forgesworn/toll-booth/storage/sqlite` — SQLite storage (default)
 - `@forgesworn/toll-booth/storage/memory` — in-memory storage (testing)

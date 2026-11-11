@@ -136,7 +136,7 @@ curl -H "Authorization: L402 <macaroon>:<preimage>" http://localhost:3000/api/jo
 ## Features
 
 - **L402 protocol** - industry-standard HTTP 402 payment flow with macaroon credentials
-- **Multiple Lightning backends** - Phoenixd, LND, CLN, LNbits, NWC (any Nostr Wallet Connect wallet)
+- **Multiple Lightning backends** - Phoenixd, LND, CLN, LNbits, BTCPay Server, NWC (any Nostr Wallet Connect wallet)
 - **Alternative payment methods** - Cashu ecash tokens and xcashu (NUT-24) direct-header payments
 - **LNURLcash bearer notes** - accepts a note URL as specified by the proposed [LUD-25 (lnurl/luds#301)](https://github.com/lnurl/luds/pull/301) in an `X-LNURLcash` header. One rotate at the mint is the verification, the double-spend check and the transfer of ownership.
 - **IETF Payment authentication** - implements [draft-ryan-httpauth-payment-01](https://datatracker.ietf.org/doc/draft-ryan-httpauth-payment/), an expired IETF Internet-Draft for HTTP payment authentication. HMAC-bound stateless challenges with Lightning settlement.
@@ -420,6 +420,7 @@ import { phoenixdBackend } from '@forgesworn/toll-booth/backends/phoenixd'
 import { lndBackend } from '@forgesworn/toll-booth/backends/lnd'
 import { clnBackend } from '@forgesworn/toll-booth/backends/cln'
 import { lnbitsBackend } from '@forgesworn/toll-booth/backends/lnbits'
+import { btcpayBackend } from '@forgesworn/toll-booth/backends/btcpay'
 import { nwcBackend } from '@forgesworn/toll-booth/backends/nwc'
 ```
 
@@ -431,6 +432,7 @@ Each backend implements the `LightningBackend` interface (`createInvoice` + `che
 | LND | Stable | Industry standard |
 | CLN | Stable | Core Lightning REST API |
 | LNbits | Stable | Any LNbits instance - self-hosted or hosted |
+| BTCPay Server | Beta | Store Lightning node via the Greenfield API, including the internal node |
 | NWC | Stable | Any Nostr Wallet Connect wallet (Alby Hub, Umbrel, Phoenix, etc.) — E2E encrypted via NIP-44 |
 
 ---
@@ -443,7 +445,7 @@ Each backend implements the `LightningBackend` interface (`createInvoice` + `che
 |---|---|---|
 | **Language** | Go binary | TypeScript middleware |
 | **Deployment** | Standalone reverse proxy | Embeds in your app, or runs as a gateway in front of any HTTP service |
-| **Lightning node** | Requires LND | Phoenixd, LND, CLN, LNbits, NWC, or none (ecash-only) |
+| **Lightning node** | Requires LND | Phoenixd, LND, CLN, LNbits, BTCPay Server, NWC, or none (ecash-only) |
 | **Payment rails** | Lightning only | Lightning, Cashu ecash, xcashu (NUT-24), LNURLcash bearer notes (proposed LUD-25, lnurl/luds#301), x402 stablecoins, IETF Payment - simultaneously |
 | **IETF Payment** | No | Yes - [draft-ryan-httpauth-payment-01](https://datatracker.ietf.org/doc/draft-ryan-httpauth-payment/) with stateless HMAC challenges |
 | **x402 stablecoins** | No | Yes - USDC on Base, Polygon via pluggable facilitator |

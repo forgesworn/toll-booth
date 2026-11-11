@@ -76,6 +76,8 @@ export { clnBackend } from './backends/cln.js'
 export type { ClnConfig } from './backends/cln.js'
 export { lnbitsBackend } from './backends/lnbits.js'
 export type { LNbitsConfig } from './backends/lnbits.js'
+export { btcpayBackend } from './backends/btcpay.js'
+export type { BTCPayConfig } from './backends/btcpay.js'
 export { nwcBackend } from './backends/nwc.js'
 export type { NwcConfig } from './backends/nwc.js'
 

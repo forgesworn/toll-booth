@@ -71,6 +71,7 @@ src/
     lnd.ts                     # LND Lightning backend (REST API)
     cln.ts                     # Core Lightning backend (clnrest API)
     lnbits.ts                  # LNbits Lightning backend (REST API)
+    btcpay.ts                  # BTCPay Server Lightning backend (Greenfield API)
     nwc.ts                     # Merchant Nostr Wallet Connect (NIP-47) backend
     conformance.ts             # Shared backend conformance test factory
   e2e/                       # End-to-end integration tests
@@ -101,7 +102,7 @@ That is the L402 flow. The xcashu, LNURLcash, x402 and IETF Payment rails answer
 
 **Storage** is abstracted via `StorageBackend` interface. SQLite (WAL mode, better-sqlite3) is the default; `memoryStorage()` available for tests. Three tables: `credits` (balance ledger), `invoices`, `cashu_claims` (redemption leases).
 
-**Backends:** Phoenixd, LND, CLN, LNbits, and NWC. All implement the `LightningBackend` interface. Cashu-only mode works without any Lightning backend.
+**Backends:** Phoenixd, LND, CLN, LNbits, BTCPay Server, and NWC. All implement the `LightningBackend` interface. Cashu-only mode works without any Lightning backend.
 
 **Payment connectors:** NWC is an operator-owned Lightning backend. Cashu redemption is an optional client payment method via `redeemCashu` and includes lease-based crash recovery. Never accept a payer NWC URI over HTTP.
 
