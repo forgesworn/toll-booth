@@ -1,3 +1,11 @@
+## 6.4.0 (2026-11-12)
+
+### Features
+
+- melt a note that is not whole sats into an amountless invoice (lnurlcash)
+
+
+
 ## 6.3.2 (2026-11-12)
 
 ### Bug Fixes
