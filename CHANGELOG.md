@@ -1,3 +1,11 @@
+## 6.3.2 (2026-11-12)
+
+### Bug Fixes
+
+- verify certificates bound to the mint domain (lnurlcash)
+
+
+
 ## 6.3.1 (2026-10-18)
 
 ### Bug Fixes
