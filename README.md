@@ -374,7 +374,7 @@ Configuration:
 
 A note pays for the request and the surplus becomes credit against that settlement, reported in `X-Credit-Balance`. The payer cannot spend that surplus later, so a client should present a note close to the price - splitting one at the mint first if it needs to.
 
-No Lightning node is required. `meltNoteToLightning({noteUrl, createInvoice})` sweeps a note onto your own node when you do have one; it returns as soon as the mint accepts the melt, with a LUD-21 `verifyUrl` to poll, because the note is only burned once the outgoing payment actually settles.
+No Lightning node is required. `meltNoteToLightning({noteUrl, createInvoice})` sweeps a note onto your own node when you do have one; it returns as soon as the mint accepts the melt, with a LUD-21 `verifyUrl` to poll, because the note is only burned once the outgoing payment actually settles. It asks `createInvoice` for the note's value rounded down to a whole sat. Mints that follow the current LUD-25 pay only an invoice for the exact value, so they refuse the melt of a note that is not a whole number of sats: the note stays outstanding and spendable, and has to be melted another way (an invoice that states no amount, or a split to a whole sat in an LNURLcash wallet).
 
 ### IETF Payment (draft-ryan-httpauth-payment-01)
 

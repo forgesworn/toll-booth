@@ -15,8 +15,11 @@ export type MeltNoteResult =
  * Melt a note into an invoice on the operator's node.
  *
  * The whole note is spent, so the invoice is created for the note's value
- * rounded down to a whole sat (what a mint accepts, and what a Lightning
- * backend can express). The mint answers as soon as the payment is in
+ * rounded down to a whole sat (what a Lightning backend can express).
+ * Mints that follow the current LUD-25 pay only an invoice for the note's
+ * exact value, or one that states no amount, so they refuse the melt of a
+ * note that is not a whole number of sats: the note stays outstanding and
+ * has to be melted another way. The mint answers as soon as the payment is in
  * flight: `accepted` means the melt was taken, not that it has settled.
  * When the mint supports LUD-21 the result carries a `verifyUrl` to poll:
  * the note is only burned once the outgoing payment actually lands, and a
