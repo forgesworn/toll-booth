@@ -5,7 +5,7 @@
 // and certifies with `sig` = hex over the note's h. Nothing is mocked but
 // the Lightning node behind each mint.
 
-import { describe, it, expect, afterEach } from 'vitest'
+import { describe, it, expect, afterEach, vi } from 'vitest'
 import { createMoneyer, createFakeBackend, fakeBolt11 } from '@forgesworn/moneyer'
 import {
   createMoneyer as createLegacyMoneyer,
@@ -30,6 +30,8 @@ interface TestMint {
   control: {
     settleInvoice(paymentHashHex: string): void
     invoiceByHash(paymentHashHex: string): { preimageHex: string } | undefined
+    /** What the mint's node sent to pay an invoice (current mint only). */
+    sentAmountMsat?(paymentHashHex: string): number | null | undefined
   }
 }
 
@@ -205,5 +207,129 @@ describe('the certificate a current mint gives', () => {
     expect((await strict.verify(req, { sats: 10 })).authenticated).toBe(true)
     const c = new URL(held!.url).searchParams.get('c')!
     expect(noteCertificateKind(held!.k1, held!.url, 21_000, c, info.mintPubkey!)).toBe('current')
+  })
+})
+
+describe('melting a note that is not a whole number of sats at a current mint', () => {
+  /** Stands in for the operator's node, recording which callback was asked. */
+  function node(amountlessMsat?: number) {
+    const asked: string[] = []
+    const hashes: string[] = []
+    const invoice = (amountMsat?: number): string => {
+      const paymentHashHex = hashK1(randomBytes(32).toString('hex'))
+      hashes.push(paymentHashHex)
+      return fakeBolt11({ ...(amountMsat !== undefined && { amountMsat }), paymentHashHex })
+    }
+    return {
+      asked,
+      hashes,
+      createInvoice: async (amountSats: number) => {
+        asked.push(`createInvoice(${amountSats})`)
+        return invoice(amountSats * 1000)
+      },
+      createAmountlessInvoice: async () => {
+        asked.push('createAmountlessInvoice()')
+        return invoice(amountlessMsat)
+      },
+    }
+  }
+
+  it('melts into an amountless invoice, and the mint pays the exact msat', async () => {
+    const m = await startMint('current')
+    const bought = await buyNote(m, 21_500)
+    const operator = node()
+
+    const melted = await meltNoteToLightning({
+      noteUrl: bought.url,
+      createInvoice: operator.createInvoice,
+      createAmountlessInvoice: operator.createAmountlessInvoice,
+    })
+
+    expect(melted).toMatchObject({ accepted: true, amountSats: 21, amountMsat: 21_500 })
+    expect(operator.asked).toEqual(['createAmountlessInvoice()'])
+    await vi.waitFor(() => expect(m.control.sentAmountMsat!(operator.hashes[0])).toBe(21_500))
+  })
+
+  it('without the amountless callback is refused, says why, and leaves the note outstanding', async () => {
+    const m = await startMint('current')
+    const bought = await buyNote(m, 21_500)
+    const operator = node()
+
+    const melted = await meltNoteToLightning({ noteUrl: bought.url, createInvoice: operator.createInvoice })
+
+    expect(melted.accepted).toBe(false)
+    if (!melted.accepted) {
+      expect(melted.error).toContain('exactly 21500 msat')
+      expect(melted.error).toContain('not a whole number of sats')
+      expect(melted.error).toContain('createAmountlessInvoice')
+    }
+    expect(operator.asked).toEqual(['createInvoice(21)'])
+    expect(await isLive(bought.url)).toBe(true)
+  })
+
+  it('reports any other failed floor melt as the mint gave it, without the whole-sat hint', async () => {
+    const m = await startMint('current')
+    const bought = await buyNote(m, 21_500)
+    const sweeper = node()
+    const operator = node()
+
+    // Between the lookup and the floor melt, another sweep spends the note.
+    const melted = await meltNoteToLightning({
+      noteUrl: bought.url,
+      createInvoice: async (amountSats) => {
+        const raced = await meltNoteToLightning({
+          noteUrl: bought.url,
+          createInvoice: sweeper.createInvoice,
+          createAmountlessInvoice: sweeper.createAmountlessInvoice,
+        })
+        expect(raced.accepted).toBe(true)
+        return operator.createInvoice(amountSats)
+      },
+    })
+
+    expect(melted.accepted).toBe(false)
+    if (!melted.accepted) {
+      expect(melted.error).toMatch(/^Melt refused: /)
+      expect(melted.error).not.toMatch(/must be for exactly/i)
+      expect(melted.error).not.toContain('not a whole number of sats')
+      expect(melted.error).not.toContain('createAmountlessInvoice')
+    }
+    expect(operator.asked).toEqual(['createInvoice(21)'])
+    expect(m.control.sentAmountMsat!(operator.hashes[0])).toBeUndefined()
+  })
+
+  it('still melts a whole-sat note into an invoice from createInvoice', async () => {
+    const m = await startMint('current')
+    const bought = await buyNote(m, 21_000)
+    const operator = node()
+
+    const melted = await meltNoteToLightning({
+      noteUrl: bought.url,
+      createInvoice: operator.createInvoice,
+      createAmountlessInvoice: operator.createAmountlessInvoice,
+    })
+
+    expect(melted).toEqual(expect.objectContaining({ accepted: true, amountSats: 21 }))
+    expect(melted).not.toHaveProperty('amountMsat')
+    expect(operator.asked).toEqual(['createInvoice(21)'])
+  })
+
+  it('refuses locally an invoice from the amountless callback that states another amount', async () => {
+    const m = await startMint('current')
+    const bought = await buyNote(m, 21_500)
+    const operator = node(21_000)
+
+    const melted = await meltNoteToLightning({
+      noteUrl: bought.url,
+      createInvoice: operator.createInvoice,
+      createAmountlessInvoice: operator.createAmountlessInvoice,
+    })
+
+    expect(melted).toEqual({
+      accepted: false,
+      error: "createAmountlessInvoice returned an invoice for 21000 msat; it must state no amount, or exactly the note's 21500 msat",
+    })
+    expect(m.control.sentAmountMsat!(operator.hashes[0])).toBeUndefined()
+    expect(await isLive(bought.url)).toBe(true)
   })
 })

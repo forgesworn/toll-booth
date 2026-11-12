@@ -339,6 +339,9 @@ const booth = new Booth({
       await meltNoteToLightning({
         noteUrl: note.url,
         createInvoice: async sats => (await myNode.createInvoice(sats)).bolt11,
+        // Optional: for a note that is not a whole number of sats, an invoice
+        // from your node that states no amount (see below).
+        // createAmountlessInvoice: async () => ...,
       })
     },
   },
@@ -374,7 +377,7 @@ Configuration:
 
 A note pays for the request and the surplus becomes credit against that settlement, reported in `X-Credit-Balance`. The payer cannot spend that surplus later, so a client should present a note close to the price - splitting one at the mint first if it needs to.
 
-No Lightning node is required. `meltNoteToLightning({noteUrl, createInvoice})` sweeps a note onto your own node when you do have one; it returns as soon as the mint accepts the melt, with a LUD-21 `verifyUrl` to poll, because the note is only burned once the outgoing payment actually settles. It asks `createInvoice` for the note's value rounded down to a whole sat. Mints that follow the current LUD-25 pay only an invoice for the exact value, so they refuse the melt of a note that is not a whole number of sats: the note stays outstanding and spendable, and has to be melted another way (an invoice that states no amount, or a split to a whole sat in an LNURLcash wallet).
+No Lightning node is required. `meltNoteToLightning({noteUrl, createInvoice})` sweeps a note onto your own node when you do have one; it returns as soon as the mint accepts the melt, with a LUD-21 `verifyUrl` to poll, because the note is only burned once the outgoing payment actually settles. A note worth a whole number of sats is melted into an invoice from `createInvoice` for that value. Mints that follow the current LUD-25 pay only an invoice for a note's exact value, or one that states no amount, so for a note that is not a whole number of sats (say 21500 msat) also pass `createAmountlessInvoice: () => Promise<string>`, returning a BOLT-11 invoice from your node that states no amount. The helper checks that invoice before it goes to the mint and refuses one stating any amount other than the note's exact value. A current mint then pays the note's exact value; an older mint pays the whole-sat floor. The result's `amountSats` (the note's value rounded down) and `amountMsat` (its exact value) describe the note and are not receipts, so credit what your node records as received for the invoice. None of the built-in backends offers an amountless invoice yet, so write this callback against your node's own API. Without it, such a note is melted into a whole-sat-floor invoice from `createInvoice`, as before: older mints accept that and current ones refuse it. When the refusal is that the invoice is not for the note's exact value, the error says the note is not a whole number of sats and names `createAmountlessInvoice`, and the note stays outstanding and spendable. Any other failure, such as a timeout or a note already spent, is reported as the mint gave it, and the melt may still be in flight.
 
 ### IETF Payment (draft-ryan-httpauth-payment-01)
 

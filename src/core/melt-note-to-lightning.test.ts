@@ -58,6 +58,21 @@ describe('meltNoteToLightning', () => {
     expect(node.asked).toEqual([21])
   })
 
+  it('refuses an amountless callback result that is not an invoice, without melting', async () => {
+    const node = invoicer()
+    const { url, k1 } = fundedNote(mint, 21_500)
+
+    const result = await meltNoteToLightning({
+      noteUrl: url,
+      createInvoice: node.create,
+      createAmountlessInvoice: async () => 'lnbc1notaninvoice',
+    })
+
+    expect(result).toEqual({ accepted: false, error: 'createAmountlessInvoice did not return a BOLT11 invoice' })
+    expect(node.asked).toEqual([])
+    expect(mint.state.noteState(k1)).toBe('outstanding')
+  })
+
   it('accepts the LUD-17 spelling of a note', async () => {
     const node = invoicer()
     const { k1 } = fundedNote(mint, 21_000)

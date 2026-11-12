@@ -207,7 +207,7 @@ Engine, storage and handlers (all exported from the main entry point):
 - `sqliteStorage({ path? })` - SQLite `StorageBackend` (in-memory when `path` is omitted); also at `@forgesworn/toll-booth/storage/sqlite`
 - `memoryStorage()` - in-memory `StorageBackend` for tests
 - `handleCreateInvoice(deps, request)`, `handleInvoiceStatus(...)`, `handleCashuRedeem(deps, request)` - the core handlers behind the adapters' routes
-- `meltNoteToLightning({ noteUrl, createInvoice, timeoutMs? })` - sweep an LNURLcash note onto your own node; `createInvoice` is `(amountSats: number) => Promise<string>` returning a BOLT-11 invoice
+- `meltNoteToLightning({ noteUrl, createInvoice, createAmountlessInvoice?, timeoutMs? })` - sweep an LNURLcash note onto your own node; `createInvoice` is `(amountSats: number) => Promise<string>` returning a BOLT-11 invoice; optional `createAmountlessInvoice` is `() => Promise<string>` returning a BOLT-11 invoice that states no amount, used for a note that is not a whole number of sats (current LUD-25 mints refuse a whole-sat invoice for one); the result reports the note's value as `amountSats` (rounded down) and, for an amountless melt, `amountMsat` (exact); neither is a receipt (an older mint pays the whole-sat floor into an amountless invoice), so credit what your node records as received
 - `meltToLightning` - Cashu-to-Lightning melt utility
 - `StatsCollector` - in-memory usage analytics; `Booth` exposes an instance as `.stats`
 
