@@ -129,14 +129,22 @@ export type CertificateVerdict = 'valid' | 'invalid' | 'unverifiable'
 /**
  * Check a note's certificate against the mint's signing key.
  *
+ * `domain` is the mint the note names: its note URL, or any URL or host of
+ * it. Since luds 92abbb3 a certificate signs
+ * `LNURLcash:<domain>:<amount_msat>:<hex(Q)>`, bound to the hostname the
+ * note URL names (port dropped), so one made for a note at another mint
+ * does not verify here. As the kit does, a certificate over the earlier
+ * message without the domain still verifies.
+ *
  * - `cs1<amount>` (current): the kit's rule, over hex(Q), with the amount in
  *   the certificate required to match.
  * - 130-hex `sig` (superseded): the pre-taproot rule, over the bearer
  *   note's h. The digest is the same Lightning signed-message construction
  *   with h in place of hex(Q), so the kit checks it once the signature is
- *   re-wrapped as a `cs1<amount>` and the note is named by h. Both byte
- *   layouts the old rule accepted (recovery id trailing, and leading as one
- *   mint once emitted it) are tried.
+ *   re-wrapped as a `cs1<amount>` and the note is named by h; these mints
+ *   signed before the domain was bound, so the kit's domain-less fallback
+ *   is what matches. Both byte layouts the old rule accepted (recovery id
+ *   trailing, and leading as one mint once emitted it) are tried.
  * - fixed-prefix `cs1` with no amount (superseded): decoded and checked
  *   under the same pre-taproot rule.
  *
@@ -146,6 +154,7 @@ export type CertificateVerdict = 'valid' | 'invalid' | 'unverifiable'
  */
 export function verifyCertificate(
   k1: string,
+  domain: string,
   amountMsat: number,
   certificate: string,
   mintPubkey: string,
@@ -155,7 +164,7 @@ export function verifyCertificate(
   // which no certificate rule here covers, whatever the certificate's shape.
   if (isLegacyCk1(k1)) return 'unverifiable'
   if (isCs1WithAmount(value)) {
-    return verifyNoteSignature(k1, amountMsat, value, mintPubkey) ? 'valid' : 'invalid'
+    return verifyNoteSignature(k1, domain, amountMsat, value, mintPubkey) ? 'valid' : 'invalid'
   }
 
   let signature: Uint8Array | null = null
@@ -169,7 +178,7 @@ export function verifyCertificate(
   for (const layout of layouts) {
     try {
       const wrapped = encodeCs1WithAmount(amountMsat, layout)
-      if (verifyNoteSignatureForKey(h, amountMsat, wrapped, mintPubkey)) return 'valid'
+      if (verifyNoteSignatureForKey(h, domain, amountMsat, wrapped, mintPubkey)) return 'valid'
     } catch {
       // not a certificate under this layout
     }

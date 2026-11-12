@@ -204,7 +204,9 @@ export function createLnurlcashRail(config: LnurlcashRailConfig, storage?: Stora
           // old certificate is never the reason a live note is refused.
           const certificate = noteCertificate(noteUrl)
           if (!certificate || !info.mintPubkey) return FAIL
-          if (verifyCertificate(k1, info.maxWithdrawable, certificate, info.mintPubkey) === 'invalid') return FAIL
+          if (verifyCertificate(k1, noteUrl, info.maxWithdrawable, certificate, info.mintPubkey) === 'invalid') {
+            return FAIL
+          }
         }
 
         if (info.maxWithdrawable < requiredSats * 1000) return FAIL
@@ -215,9 +217,10 @@ export function createLnurlcashRail(config: LnurlcashRailConfig, storage?: Stora
         const rotated = await rotateNote(info.callback, k1, clientOptions)
 
         // What the mint certified the new note as, kept only if it holds up.
+        // The new note lives at the same mint, under the same note URL.
         const verdict =
           rotated.certificate && info.mintPubkey
-            ? verifyCertificate(rotated.k1, info.maxWithdrawable, rotated.certificate, info.mintPubkey)
+            ? verifyCertificate(rotated.k1, noteUrl, info.maxWithdrawable, rotated.certificate, info.mintPubkey)
             : undefined
         const certificate = rotated.certificate && verdict !== 'invalid' ? rotated.certificate : undefined
 

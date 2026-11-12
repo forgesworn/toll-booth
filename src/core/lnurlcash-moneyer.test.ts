@@ -11,7 +11,7 @@ import {
   createMoneyer as createLegacyMoneyer,
   createFakeBackend as createLegacyFakeBackend,
 } from 'moneyer-legacy'
-import { buildNoteUrl, fetchPayRequest, hashK1, requestInvoice } from '@lnurlcash/kit'
+import { buildNoteUrl, fetchPayRequest, hashK1, noteCertificateKind, requestInvoice } from '@lnurlcash/kit'
 import { decodeBolt11 } from 'farrier-kit/bolt11'
 import { randomBytes } from 'node:crypto'
 import { createLnurlcashRail } from './lnurlcash-rail.js'
@@ -184,5 +184,26 @@ describe('the certificate an older mint gives on rotate', () => {
 
     const strict = createLnurlcashRail({ mints: [m.host], requireSignature: true }, memoryStorage())
     expect((await strict.verify(req(held!.url), { sats: 10 })).authenticated).toBe(true)
+  })
+})
+
+describe('the certificate a current mint gives', () => {
+  it('is bound to the domain the note URL names, on lookup and on rotate', async () => {
+    const m = await startMint('current')
+    const bought = await buyNote(m, 21_000)
+    const info = await lookupNote(bought.url, { timeoutMs: 5_000 })
+    expect(noteCertificateKind(bought.k1, bought.url, 21_000, info.certificate!, info.mintPubkey!)).toBe('current')
+
+    const presented = new URL(bought.url)
+    presented.searchParams.set('c', info.certificate!)
+    let held: ReceivedNote | undefined
+    const strict = createLnurlcashRail(
+      { mints: [m.host], requireSignature: true, onNoteReceived: (n) => { held = n } },
+      memoryStorage(),
+    )
+    const req = { method: 'GET', path: '/api', headers: { 'x-lnurlcash': presented.toString() }, ip: '127.0.0.1' }
+    expect((await strict.verify(req, { sats: 10 })).authenticated).toBe(true)
+    const c = new URL(held!.url).searchParams.get('c')!
+    expect(noteCertificateKind(held!.k1, held!.url, 21_000, c, info.mintPubkey!)).toBe('current')
   })
 })

@@ -14,7 +14,7 @@ import type { MockMint } from 'lnurlcash-conformance/mock-mint'
 import { createMockMint as createLegacyMockMint } from 'lnurlcash-conformance-0-13/mock-mint'
 import { randomBytes } from 'node:crypto'
 import { bech32m } from '@scure/base'
-import { hashK1, rotateNoteWithHashShort } from '@lnurlcash/kit'
+import { hashK1, noteCertificateKind, rotateNoteWithHashShort } from '@lnurlcash/kit'
 import { createLnurlcashRail } from './lnurlcash-rail.js'
 import { meltNoteToLightning } from './melt-note-to-lightning.js'
 import {
@@ -226,7 +226,7 @@ describe('lnurlcash compatibility', () => {
       expect(written.searchParams.get('sig')).toBeNull()
       expect(written.searchParams.get('amount')).toBeNull()
       const c = written.searchParams.get('c')!
-      expect(verifyCertificate(held!.k1, 21_000, c, (await lookupNote(held!.url, { timeoutMs: 5_000 })).mintPubkey!)).toBe('valid')
+      expect(verifyCertificate(held!.k1, held!.url, 21_000, c, (await lookupNote(held!.url, { timeoutMs: 5_000 })).mintPubkey!)).toBe('valid')
     })
 
     it('writes the payer certificate nowhere: an old mint uncertified rotate leaves amount alone', async () => {
@@ -247,7 +247,7 @@ describe('lnurlcash compatibility', () => {
       const sig = written.searchParams.get('sig')!
       expect(sig).toMatch(/^[0-9a-f]{130}$/)
       const { mintPubkey } = await lookupNote(held!.url, { timeoutMs: 5_000 })
-      expect(verifyCertificate(held!.k1, 21_000, sig, mintPubkey!)).toBe('valid')
+      expect(verifyCertificate(held!.k1, held!.url, 21_000, sig, mintPubkey!)).toBe('valid')
     })
 
     for (const [name, pick] of [
@@ -263,6 +263,71 @@ describe('lnurlcash compatibility', () => {
         expect(m.state.noteState(held!.k1)).not.toBe('outstanding')
       })
     }
+  })
+
+  describe('certificates bound to the mint domain', () => {
+    // Since luds 92abbb3 a certificate signs LNURLcash:<domain>:<amount>:<hex(Q)>,
+    // the domain being the hostname the note URL names. The 0.16 mock signs
+    // the old domain-less message until its first request tells it where it
+    // was reached, so each mint here is asked something first.
+    const warmed = async (options: Parameters<typeof createMockMint>[0]): Promise<MockMint> => {
+      const m = await createMockMint(options)
+      await lookupNote(noteOn(m, null).url, { timeoutMs: 5_000 })
+      return m
+    }
+
+    it('keeps a rotated certificate the mint bound to the note URL domain', async () => {
+      const m = await warmed({})
+      try {
+        const { url } = noteOn(m, 'c')
+        const { authenticated, held } = await settle(m, url, true)
+        expect(authenticated).toBe(true)
+        const c = new URL(held!.url).searchParams.get('c')!
+        const { mintPubkey } = await lookupNote(held!.url, { timeoutMs: 5_000 })
+        expect(noteCertificateKind(held!.k1, held!.url, 21_000, c, mintPubkey!)).toBe('current')
+        expect(verifyCertificate(held!.k1, held!.url, 21_000, c, mintPubkey!)).toBe('valid')
+      } finally {
+        await m.close()
+      }
+    })
+
+    it('refuses a certificate bound to another domain when signatures are required', async () => {
+      const m = await warmed({ domains: 'other.example' })
+      try {
+        const { url, k1, cert } = noteOn(m, 'c')
+        const { mintPubkey } = await lookupNote(url, { timeoutMs: 5_000 })
+        // The same certificate, judged against the domain it names and the
+        // one the note URL names.
+        expect(verifyCertificate(k1, 'https://other.example/w', 21_000, cert, mintPubkey!)).toBe('valid')
+        expect(verifyCertificate(k1, url, 21_000, cert, mintPubkey!)).toBe('invalid')
+
+        expect((await settle(m, url, true)).authenticated).toBe(false)
+        expect(m.state.noteState(k1)).toBe('outstanding')
+
+        // Without the requirement the mint's answer is what counts, and the
+        // rotated certificate, bound to the other domain too, is not kept.
+        const { authenticated, held } = await settle(m, url, false)
+        expect(authenticated).toBe(true)
+        const written = new URL(held!.url)
+        expect(written.searchParams.get('c')).toBeNull()
+        expect(written.searchParams.get('sig')).toBeNull()
+        expect(written.searchParams.get('amount')).toBe('21000')
+      } finally {
+        await m.close()
+      }
+    })
+
+    it('still takes a certificate over the message before the domain was bound', async () => {
+      const m = await warmed({ certificateWithoutDomain: true } as Parameters<typeof createMockMint>[0])
+      try {
+        const { url, k1, cert } = noteOn(m, 'c')
+        const { mintPubkey } = await lookupNote(url, { timeoutMs: 5_000 })
+        expect(noteCertificateKind(k1, url, 21_000, cert, mintPubkey!)).toBe('legacy')
+        expect((await settle(m, url, true)).authenticated).toBe(true)
+      } finally {
+        await m.close()
+      }
+    })
   })
 
   describe('notes stored by toll-booth 6.2.6', () => {
@@ -316,9 +381,9 @@ describe('lnurlcash compatibility', () => {
       expect(isLegacyCk1(ck1)).toBe(true)
       expect(resolveNoteInput(`https://mint.example.com/w?k1=${ck1}`)).not.toBeNull()
       // Its certificate has no offline rule here, so it decides nothing.
-      expect(verifyCertificate(ck1, 21_000, 'ab'.repeat(65), '02' + 'ab'.repeat(32))).toBe('unverifiable')
+      expect(verifyCertificate(ck1, 'https://mint.example.com', 21_000, 'ab'.repeat(65), '02' + 'ab'.repeat(32))).toBe('unverifiable')
       const cs1 = current.state.creditNote(newSecret(), 21_000)!
-      expect(verifyCertificate(ck1, 21_000, cs1, '02' + 'ab'.repeat(32))).toBe('unverifiable')
+      expect(verifyCertificate(ck1, 'https://mint.example.com', 21_000, cs1, '02' + 'ab'.repeat(32))).toBe('unverifiable')
     })
 
     it('refuses something that is no spend at all', () => {
