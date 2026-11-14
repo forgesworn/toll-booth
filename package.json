@@ -123,12 +123,12 @@
   "dependencies": {
     "@cashu/cashu-ts": "4.13.0",
     "@forgesworn/nwc-kit": "0.1.9",
+    "@forgesworn/qr": "^0.1.0",
     "@lnurlcash/kit": "0.21.2",
     "@scure/base": "2.4.0",
     "better-sqlite3": "^13.0.2",
     "farrier-kit": "1.1.3",
-    "macaroon": "^3.0.4",
-    "qrcode": "^1.5.4"
+    "macaroon": "^3.0.4"
   },
   "peerDependencies": {
     "express": "^4.0.0 || ^5.0.0",
@@ -147,7 +147,6 @@
     "@hono/node-server": "^2.0.12",
     "@types/better-sqlite3": "^9.6.0",
     "@types/express": "^5.0.6",
-    "@types/qrcode": "^1.5.6",
     "express": "^5.2.1",
     "hono": "^4.12.8",
     "lnurlcash-conformance": "0.16.2",

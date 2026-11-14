@@ -1,9 +1,9 @@
 // src/core/create-invoice.ts
 import { randomBytes } from 'node:crypto'
-import QRCode from 'qrcode'
 import type { LightningBackend, CreditTier } from '../types.js'
 import type { StorageBackend } from '../storage/interface.js'
 import { mintMacaroon } from '../macaroon.js'
+import { invoiceQrSvg } from '../qr.js'
 import { deriveIpHashKey, hashIp } from './types.js'
 import type { CreateInvoiceRequest, CreateInvoiceResult } from './types.js'
 
@@ -97,12 +97,7 @@ export async function handleCreateInvoice(
 
     deps.storage.storeInvoice(paymentHash, bolt11 ?? '', creditSats, macaroon, statusToken, ipHash)
 
-    const qrSvg = bolt11
-      ? await QRCode.toString(
-          `lightning:${bolt11}`.toUpperCase(),
-          { type: 'svg', margin: 2 },
-        )
-      : undefined
+    const qrSvg = bolt11 ? invoiceQrSvg(bolt11) : undefined
 
     return {
       success: true,

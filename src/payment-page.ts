@@ -1,5 +1,5 @@
 // src/payment-page.ts
-import QRCode from 'qrcode'
+import { invoiceQrSvg } from './qr.js'
 import type { CreditTier } from './types.js'
 import type { StoredInvoice } from './storage/interface.js'
 
@@ -19,7 +19,7 @@ export interface PaymentPageErrorData {
 
 export async function renderPaymentPage(data: PaymentPageData): Promise<string> {
   const { invoice, paid, preimage, tokenSuffix, tiers, cashuEnabled } = data
-  const qrSvg = await QRCode.toString(`lightning:${invoice.bolt11}`.toUpperCase(), { type: 'svg', margin: 2 })
+  const qrSvg = invoiceQrSvg(invoice.bolt11)
 
   return `<!DOCTYPE html>
 <html lang="en">
