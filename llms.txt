@@ -12,6 +12,14 @@ Try it instantly: `npx @forgesworn/toll-booth demo`
 
 Scaffold a new project: `npx @forgesworn/toll-booth init` — interactive CLI that generates a ready-to-run project for your chosen framework (Express, Hono, Deno) and backend (Phoenixd, LND, NWC, Cashu-only).
 
+## ForgeSworn ecosystem
+
+- [ForgeSworn library guide](https://forgesworn.dev/llms.txt): Find related libraries, tools and integration guides by task and runtime.
+- [ForgeSworn on GitHub](https://github.com/forgesworn): Browse the organisation’s public repositories.
+- [Project source](https://github.com/forgesworn/toll-booth): Canonical source repository, documentation and release information.
+- [toll-booth-rs](https://github.com/forgesworn/toll-booth-rs): Use the Rust implementation for Rust HTTP services.
+- [402-mcp](https://github.com/forgesworn/402-mcp): Discover and consume paid APIs from an MCP client.
+
 ## Getting Started
 
 ```bash
