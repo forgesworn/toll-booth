@@ -25,6 +25,7 @@ The `init` scaffolder generates a ready-to-run project for your chosen framework
 | `@forgesworn/toll-booth/backends/lnd` | `lndBackend` |
 | `@forgesworn/toll-booth/backends/cln` | `clnBackend` |
 | `@forgesworn/toll-booth/backends/lnbits` | `lnbitsBackend` |
+| `@forgesworn/toll-booth/backends/btcpay` | `btcpayBackend` |
 | `@forgesworn/toll-booth/backends/nwc` | `nwcBackend` |
 | `@forgesworn/toll-booth/storage/sqlite` | `sqliteStorage` |
 | `@forgesworn/toll-booth/storage/memory` | `memoryStorage` |
@@ -338,6 +339,24 @@ lnbitsBackend(config: LNbitsConfig): LightningBackend
 ```
 
 Works with self-hosted or hosted LNbits instances.
+
+### BTCPay Server
+
+```typescript
+import { btcpayBackend } from '@forgesworn/toll-booth/backends/btcpay'
+
+interface BTCPayConfig {
+  url: string         // e.g. "https://btcpay.example.com"
+  storeId: string     // store whose Lightning node receives payments
+  apiKey: string      // Greenfield API key for the store
+  expirySecs?: number // invoice expiry in seconds (default: 3600)
+  timeout?: number
+}
+
+btcpayBackend(config: BTCPayConfig): LightningBackend
+```
+
+Uses the store's Lightning node through the Greenfield API, including BTCPay's internal node. The API key needs `btcpay.store.cancreatelightninginvoice` and `btcpay.store.canviewlightninginvoice`; `sendPayment` (session refunds) also needs `btcpay.store.canuselightningnode`.
 
 ### NWC (Nostr Wallet Connect)
 

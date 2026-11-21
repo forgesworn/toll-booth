@@ -80,6 +80,10 @@
       "import": "./dist/backends/lnbits.js",
       "types": "./dist/backends/lnbits.d.ts"
     },
+    "./backends/btcpay": {
+      "import": "./dist/backends/btcpay.js",
+      "types": "./dist/backends/btcpay.d.ts"
+    },
     "./storage/sqlite": {
       "import": "./dist/storage/sqlite.js",
       "types": "./dist/storage/sqlite.d.ts"

@@ -84,7 +84,7 @@ The integration test script (`scripts/test-integration.sh`) handles Docker orche
 
 ## Adding a Lightning backend
 
-toll-booth ships with Phoenixd, LND, CLN, LNbits, and NWC backends. To add another:
+toll-booth ships with Phoenixd, LND, CLN, LNbits, BTCPay Server, and NWC backends. To add another:
 
 1. Create `src/backends/yourbackend.ts` implementing the `LightningBackend` interface (two methods: `createInvoice` and `checkInvoice`)
 2. Create `src/backends/yourbackend.test.ts` with unit tests mocking the HTTP layer
