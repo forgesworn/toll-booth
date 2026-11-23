@@ -121,9 +121,9 @@
     "prepare": "patch-package"
   },
   "dependencies": {
-    "@cashu/cashu-ts": "4.13.0",
+    "@cashu/cashu-ts": "4.13.1",
     "@forgesworn/nwc-kit": "0.1.9",
-    "@forgesworn/qr": "0.2.0",
+    "@forgesworn/qr": "0.3.16",
     "@lnurlcash/kit": "0.21.2",
     "@scure/base": "2.4.0",
     "better-sqlite3": "^13.0.2",
